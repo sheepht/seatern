@@ -1,0 +1,26 @@
+{
+  "name": "@seatern/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -b",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "@hono/zod-validator": "^0.5.0",
+    "@seatern/db": "*",
+    "@seatern/shared": "*",
+    "graphology": "^0.25.0",
+    "graphology-communities-louvain": "^2.0.0",
+    "hono": "^4.7.0",
+    "jose": "^6.0.0",
+    "nanoid": "^5.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0"
+  }
+}

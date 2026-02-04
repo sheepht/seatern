@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  events    Event[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Event {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  date       DateTime
+  type       EventType   @default(WEDDING)
+  guests     Guest[]
+  groups     Group[]
+  tables     Table[]
+  edges      Edge[]
+  avoidances Avoidance[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([userId])
+}
+
+enum EventType {
+  WEDDING
+  BANQUET
+  CORPORATE
+  OTHER
+}
+
+enum Side {
+  GROOM
+  BRIDE
+  MUTUAL
+}
+
+enum RsvpStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+  MODIFIED
+}
+
+model Guest {
+  id                String     @id @default(cuid())
+  eventId           String
+  event             Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name              String
+  aliases           String[]   @default([])
+  side              Side
+  relationScore     Int        @default(3)
+  rsvpStatus        RsvpStatus @default(PENDING)
+  attendeeCount     Int        @default(1)
+  plusOneName        String?
+  wantToSitWith     String[]   @default([])
+  dietaryNeeds      String[]   @default([])
+  specialNeeds      String[]   @default([])
+  satisfactionScore Float      @default(50)
+  isOverflow        Boolean    @default(false)
+  isIsolated        Boolean    @default(false)
+  formToken         String?    @unique
+
+  assignedTableId String?
+  assignedTable   Table?  @relation(fields: [assignedTableId], references: [id])
+  groups          GuestGroup[]
+  avoidances1     Avoidance[] @relation("AvoidanceGuest1")
+  avoidances2     Avoidance[] @relation("AvoidanceGuest2")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventId])
+  @@index([formToken])
+}
+
+model Group {
+  id        String       @id @default(cuid())
+  eventId   String
+  event     Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name      String
+  side      Side
+  isCustom  Boolean      @default(false)
+  members   GuestGroup[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([eventId])
+}
+
+model GuestGroup {
+  guestId String
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([guestId, groupId])
+  @@index([groupId])
+}
+
+model Table {
+  id                  String   @id @default(cuid())
+  eventId             String
+  event               Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name                String
+  capacity            Int      @default(10)
+  positionRow         Int      @default(0)
+  positionCol         Int      @default(0)
+  averageSatisfaction Float    @default(0)
+  tags                String[] @default([])
+  guests              Guest[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([eventId])
+}
+
+enum EdgeType {
+  MUTUAL
+  ONE_WAY
+  SAME_GROUP
+  INFERRED
+}
+
+model Edge {
+  id          String   @id @default(cuid())
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  fromGuestId String
+  toGuestId   String
+  weight      Float    @default(1)
+  type        EdgeType
+  createdAt   DateTime @default(now())
+
+  @@unique([eventId, fromGuestId, toGuestId])
+  @@index([eventId])
+}
+
+enum AvoidanceReason {
+  EX
+  FAMILY_CONFLICT
+  WORK_CONFLICT
+  OTHER
+}
+
+model Avoidance {
+  id       String           @id @default(cuid())
+  eventId  String
+  event    Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guestId1 String
+  guest1   Guest            @relation("AvoidanceGuest1", fields: [guestId1], references: [id], onDelete: Cascade)
+  guestId2 String
+  guest2   Guest            @relation("AvoidanceGuest2", fields: [guestId2], references: [id], onDelete: Cascade)
+  reason   AvoidanceReason?
+  note     String?
+
+  @@unique([guestId1, guestId2])
+  @@index([eventId])
+}
