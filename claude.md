@@ -634,7 +634,20 @@
 
 ## 4. 資料結構
 
-### 4.1 通訊錄（Contact）
+### 4.1 使用者（User）
+
+```typescript
+interface User {
+  id: string                      // UUID，對齊 Supabase Auth auth.users.id
+  email: string                   // 登入 email（唯一）
+  name: string                    // 顯示名稱
+  avatarUrl?: string              // 社交登入頭像
+  createdAt: string
+  updatedAt: string
+}
+```
+
+### 4.2 通訊錄（Contact）
 
 ```typescript
 interface Contact {
@@ -650,7 +663,7 @@ interface Contact {
 }
 ```
 
-### 4.2 賓客（Guest）
+### 4.3 賓客（Guest）
 
 ```typescript
 interface Guest {
@@ -676,7 +689,7 @@ interface Guest {
 }
 ```
 
-### 4.3 關係邊（Edge）
+### 4.4 關係邊（Edge）
 
 ```typescript
 interface Edge {
@@ -691,7 +704,7 @@ interface Edge {
 }
 ```
 
-### 4.4 標籤（Tag）
+### 4.5 標籤（Tag）
 
 ```typescript
 type AssignedBy = 'host' | 'guest'
@@ -709,7 +722,7 @@ interface GuestTag {
 }
 ```
 
-### 4.5 座位偏好（SeatPreference）
+### 4.6 座位偏好（SeatPreference）
 
 ```typescript
 interface SeatPreference {
@@ -719,7 +732,7 @@ interface SeatPreference {
 }
 ```
 
-### 4.6 桌次（Table）
+### 4.7 桌次（Table）
 
 ```typescript
 interface Table {
@@ -736,7 +749,7 @@ interface Table {
 }
 ```
 
-### 4.7 座位快照（SeatingSnapshot）
+### 4.8 座位快照（SeatingSnapshot）
 
 ```typescript
 interface SeatingSnapshot {

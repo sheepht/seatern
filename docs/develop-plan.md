@@ -125,8 +125,10 @@ git init && git add -A && git commit -m "Initial project setup"
 
 資料庫使用 Supabase 託管的 PostgreSQL：
 - `.env` 中的 `DATABASE_URL` 填入 Supabase 的 connection string（Project Settings → Database → Connection string → URI）
+- `.env` 同時設定 `SUPABASE_URL`、`SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`（用於 Auth 及 API 呼叫）
 - Prisma 使用 `directUrl` 連線（避免 connection pooler 的 prepared statement 問題）
 - `prisma db push` / `prisma migrate dev` 直接對 Supabase 操作
+- User.id 使用 UUID，對齊 Supabase Auth 的 `auth.users.id`
 - 不需要本地 PostgreSQL 或 Docker
 
 ## 驗證方式
