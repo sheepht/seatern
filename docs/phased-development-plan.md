@@ -150,24 +150,32 @@
    - LINE OAuth 登入
    - 需在 Supabase Dashboard 設定各 provider 的 OAuth credentials
 7. 設定 `react-router-dom` 路由：
+   - `/` — 公開 Landing page（服務介紹、功能亮點、CTA）
+   - `/demo` — 公開體驗頁（用範例資料讓訪客直接操作排位）
    - `/login` — 公開
-   - `/` → 導向 `/events`（需登入）
+   - `/register` — 公開
+   - `/events` — 需登入（登入後預設導向）
+   - `/events/:eventId` — 需登入，活動詳情（Tabs：賓客、標籤、桌次）
+   - `/events/:eventId/seating` — 需登入，排位工作區（全螢幕畫布 + 右側參考面板）
+   - `/contacts` — 需登入，通訊錄管理
+   - `/form/:token` — 公開，賓客填寫表單（無需登入）
 8. 新增 `VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY` 到 `.env`
 
 > **注意**：Email + 密碼登入為 Supabase Auth 內建功能，只需在 Dashboard 開啟即可。LINE Login 需要在 [LINE Developers Console](https://developers.line.biz/) 建立 channel。所有 provider 皆透過 Supabase Auth 統一管理，後端 JWT 驗證邏輯不受影響。
 
 **驗證方式**：
 1. `npm run dev` 啟動全端
-2. 開啟 http://localhost:5173 → 應導向 `/login`
-3. 確認登入頁顯示 Email/密碼表單及兩個 OAuth 按鈕（Google、LINE）
-4. 用 Email + 密碼註冊新帳號 → 完成後導向 `/events`
-5. 登出後用同一組 Email + 密碼登入 → 導向 `/events`
-6. 點擊「使用 Google 登入」→ 完成 OAuth 後導向 `/events`
-7. 點擊「使用 LINE 登入」→ 完成 LINE OAuth 後導向 `/events`
-8. DevTools Network 確認 API 請求帶有 `Authorization: Bearer <token>`
-9. 不帶 token 的 curl 請求 → 回傳 401
-10. Prisma Studio 確認 User 表新增了對應帳號記錄
-11. 點擊「登出」→ 導向 `/login`
+2. 開啟 http://localhost:5173 → 顯示 Landing page
+3. 點擊「體驗 Demo」→ 導向 `/demo`，可操作範例排位
+4. 點擊「登入」→ 導向 `/login`，確認顯示 Email/密碼表單及兩個 OAuth 按鈕（Google、LINE）
+5. 用 Email + 密碼註冊新帳號 → 完成後導向 `/events`
+6. 登出後用同一組 Email + 密碼登入 → 導向 `/events`
+7. 點擊「使用 Google 登入」→ 完成 OAuth 後導向 `/events`
+8. 點擊「使用 LINE 登入」→ 完成 LINE OAuth 後導向 `/events`
+9. DevTools Network 確認 API 請求帶有 `Authorization: Bearer <token>`
+10. 不帶 token 的 curl 請求 → 回傳 401
+11. Prisma Studio 確認 User 表新增了對應帳號記錄
+12. 點擊「登出」→ 導向 `/`
 
 **預期結果**：使用者可透過 Email+密碼、Google 或 LINE 登入。API 端點受 JWT 保護。前端自動附加 token。
 
