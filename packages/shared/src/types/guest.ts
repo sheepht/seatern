@@ -8,7 +8,7 @@ export interface Guest {
   contactId: string
   side?: Side
   relationScore: number
-  groups: string[]
+  tagIds: string[]
   rsvpStatus: RsvpStatus
   attendeeCount: number
   plusOneName?: string

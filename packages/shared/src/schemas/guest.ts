@@ -8,7 +8,7 @@ export const createGuestSchema = z.object({
   contactId: z.string().min(1),
   side: sideSchema.optional(),
   relationScore: z.number().int().min(1).max(5),
-  groupIds: z.array(z.string()).default([]),
+  tagIds: z.array(z.string()).default([]),
 })
 
 export const guestFormSchema = z.object({
@@ -18,4 +18,6 @@ export const guestFormSchema = z.object({
   wantToSitWith: z.array(z.string()).max(3).default([]),
   dietaryNeeds: z.array(z.string()).default([]),
   specialNeeds: z.array(z.string()).default([]),
+  addTagIds: z.array(z.string()).default([]),
+  removeTagIds: z.array(z.string()).default([]),
 })

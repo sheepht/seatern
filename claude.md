@@ -659,7 +659,7 @@ interface Guest {
   contactId: string               // 連結通訊錄（姓名、別名從 Contact 讀取）
   side?: 'groom' | 'bride' | 'mutual'  // 婚禮用，其他活動可不填
   relationScore: number           // 1-5，與新人親疏（每次活動可不同）
-  groups: string[]                // 所屬群組 ID
+  tagIds: string[]                // 所屬標籤 ID
 
   // 賓客填寫
   rsvpStatus: 'pending' | 'confirmed' | 'declined' | 'modified'
@@ -692,15 +692,21 @@ interface Edge {
 }
 ```
 
-### 4.4 群組（Group）
+### 4.4 標籤（Tag）
 
 ```typescript
-interface Group {
+type AssignedBy = 'host' | 'guest'
+
+interface Tag {
   id: string
-  name: string                    // 群組名稱
-  side: 'groom' | 'bride' | 'mutual'
-  memberIds: string[]             // 成員賓客 ID
-  isCustom: boolean               // 是否為自訂群組
+  eventId: string                 // 所屬活動
+  name: string                    // 標籤名稱
+}
+
+interface GuestTag {
+  guestId: string                 // 賓客 ID
+  tagId: string                   // 標籤 ID
+  assignedBy: AssignedBy          // 由新人或賓客指派
 }
 ```
 

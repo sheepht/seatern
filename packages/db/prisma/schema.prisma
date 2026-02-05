@@ -44,7 +44,7 @@ model Event {
   date       DateTime
   type       EventType   @default(WEDDING)
   guests     Guest[]
-  groups     Group[]
+  tags       Tag[]
   tables     Table[]
   edges      Edge[]
   avoidances Avoidance[]
@@ -95,7 +95,7 @@ model Guest {
 
   assignedTableId String?
   assignedTable   Table?  @relation(fields: [assignedTableId], references: [id])
-  groups          GuestGroup[]
+  tags            GuestTag[]
   avoidances1     Avoidance[] @relation("AvoidanceGuest1")
   avoidances2     Avoidance[] @relation("AvoidanceGuest2")
 
@@ -108,28 +108,34 @@ model Guest {
   @@index([formToken])
 }
 
-model Group {
-  id        String       @id @default(cuid())
-  eventId   String
-  event     Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  name      String
-  side      Side
-  isCustom  Boolean      @default(false)
-  members   GuestGroup[]
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+enum AssignedBy {
+  HOST
+  GUEST
+}
 
+model Tag {
+  id        String     @id @default(cuid())
+  eventId   String
+  event     Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name      String
+  guests    GuestTag[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([eventId, name])
   @@index([eventId])
 }
 
-model GuestGroup {
-  guestId String
-  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  groupId String
-  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+model GuestTag {
+  guestId    String
+  guest      Guest      @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  tagId      String
+  tag        Tag        @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  assignedBy AssignedBy @default(HOST)
+  createdAt  DateTime   @default(now())
 
-  @@id([guestId, groupId])
-  @@index([groupId])
+  @@id([guestId, tagId])
+  @@index([tagId])
 }
 
 model Table {
