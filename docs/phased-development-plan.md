@@ -185,31 +185,32 @@
 3. 建立 `src/stores/auth.ts`（Zustand：user、session、isLoading、signIn/Out）
 4. 建立 `src/providers/AuthProvider.tsx`（監聽 auth state 變化）
 5. 建立 `src/lib/api.ts`（Axios instance + token interceptor）
-6. 建立 `src/pages/LoginPage.tsx`（多種 OAuth 登入按鈕）：
-   - Google 登入
-   - LINE 登入
-   - Apple 登入
+6. 建立 `src/pages/LoginPage.tsx`（登入頁面）：
+   - Email + 密碼登入 / 註冊（Supabase Auth 內建）
+   - Google OAuth 登入
+   - LINE OAuth 登入
    - 需在 Supabase Dashboard 設定各 provider 的 OAuth credentials
 7. 設定 `react-router-dom` 路由：
    - `/login` — 公開
    - `/` → 導向 `/events`（需登入）
 8. 新增 `VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY` 到 `.env`
 
-> **注意**：LINE Login 需要在 [LINE Developers Console](https://developers.line.biz/) 建立 channel，Apple Sign In 需要在 [Apple Developer](https://developer.apple.com/) 設定 Service ID。三個 provider 皆透過 Supabase Auth 統一管理，後端 JWT 驗證邏輯不受影響。
+> **注意**：Email + 密碼登入為 Supabase Auth 內建功能，只需在 Dashboard 開啟即可。LINE Login 需要在 [LINE Developers Console](https://developers.line.biz/) 建立 channel。所有 provider 皆透過 Supabase Auth 統一管理，後端 JWT 驗證邏輯不受影響。
 
 **驗證方式**：
 1. `npm run dev` 啟動全端
 2. 開啟 http://localhost:5173 → 應導向 `/login`
-3. 確認登入頁顯示三個登入按鈕：Google、LINE、Apple
-4. 點擊「使用 Google 登入」→ 完成 OAuth 後導向 `/events`
-5. 點擊「使用 LINE 登入」→ 完成 LINE OAuth 後導向 `/events`
-6. 點擊「使用 Apple 登入」→ 完成 Apple OAuth 後導向 `/events`
-7. DevTools Network 確認 API 請求帶有 `Authorization: Bearer <token>`
-8. 不帶 token 的 curl 請求 → 回傳 401
-9. Prisma Studio 確認 User 表新增了對應帳號記錄
-10. 點擊「登出」→ 導向 `/login`
+3. 確認登入頁顯示 Email/密碼表單及兩個 OAuth 按鈕（Google、LINE）
+4. 用 Email + 密碼註冊新帳號 → 完成後導向 `/events`
+5. 登出後用同一組 Email + 密碼登入 → 導向 `/events`
+6. 點擊「使用 Google 登入」→ 完成 OAuth 後導向 `/events`
+7. 點擊「使用 LINE 登入」→ 完成 LINE OAuth 後導向 `/events`
+8. DevTools Network 確認 API 請求帶有 `Authorization: Bearer <token>`
+9. 不帶 token 的 curl 請求 → 回傳 401
+10. Prisma Studio 確認 User 表新增了對應帳號記錄
+11. 點擊「登出」→ 導向 `/login`
 
-**預期結果**：使用者可透過 Google、LINE 或 Apple OAuth 登入。API 端點受 JWT 保護。前端自動附加 token。
+**預期結果**：使用者可透過 Email+密碼、Google 或 LINE 登入。API 端點受 JWT 保護。前端自動附加 token。
 
 ---
 
