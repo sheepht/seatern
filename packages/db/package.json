@@ -23,6 +23,7 @@
     "@prisma/client": "^6.4.0"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.2.0",
     "prisma": "^6.4.0",
     "tsx": "^4.0.0"
   }

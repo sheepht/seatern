@@ -93,32 +93,37 @@
 
 ## 階段 1：資料庫基礎與種子資料
 
-**目標**：推送 Prisma schema 到 PostgreSQL，建立開發用種子資料
+**目標**：推送 Prisma schema 到 PostgreSQL，建立兩個完整場景的種子資料
 
 **涉及套件**：`packages/db`
 
 **具體任務**：
-1. 設定 `.env` 檔案（從 `.env.example` 填入實際 Supabase 憑證）
+1. 設定 `.env` 檔案（DATABASE_URL 指向 PostgreSQL）
 2. 執行 `npm run db:push` 將 schema 同步到資料庫
-3. 建立 `packages/db/prisma/seed.ts`：
-   - 1 位 User（新人帳號）
-   - 8-10 位 Contact（含別名，如：主名「陳志明」、別名「小明、阿明、David」）
-   - 1 個 Event（婚禮類型）
-   - 8-10 位 Guest（不同 category、relationScore、rsvpStatus、部分含 infantCount）
-   - 3-4 個 Tag（大學同學、公司同事、家人、高中同學）
-   - GuestTag 關聯資料
-   - 2-3 筆 SeatPreference
-   - 2 張 Table（不同容量與位置）
-   - 數筆 Edge 記錄
-4. 執行 `npm run db:seed` 驗證
+3. 建立 `packages/db/prisma/seed.ts` 及 `seed/` 模組，使用 `@faker-js/faker`（zh_TW locale）產生兩個場景：
+   - **場景 A — 婚禮**（User A: `wedding@example.com`）
+     - 145 位 Contact / Guest（繁體中文姓名 + 別名）
+     - 1 個 Event（WEDDING, categories: 男方/女方/共同）
+     - 10 個 Tag（男方家人、女方家人、大學同學、高中同學、男方公司同事、女方公司同事、教會朋友、社團朋友、鄰居長輩、共同朋友）
+     - 15 張 Table（5×3 網格, capacity=10）
+     - ~1,300 Edges + ~200 SeatPreferences
+     - 滿意度依 PRD 公式計算（平均 ~74）
+   - **場景 B — 公司尾牙**（User B: `corporate@example.com`）
+     - 402 位 Contact / Guest
+     - 1 個 Event（CORPORATE, categories: 研發部/業務部/行銷部/人資部/財務部/管理層）
+     - 8 個 Tag（新人、資深員工、主管、特約人員、眷屬、VIP、表演者、素食）
+     - 40 張 Table（8×5 網格, capacity=10）
+     - ~5,700 Edges + ~470 SeatPreferences
+     - 滿意度依 PRD 公式計算（平均 ~62，因溢出多故較低）
+4. 執行 `npm run db:seed` 驗證（支援重複執行，先 deleteMany 再重建）
 
 **驗證方式**：
-1. `npm run db:push -w packages/db` → 輸出 "Your database is now in sync"
-2. `npm run db:seed -w packages/db` → 無錯誤完成
-3. `npx prisma studio --schema packages/db/prisma/schema.prisma` → 開啟 http://localhost:5555，確認各表資料筆數正確
-4. 點擊 Guest 記錄，確認 contact 關聯顯示正確姓名
+1. `npm run db:push` → 輸出 "Your database is now in sync"
+2. `npm run db:seed` → 無錯誤完成，console 顯示各步驟進度與統計
+3. `npx prisma studio --schema packages/db/prisma/schema.prisma` → 確認：User 2 筆、Contact 547 筆、Event 2 筆、Guest 547 筆、Table 55 筆、Edge ~7,000 筆
+4. 重跑 `npm run db:seed` → 結果一致（idempotent）
 
-**預期結果**：資料庫在 Supabase 上運行，含完整種子資料。Prisma Studio 可瀏覽所有表。
+**預期結果**：資料庫含兩個完整場景的種子資料，滿意度分數依 PRD 公式計算，可供後續 Phase 開發使用。
 
 ---
 
