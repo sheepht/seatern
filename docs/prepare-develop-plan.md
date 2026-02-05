@@ -113,12 +113,12 @@ git init && git add -A && git commit -m "Initial project setup"
 
 10 個 models 對應 PRD 資料結構：
 - `User` / `Event` — 多租戶基礎
-- `Contact` — 持久通訊錄，跨活動共用（姓名、別名、聯絡方式）
-- `Guest` — 活動出席紀錄，透過 `contactId` 連結通訊錄，含 `formToken` 做賓客專屬連結
+- `Contact` — 持久通訊錄，跨活動共用（姓名、別名、email、phone）
+- `Guest` — 活動出席紀錄，透過 `contactId` 連結通訊錄，含 `formToken` 做賓客專屬連結、`dietaryNote`/`specialNote` 備註
 - `Tag` + `GuestTag` (join table) — 多對多標籤，含 `assignedBy`（HOST / GUEST）
 - `SeatPreference` — 賓客想同桌偏好（最多 3 位，帶 rank），雙向 FK 到 Guest
 - `SeatingSnapshot` — 座位快照（每活動最多一份），Json 儲存完整排位，支援一鍵回復
-- `Table` — 含 `positionRow`/`positionCol` 做鄰桌計算
+- `Table` — 含 `positionX`/`positionY` 做鄰桌計算（自由座標）、`color`、`note`
 - `Edge` — 關係邊，unique constraint `[eventId, fromGuestId, toGuestId]`
 
 ## Supabase (PostgreSQL) 注意事項

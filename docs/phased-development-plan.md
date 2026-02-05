@@ -48,16 +48,26 @@
    - 還原時同時還原「誰坐哪桌」和「桌子怎麼排」
    - data 格式：`{ guests: [{guestId, tableId, satisfactionScore, isOverflow}], tables: [{tableId, name, positionX, positionY, capacity}] }`
 
-7. **需求分計算調整**
-   - 需求是否「被滿足」改為主端手動勾選確認
-   - Guest 新增 `needsMet: Boolean @default(false)`
-   - 主端在確認安排好飲食/嬰兒座等需求後勾選
+7. **Guest 飲食/特殊需求簡化**
+   - 移除 `dietaryNeeds: String[]` 和 `specialNeeds: String[]`（陣列欄位）
+   - 改為 `dietaryNote: String?` 和 `specialNote: String?`（自由文字備註）
+   - 需求分固定 +5，不再區分「是否被滿足」
 
-8. **同步更新 TypeScript 型別與 Zod schemas**
-   - `packages/shared/src/types/guest.ts` — 移除 `Side` type，`side` → `category: string?`，新增 `infantCount`、`needsMet`，移除 `plusOneName`
+8. **Contact 模型精簡**
+   - 移除 `dietaryNeeds`、`specialNeeds`、`tags` 欄位
+   - Contact 只保留聯絡資訊（姓名、別名、email、phone）
+   - 飲食/特殊需求為每次活動不同，由 Guest 記錄
+
+9. **Table 模型精簡**
+   - 移除 `tags: String[]` 欄位
+   - 桌次標註改用 `color` 和 `note` 欄位即可
+
+10. **同步更新 TypeScript 型別與 Zod schemas**
+   - `packages/shared/src/types/guest.ts` — 移除 `Side` type，`side` → `category: string?`，新增 `infantCount`，移除 `plusOneName`、`dietaryNeeds[]`、`specialNeeds[]`、`needsMet`，新增 `dietaryNote?`、`specialNote?`
+   - `packages/shared/src/types/contact.ts` — 移除 `dietaryNeeds`、`specialNeeds`、`tags`
    - `packages/shared/src/types/event.ts` — 新增 `categories: string[]`
    - `packages/shared/src/types/tag.ts` — 新增 `category?: string`
-   - `packages/shared/src/types/table.ts` — `positionRow/Col` → `positionX/Y: number`
+   - `packages/shared/src/types/table.ts` — `positionRow/Col` → `positionX/Y: number`，移除 `tags`
    - 對應 Zod schemas 更新
 
 **涉及檔案**：
@@ -375,8 +385,7 @@
      - **偏好分** (0-25)：想同桌的人配對成功數
        - 3/3 → +25 | 2/3 → +18 | 1/3 → +10 | 0 但鄰桌有 → +5 | 無 → +0
        - 鄰桌判定：兩桌歐幾里得距離 ≤ 門檻值（根據 positionX/Y 計算）
-     - **需求分** (0-5)：
-       - 無需求或 `needsMet=true` → +5 | 有需求且 `needsMet=false` → +0
+     - **需求分**：固定 +5（飲食/特殊需求以備註記錄，不影響分數）
    - `calculateTableSatisfaction()` — 桌次賓客平均
    - `calculateEventSatisfaction()` — 全場已指派賓客平均
 2. `POST /api/events/:eventId/recalculate` — 重算所有分數，更新 Guest 和 Table 記錄
@@ -390,13 +399,13 @@
    - 基礎：50
    - 群組：+X（「同桌 3/8 人共享標籤 '大學同學'」）
    - 偏好：+X（「2 位想同桌的人在此桌：陳XX、王XX」）
-   - 需求：+X
+   - 需求：+5
    - 總計：XX
 
 **驗證方式**：
 1. 將 3-4 位同標籤賓客指派到同桌 → 確認滿意度 > 50（有群組加分）
 2. 將賓客移離想同桌的人 → 確認分數下降
-3. 點擊賓客 → 確認顯示分數明細（基礎 50 + 群組 +X + 偏好 +X + 需求 +X）
+3. 點擊賓客 → 確認顯示分數明細（基礎 50 + 群組 +X + 偏好 +X + 需求 +5）
 4. 3 位想同桌的人全在同桌 → 確認偏好分為 +25
 5. 無同標籤、無偏好配對的賓客 → 確認分數為 55（50 + 0 + 0 + 5）
 6. 統計列顯示正確的全場平均和四色分佈
@@ -582,4 +591,5 @@
 |-----|------|---------|
 | 1.0 | 2026-02-05 | 初版建立 |
 | 1.1 | 2026-02-05 | 新增階段 0 (Schema 變更)：side→category、Tag 加 category 欄位、Event 加 categories；登入新增 LINE/Apple OAuth |
-| 1.2 | 2026-02-05 | 階段 0 新增：Guest 眷屬欄位（infantCount）、移除 plusOneName、Table 位置改為 positionX/Y 自由座標、SeatingSnapshot 含桌次位置、需求分改用 needsMet 手動勾選 |
+| 1.2 | 2026-02-05 | 階段 0 新增：Guest 眷屬欄位（infantCount）、移除 plusOneName、Table 位置改為 positionX/Y 自由座標、SeatingSnapshot 含桌次位置 |
+| 1.3 | 2026-02-05 | Schema 精簡：Contact 移除 dietaryNeeds/specialNeeds/tags、Guest 移除 dietaryNeeds[]/specialNeeds[]/needsMet 改用 dietaryNote/specialNote (String?)、Table 移除 tags、需求分固定 +5 |
