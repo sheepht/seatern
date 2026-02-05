@@ -1,7 +1,7 @@
 # 婚禮座位安排系統 PRD
 
 > Product Requirements Document  
-> 版本：1.0  
+> 版本：1.1
 > 日期：2026-02-05
 
 ---
@@ -124,9 +124,9 @@
 |-----|------|-----|
 | 主要姓名 | ✓ | 正式顯示名稱 |
 | 別名/暱稱 | | 支援多個，用於賓客搜尋配對 |
-| 來源 | ✓ | 男方 / 女方 / 共同 |
-| 關係分數 | ✓ | 1-5 分，代表與新人親疏程度 |
-| 所屬群組 | | 可複選：大學同學、公司同事、家人、自訂... |
+| 分類（category） | | 主分類，由活動定義可用選項（如婚禮：男方/女方/共同） |
+| 關係分數 | ✓ | 1-5 分，代表與主辦人親疏程度 |
+| 所屬標籤 | | 可複選：大學同學、公司同事、家人、自訂...（可綁定分類） |
 | 避免同桌 | | 新人標記，賓客不可見 |
 
 #### 3.1.2 別名設計目的
@@ -164,10 +164,10 @@
 
 | 欄位 | 必填 | 說明 |
 |-----|------|-----|
-| 確認出席 | ✓ | 是 / 否 / 待定 |
-| 出席人數 | ✓ | 包含 +1 及小孩 |
-| 攜伴姓名 | | 若有 +1 填寫 |
-| 想同桌的人 | | 最多選 3 位，從名單選或手打 |
+| 確認出席 | ✓ | 確認 / 婉拒 |
+| 成人人數 | ✓ | 出席成人數（含本人，預設 1） |
+| 嬰兒人數 | | 需要嬰兒椅的數量（預設 0） |
+| 想同桌的人 | | 最多選 3 位，可排優先順序 |
 | 飲食需求 | | 素食 / 過敏 / 不吃牛 / 其他 |
 | 特殊需求 | | 輪椅 / 兒童椅 / 靠近出口 / 其他 |
 
@@ -647,7 +647,22 @@ interface User {
 }
 ```
 
-### 4.2 通訊錄（Contact）
+### 4.2 活動（Event）
+
+```typescript
+type EventType = 'wedding' | 'banquet' | 'corporate' | 'other'
+
+interface Event {
+  id: string
+  userId: string                  // 建立者
+  name: string                    // 活動名稱
+  date: string                    // 活動日期
+  type: EventType                 // 活動類型（預設 wedding）
+  categories: string[]            // 可用的分類選項（如婚禮：['男方', '女方', '共同']）
+}
+```
+
+### 4.3 通訊錄（Contact）
 
 ```typescript
 interface Contact {
@@ -663,33 +678,34 @@ interface Contact {
 }
 ```
 
-### 4.3 賓客（Guest）
+### 4.4 賓客（Guest）
 
 ```typescript
 interface Guest {
   id: string
   eventId: string                 // 所屬活動
   contactId: string               // 連結通訊錄（姓名、別名從 Contact 讀取）
-  side?: 'groom' | 'bride' | 'mutual'  // 婚禮用，其他活動可不填
-  relationScore: number           // 1-5，與新人親疏（每次活動可不同）
+  category?: string               // 主分類（婚禮：男方/女方/共同；企業：部門名等）
+  relationScore: number           // 1-5，與主辦人親疏（每次活動可不同）
   tagIds: string[]                // 所屬標籤 ID
 
   // 賓客填寫
   rsvpStatus: 'pending' | 'confirmed' | 'declined' | 'modified'
-  attendeeCount: number           // 出席人數（含本人）
-  plusOneName?: string            // +1 姓名
+  attendeeCount: number           // 成人出席人數（含本人，預設 1）
+  infantCount: number             // 嬰兒人數（預設 0）
   dietaryNeeds?: string[]         // 飲食需求（可覆寫 Contact 預設）
   specialNeeds?: string[]         // 特殊需求（可覆寫 Contact 預設）
 
-  // 系統計算
+  // 系統計算 / 主辦人操作
+  needsMet: boolean               // 需求是否已被滿足（主辦人手動標記）
   satisfactionScore: number       // 滿意度分數
-  assignedTable?: string          // 分配的桌次 ID
+  assignedTableId?: string        // 分配的桌次 ID
   isOverflow: boolean             // 是否為溢出安排
   isIsolated: boolean             // 是否為孤立賓客
 }
 ```
 
-### 4.4 關係邊（Edge）
+### 4.5 關係邊（Edge）
 
 ```typescript
 interface Edge {
@@ -704,7 +720,7 @@ interface Edge {
 }
 ```
 
-### 4.5 標籤（Tag）
+### 4.6 標籤（Tag）
 
 ```typescript
 type AssignedBy = 'host' | 'guest'
@@ -713,6 +729,7 @@ interface Tag {
   id: string
   eventId: string                 // 所屬活動
   name: string                    // 標籤名稱
+  category?: string               // 綁定特定分類（如「男方大學」只出現在男方）
 }
 
 interface GuestTag {
@@ -722,7 +739,7 @@ interface GuestTag {
 }
 ```
 
-### 4.6 座位偏好（SeatPreference）
+### 4.7 座位偏好（SeatPreference）
 
 ```typescript
 interface SeatPreference {
@@ -732,31 +749,35 @@ interface SeatPreference {
 }
 ```
 
-### 4.7 桌次（Table）
+### 4.8 桌次（Table）
 
 ```typescript
 interface Table {
   id: string
+  eventId: string                 // 所屬活動
   name: string                    // 桌名（可自訂）
-  capacity: number                // 容量上限
+  capacity: number                // 容量上限（預設 10）
   guestIds: string[]              // 已安排的賓客 ID
-  position: {                     // 實體位置（用於鄰桌計算）
-    row: number
-    col: number
-  }
+  positionX: number               // 畫布 X 座標（自由拖曳定位）
+  positionY: number               // 畫布 Y 座標（歐幾里德距離算鄰桌）
   averageSatisfaction: number     // 平均滿意度
   tags: string[]                  // 標籤：主桌、素食桌、靠出口...
+  color?: string                  // 桌次顏色
+  note?: string                   // 備註
 }
 ```
 
-### 4.8 座位快照（SeatingSnapshot）
+### 4.9 座位快照（SeatingSnapshot）
 
 ```typescript
 interface SeatingSnapshot {
   id: string
   eventId: string                 // 所屬活動（每活動最多一份）
   name: string                    // 快照名稱
-  data: json                      // [{ guestId, tableId, satisfactionScore, isOverflow }]
+  data: {                         // 快照資料
+    guests: Array<{ guestId: string, tableId: string, satisfactionScore: number, isOverflow: boolean }>
+    tables: Array<{ tableId: string, positionX: number, positionY: number }>
+  }
   averageSatisfaction: number     // 快照時的全場平均滿意度
 }
 ```
@@ -883,3 +904,4 @@ interface SeatingSnapshot {
 | 版本 | 日期 | 變更內容 |
 |-----|------|---------|
 | 1.0 | 2026-02-05 | 初版建立 |
+| 1.1 | 2026-02-05 | Phase 0 schema 更新：side→category、移除 plusOneName 改用 attendeeCount+infantCount、新增 needsMet、Table 改用 positionX/Y+color+note、Tag 新增 category、Event 新增 categories、SeatingSnapshot data 含桌次位置 |
