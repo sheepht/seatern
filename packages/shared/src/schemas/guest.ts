@@ -17,8 +17,8 @@ export const guestFormSchema = z.object({
     preferredId: z.string(),
     rank: z.number().int().min(1).max(3),
   })).max(3).default([]),
-  dietaryNeeds: z.array(z.string()).default([]),
-  specialNeeds: z.array(z.string()).default([]),
+  dietaryNote: z.string().optional(),
+  specialNote: z.string().optional(),
   addTagIds: z.array(z.string()).default([]),
   removeTagIds: z.array(z.string()).default([]),
 })

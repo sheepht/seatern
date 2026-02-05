@@ -10,9 +10,8 @@ export interface Guest {
   rsvpStatus: RsvpStatus
   attendeeCount: number
   infantCount: number
-  dietaryNeeds?: string[]
-  specialNeeds?: string[]
-  needsMet: boolean
+  dietaryNote?: string
+  specialNote?: string
   satisfactionScore: number
   assignedTableId?: string
   isOverflow: boolean

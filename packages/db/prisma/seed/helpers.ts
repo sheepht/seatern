@@ -74,16 +74,16 @@ export function randomRsvpStatus(): 'CONFIRMED' | 'PENDING' | 'DECLINED' | 'MODI
   return 'MODIFIED'
 }
 
-// ─── 飲食/特殊需求 ───
+// ─── 飲食/特殊需求備註 ───
 
-export function randomDietaryNeeds(): string[] {
-  if (faker.number.float({ min: 0, max: 1 }) > 0.15) return []
-  return faker.helpers.arrayElements(DIETARY_OPTIONS, { min: 1, max: 2 })
+export function randomDietaryNote(): string | undefined {
+  if (faker.number.float({ min: 0, max: 1 }) > 0.15) return undefined
+  return faker.helpers.arrayElement(DIETARY_OPTIONS)
 }
 
-export function randomSpecialNeeds(): string[] {
-  if (faker.number.float({ min: 0, max: 1 }) > 0.08) return []
-  return faker.helpers.arrayElements(SPECIAL_NEEDS_OPTIONS, { min: 1, max: 1 })
+export function randomSpecialNote(): string | undefined {
+  if (faker.number.float({ min: 0, max: 1 }) > 0.08) return undefined
+  return faker.helpers.arrayElement(SPECIAL_NEEDS_OPTIONS)
 }
 
 // ─── 滿意度計算（依 PRD 公式）───
@@ -97,10 +97,6 @@ export interface SatisfactionInput {
   totalPreferences: number
   /** 偏好在鄰桌 */
   preferenceNearby: boolean
-  /** 有特殊需求 */
-  hasSpecialNeeds: boolean
-  /** 需求是否被滿足 */
-  needsMet: boolean
 }
 
 export function computeSatisfaction(input: SatisfactionInput): number {
@@ -120,10 +116,8 @@ export function computeSatisfaction(input: SatisfactionInput): number {
     else if (input.preferenceNearby) score += 5
   }
 
-  // 需求分 (0-5)
-  if (!input.hasSpecialNeeds || input.needsMet) {
-    score += 5
-  }
+  // 需求分：一律 +5
+  score += 5
 
   return score
 }

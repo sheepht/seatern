@@ -5,8 +5,8 @@ import {
   generateChineseName,
   generateTablePositions,
   randomRsvpStatus,
-  randomDietaryNeeds,
-  randomSpecialNeeds,
+  randomDietaryNote,
+  randomSpecialNote,
   computeSatisfaction,
   weightedCategory,
   faker,
@@ -35,8 +35,6 @@ export async function seedCorporate(prisma: PrismaClient) {
     const created = await prisma.$transaction(
       batch.map(() => {
         const { name, aliases } = generateChineseName()
-        const dietary = randomDietaryNeeds()
-        const special = randomSpecialNeeds()
         return prisma.contact.create({
           data: {
             userId: user.id,
@@ -44,8 +42,6 @@ export async function seedCorporate(prisma: PrismaClient) {
             aliases,
             email: faker.internet.email(),
             phone: faker.phone.number({ style: 'national' }),
-            dietaryNeeds: dietary,
-            specialNeeds: special,
           },
           select: { id: true, name: true, aliases: true },
         })
@@ -118,8 +114,8 @@ export async function seedCorporate(prisma: PrismaClient) {
               ])
               : 1,
             infantCount: faker.number.float({ min: 0, max: 1 }) < 0.03 ? 1 : 0,
-            dietaryNeeds: randomDietaryNeeds(),
-            specialNeeds: randomSpecialNeeds(),
+            dietaryNote: randomDietaryNote(),
+            specialNote: randomSpecialNote(),
             formToken: crypto.randomUUID(),
           },
           select: { id: true, contactId: true, category: true },
@@ -373,18 +369,12 @@ async function computeAndUpdateSatisfaction(
       .map(d => d.id)
   }
 
-  const guestsWithNeeds = await prisma.guest.findMany({
-    where: { eventId },
-    select: { id: true, specialNeeds: true, needsMet: true },
-  })
-  const needsMap = new Map(guestsWithNeeds.map(g => [g.id, { specialNeeds: g.specialNeeds, needsMet: g.needsMet }]))
-
-  const updates: Array<{ id: string; score: number; needsMet: boolean }> = []
+  const updates: Array<{ id: string; score: number }> = []
 
   for (const guest of guestRecords) {
     const tableId = guestToTable.get(guest.id)
     if (!tableId) {
-      updates.push({ id: guest.id, score: 50, needsMet: false })
+      updates.push({ id: guest.id, score: 55 }) // 基礎分 50 + 需求分 5
       continue
     }
 
@@ -417,20 +407,14 @@ async function computeAndUpdateSatisfaction(
       else if (adjacentGuests.has(prefId)) preferenceNearby = true
     }
 
-    const needs = needsMap.get(guest.id)
-    const hasSpecialNeeds = (needs?.specialNeeds?.length ?? 0) > 0
-    const met = hasSpecialNeeds ? Math.random() < 0.7 : false
-
     const score = computeSatisfaction({
       sameTagRatio,
       preferenceMatches,
       totalPreferences: prefs.length,
       preferenceNearby,
-      hasSpecialNeeds,
-      needsMet: met || !hasSpecialNeeds,
     })
 
-    updates.push({ id: guest.id, score, needsMet: met })
+    updates.push({ id: guest.id, score })
   }
 
   for (const batch of chunk(updates, 50)) {
@@ -438,7 +422,7 @@ async function computeAndUpdateSatisfaction(
       batch.map(u =>
         prisma.guest.update({
           where: { id: u.id },
-          data: { satisfactionScore: u.score, needsMet: u.needsMet },
+          data: { satisfactionScore: u.score },
         }),
       ),
     )

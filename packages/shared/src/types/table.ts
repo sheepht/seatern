@@ -7,7 +7,6 @@ export interface Table {
   positionX: number
   positionY: number
   averageSatisfaction: number
-  tags: string[]
   color?: string
   note?: string
 }

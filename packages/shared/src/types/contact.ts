@@ -5,9 +5,6 @@ export interface Contact {
   aliases: string[]
   email?: string
   phone?: string
-  dietaryNeeds: string[]
-  specialNeeds: string[]
-  tags: string[]
   createdAt: string
   updatedAt: string
 }

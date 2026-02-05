@@ -27,9 +27,6 @@ model Contact {
   aliases      String[] @default([])
   email        String?
   phone        String?
-  dietaryNeeds String[] @default([])
-  specialNeeds String[] @default([])
-  tags         String[] @default([])
   guests       Guest[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -81,9 +78,8 @@ model Guest {
   rsvpStatus        RsvpStatus @default(PENDING)
   attendeeCount     Int        @default(1)
   infantCount       Int        @default(0)
-  dietaryNeeds      String[]   @default([])
-  specialNeeds      String[]   @default([])
-  needsMet          Boolean    @default(false)
+  dietaryNote       String?
+  specialNote       String?
   satisfactionScore Float      @default(50)
   isOverflow        Boolean    @default(false)
   isIsolated        Boolean    @default(false)
@@ -154,7 +150,6 @@ model Table {
   positionX           Float    @default(0)
   positionY           Float    @default(0)
   averageSatisfaction Float    @default(0)
-  tags                String[] @default([])
   color               String?
   note                String?
   guests              Guest[]

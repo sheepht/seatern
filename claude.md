@@ -1,7 +1,7 @@
 # 婚禮座位安排系統 PRD
 
 > Product Requirements Document  
-> 版本：1.1
+> 版本：1.2
 > 日期：2026-02-05
 
 ---
@@ -296,13 +296,9 @@
 | 0 位在同桌，但有人在鄰桌 | +5 |
 | 完全沒配到 | +0 |
 
-#### 3.4.4 需求分（最高 +5 分）
+#### 3.4.4 需求分（固定 +5 分）
 
-| 條件 | 加分 |
-|-----|------|
-| 有特殊需求且被滿足 | +5 |
-| 有特殊需求但沒被滿足 | +0 |
-| 沒有特殊需求 | +5（不懲罰） |
+所有賓客一律 +5 分。飲食與特殊需求以備註欄記錄，供主辦人參考，不影響滿意度計算。
 
 #### 3.4.5 分數解讀
 
@@ -672,9 +668,6 @@ interface Contact {
   aliases: string[]               // 別名列表
   email?: string                  // 聯絡 email（發送表單用）
   phone?: string                  // 電話
-  dietaryNeeds: string[]          // 飲食需求（持久預設值）
-  specialNeeds: string[]          // 特殊需求（持久預設值）
-  tags: string[]                  // 持久標籤（如部門、關係分類）
 }
 ```
 
@@ -693,11 +686,10 @@ interface Guest {
   rsvpStatus: 'pending' | 'confirmed' | 'declined' | 'modified'
   attendeeCount: number           // 成人出席人數（含本人，預設 1）
   infantCount: number             // 嬰兒人數（預設 0）
-  dietaryNeeds?: string[]         // 飲食需求（可覆寫 Contact 預設）
-  specialNeeds?: string[]         // 特殊需求（可覆寫 Contact 預設）
+  dietaryNote?: string            // 飲食需求備註（素食、過敏等）
+  specialNote?: string            // 特殊需求備註（輪椅、兒童椅等）
 
-  // 系統計算 / 主辦人操作
-  needsMet: boolean               // 需求是否已被滿足（主辦人手動標記）
+  // 系統計算
   satisfactionScore: number       // 滿意度分數
   assignedTableId?: string        // 分配的桌次 ID
   isOverflow: boolean             // 是否為溢出安排
@@ -761,7 +753,6 @@ interface Table {
   positionX: number               // 畫布 X 座標（自由拖曳定位）
   positionY: number               // 畫布 Y 座標（歐幾里德距離算鄰桌）
   averageSatisfaction: number     // 平均滿意度
-  tags: string[]                  // 標籤：主桌、素食桌、靠出口...
   color?: string                  // 桌次顏色
   note?: string                   // 備註
 }
@@ -893,8 +884,7 @@ interface SeatingSnapshot {
   完全沒有   → +0
 
 需求分：
-  滿足或無需求 → +5
-  未滿足       → +0
+  一律 +5（備註欄記錄，不影響分數）
 ```
 
 ---
@@ -905,3 +895,4 @@ interface SeatingSnapshot {
 |-----|------|---------|
 | 1.0 | 2026-02-05 | 初版建立 |
 | 1.1 | 2026-02-05 | Phase 0 schema 更新：side→category、移除 plusOneName 改用 attendeeCount+infantCount、新增 needsMet、Table 改用 positionX/Y+color+note、Tag 新增 category、Event 新增 categories、SeatingSnapshot data 含桌次位置 |
+| 1.2 | 2026-02-05 | Schema 精簡：Contact 移除 dietaryNeeds/specialNeeds/tags、Guest 移除 dietaryNeeds[]/specialNeeds[]/needsMet 改用 dietaryNote/specialNote (String?)、Table 移除 tags、需求分固定 +5 |
