@@ -1,15 +1,13 @@
-export interface TablePosition {
-  row: number
-  col: number
-}
-
 export interface Table {
   id: string
   eventId: string
   name: string
   capacity: number
   guestIds: string[]
-  position: TablePosition
+  positionX: number
+  positionY: number
   averageSatisfaction: number
   tags: string[]
+  color?: string
+  note?: string
 }

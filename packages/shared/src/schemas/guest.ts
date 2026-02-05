@@ -1,12 +1,10 @@
 import { z } from 'zod'
 
-export const sideSchema = z.enum(['groom', 'bride', 'mutual'])
-
 export const rsvpStatusSchema = z.enum(['pending', 'confirmed', 'declined', 'modified'])
 
 export const createGuestSchema = z.object({
   contactId: z.string().min(1),
-  side: sideSchema.optional(),
+  category: z.string().optional(),
   relationScore: z.number().int().min(1).max(5),
   tagIds: z.array(z.string()).default([]),
 })
@@ -14,7 +12,7 @@ export const createGuestSchema = z.object({
 export const guestFormSchema = z.object({
   rsvpStatus: z.enum(['confirmed', 'declined']),
   attendeeCount: z.number().int().min(1).max(10),
-  plusOneName: z.string().optional(),
+  infantCount: z.number().int().min(0).max(5).default(0),
   seatPreferences: z.array(z.object({
     preferredId: z.string(),
     rank: z.number().int().min(1).max(3),

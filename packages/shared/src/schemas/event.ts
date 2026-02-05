@@ -6,4 +6,5 @@ export const createEventSchema = z.object({
   name: z.string().min(1),
   date: z.string().datetime(),
   type: eventTypeSchema.default('wedding'),
+  categories: z.array(z.string()).default([]),
 })

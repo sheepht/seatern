@@ -6,6 +6,7 @@ export interface Event {
   name: string
   date: string
   type: EventType
+  categories: string[]
   createdAt: string
   updatedAt: string
 }

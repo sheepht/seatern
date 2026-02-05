@@ -4,6 +4,7 @@ export interface Tag {
   id: string
   eventId: string
   name: string
+  category?: string
 }
 
 export interface GuestTag {

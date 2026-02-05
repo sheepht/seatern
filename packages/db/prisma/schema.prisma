@@ -44,6 +44,7 @@ model Event {
   name       String
   date       DateTime
   type       EventType   @default(WEDDING)
+  categories String[]    @default([])
   guests          Guest[]
   tags            Tag[]
   tables          Table[]
@@ -62,12 +63,6 @@ enum EventType {
   OTHER
 }
 
-enum Side {
-  GROOM
-  BRIDE
-  MUTUAL
-}
-
 enum RsvpStatus {
   PENDING
   CONFIRMED
@@ -81,13 +76,14 @@ model Guest {
   event             Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
   contactId         String
   contact           Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  side              Side?
+  category          String?
   relationScore     Int        @default(3)
   rsvpStatus        RsvpStatus @default(PENDING)
   attendeeCount     Int        @default(1)
-  plusOneName        String?
+  infantCount       Int        @default(0)
   dietaryNeeds      String[]   @default([])
   specialNeeds      String[]   @default([])
+  needsMet          Boolean    @default(false)
   satisfactionScore Float      @default(50)
   isOverflow        Boolean    @default(false)
   isIsolated        Boolean    @default(false)
@@ -117,6 +113,7 @@ model Tag {
   eventId   String
   event     Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
   name      String
+  category  String?
   guests    GuestTag[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -154,10 +151,12 @@ model Table {
   event               Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   name                String
   capacity            Int      @default(10)
-  positionRow         Int      @default(0)
-  positionCol         Int      @default(0)
+  positionX           Float    @default(0)
+  positionY           Float    @default(0)
   averageSatisfaction Float    @default(0)
   tags                String[] @default([])
+  color               String?
+  note                String?
   guests              Guest[]
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -170,7 +169,7 @@ model SeatingSnapshot {
   eventId             String   @unique
   event               Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   name                String
-  data                Json     // [{ guestId, tableId, satisfactionScore, isOverflow }]
+  data                Json     // { guests: [{guestId, tableId, satisfactionScore, isOverflow}], tables: [{tableId, name, positionX, positionY, capacity}] }
   averageSatisfaction Float    @default(0)
   createdAt           DateTime @default(now())
 }

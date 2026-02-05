@@ -1,19 +1,18 @@
-export type Side = 'groom' | 'bride' | 'mutual'
-
 export type RsvpStatus = 'pending' | 'confirmed' | 'declined' | 'modified'
 
 export interface Guest {
   id: string
   eventId: string
   contactId: string
-  side?: Side
+  category?: string
   relationScore: number
   tagIds: string[]
   rsvpStatus: RsvpStatus
   attendeeCount: number
-  plusOneName?: string
+  infantCount: number
   dietaryNeeds?: string[]
   specialNeeds?: string[]
+  needsMet: boolean
   satisfactionScore: number
   assignedTableId?: string
   isOverflow: boolean
