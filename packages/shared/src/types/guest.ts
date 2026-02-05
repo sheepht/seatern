@@ -5,9 +5,8 @@ export type RsvpStatus = 'pending' | 'confirmed' | 'declined' | 'modified'
 export interface Guest {
   id: string
   eventId: string
-  name: string
-  aliases: string[]
-  side: Side
+  contactId: string
+  side?: Side
   relationScore: number
   groups: string[]
   rsvpStatus: RsvpStatus

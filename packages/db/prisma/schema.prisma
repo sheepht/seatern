@@ -9,12 +9,31 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String    @id @default(cuid())
+  email     String    @unique
   name      String
   events    Event[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  contacts  Contact[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Contact {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  aliases      String[] @default([])
+  email        String?
+  phone        String?
+  dietaryNeeds String[] @default([])
+  specialNeeds String[] @default([])
+  tags         String[] @default([])
+  guests       Guest[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Event {
@@ -59,9 +78,9 @@ model Guest {
   id                String     @id @default(cuid())
   eventId           String
   event             Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  name              String
-  aliases           String[]   @default([])
-  side              Side
+  contactId         String
+  contact           Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  side              Side?
   relationScore     Int        @default(3)
   rsvpStatus        RsvpStatus @default(PENDING)
   attendeeCount     Int        @default(1)
@@ -83,7 +102,9 @@ model Guest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([eventId, contactId])
   @@index([eventId])
+  @@index([contactId])
   @@index([formToken])
 }
 

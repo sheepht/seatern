@@ -634,25 +634,41 @@
 
 ## 4. 資料結構
 
-### 4.1 賓客（Guest）
+### 4.1 通訊錄（Contact）
+
+```typescript
+interface Contact {
+  id: string
+  userId: string                  // 通訊錄歸屬
+  name: string                    // 主要姓名
+  aliases: string[]               // 別名列表
+  email?: string                  // 聯絡 email（發送表單用）
+  phone?: string                  // 電話
+  dietaryNeeds: string[]          // 飲食需求（持久預設值）
+  specialNeeds: string[]          // 特殊需求（持久預設值）
+  tags: string[]                  // 持久標籤（如部門、關係分類）
+}
+```
+
+### 4.2 賓客（Guest）
 
 ```typescript
 interface Guest {
   id: string
-  name: string                    // 主要姓名
-  aliases: string[]               // 別名列表
-  side: 'groom' | 'bride' | 'mutual'
-  relationScore: number           // 1-5，與新人親疏
+  eventId: string                 // 所屬活動
+  contactId: string               // 連結通訊錄（姓名、別名從 Contact 讀取）
+  side?: 'groom' | 'bride' | 'mutual'  // 婚禮用，其他活動可不填
+  relationScore: number           // 1-5，與新人親疏（每次活動可不同）
   groups: string[]                // 所屬群組 ID
-  
+
   // 賓客填寫
   rsvpStatus: 'pending' | 'confirmed' | 'declined' | 'modified'
   attendeeCount: number           // 出席人數（含本人）
   plusOneName?: string            // +1 姓名
   wantToSitWith: string[]         // 想同桌的賓客 ID（最多 3）
-  dietaryNeeds?: string[]         // 飲食需求
-  specialNeeds?: string[]         // 特殊需求
-  
+  dietaryNeeds?: string[]         // 飲食需求（可覆寫 Contact 預設）
+  specialNeeds?: string[]         // 特殊需求（可覆寫 Contact 預設）
+
   // 系統計算
   satisfactionScore: number       // 滿意度分數
   assignedTable?: string          // 分配的桌次 ID
@@ -661,7 +677,7 @@ interface Guest {
 }
 ```
 
-### 4.2 關係邊（Edge）
+### 4.3 關係邊（Edge）
 
 ```typescript
 interface Edge {
@@ -676,7 +692,7 @@ interface Edge {
 }
 ```
 
-### 4.3 群組（Group）
+### 4.4 群組（Group）
 
 ```typescript
 interface Group {
@@ -688,7 +704,7 @@ interface Group {
 }
 ```
 
-### 4.4 桌次（Table）
+### 4.5 桌次（Table）
 
 ```typescript
 interface Table {
@@ -705,7 +721,7 @@ interface Table {
 }
 ```
 
-### 4.5 避免同桌標記（Avoidance）
+### 4.6 避免同桌標記（Avoidance）
 
 ```typescript
 interface Avoidance {

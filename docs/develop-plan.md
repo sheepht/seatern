@@ -24,14 +24,14 @@
 │   │   ├── tsconfig.json
 │   │   └── src/
 │   │       ├── index.ts
-│   │       ├── types/              # Guest, Table, Edge, Group, Avoidance, Event, User
+│   │       ├── types/              # Contact, Guest, Table, Edge, Group, Avoidance, Event, User
 │   │       └── schemas/            # Zod validation schemas
 │   ├── db/                         # Prisma ORM
 │   │   ├── package.json
 │   │   ├── tsconfig.json
 │   │   ├── src/index.ts            # PrismaClient singleton export
 │   │   └── prisma/
-│   │       ├── schema.prisma       # 8 models: User, Event, Guest, Group, GuestGroup, Table, Edge, Avoidance
+│   │       ├── schema.prisma       # 9 models: User, Contact, Event, Guest, Group, GuestGroup, Table, Edge, Avoidance
 │   │       └── seed.ts
 │   ├── api/                        # Hono backend
 │   │   ├── package.json
@@ -111,9 +111,10 @@ git init && git add -A && git commit -m "Initial project setup"
 
 ## Prisma Schema 重點
 
-8 個 models 對應 PRD 資料結構：
+9 個 models 對應 PRD 資料結構：
 - `User` / `Event` — 多租戶基礎
-- `Guest` — 核心，含 `formToken` 做賓客專屬連結
+- `Contact` — 持久通訊錄，跨活動共用（姓名、別名、聯絡方式）
+- `Guest` — 活動出席紀錄，透過 `contactId` 連結通訊錄，含 `formToken` 做賓客專屬連結
 - `Group` + `GuestGroup` (join table) — 多對多群組
 - `Table` — 含 `positionRow`/`positionCol` 做鄰桌計算
 - `Edge` — 關係邊，unique constraint `[eventId, fromGuestId, toGuestId]`

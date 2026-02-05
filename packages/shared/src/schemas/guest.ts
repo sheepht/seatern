@@ -5,9 +5,8 @@ export const sideSchema = z.enum(['groom', 'bride', 'mutual'])
 export const rsvpStatusSchema = z.enum(['pending', 'confirmed', 'declined', 'modified'])
 
 export const createGuestSchema = z.object({
-  name: z.string().min(1),
-  aliases: z.array(z.string()).default([]),
-  side: sideSchema,
+  contactId: z.string().min(1),
+  side: sideSchema.optional(),
   relationScore: z.number().int().min(1).max(5),
   groupIds: z.array(z.string()).default([]),
 })
