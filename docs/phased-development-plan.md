@@ -11,77 +11,21 @@
 
 **目前狀態**：Monorepo 架構已建立，4 個套件 (shared/db/api/web)、Prisma schema、TypeScript 型別、Zod schemas 皆已完成。尚無任何功能程式碼（僅 health check 端點與 placeholder 首頁）。
 
-### 前置 Schema 變更（階段 0）
+### 前置 Schema 變更（階段 0）✅ 已完成
 
-在開始階段 1 之前，需先更新資料模型以支援多活動類型：
+資料模型設計原則：
 
-1. **Guest.side → Guest.category (String?)**
-   - 刪除 `Side` enum（GROOM/BRIDE/MUTUAL）
-   - 改為自訂字串欄位，單選一個主要歸屬
-   - 婚禮：「男方」「女方」「共同」
-   - 公司活動：「研發部」「業務部」「行銷部」
+- **Guest.category (String?)**：活動自訂的主分類（婚禮：男方/女方/共同；企業：部門名）
+- **Event.categories (String[])**：定義該活動可用的 category 選項
+- **Tag.category (String?)**：綁定特定分類，控制哪些賓客能看到該標籤
+- **Guest.attendeeCount / infantCount**：成人數（含本人）+ 嬰兒數（不佔座位）
+- **Guest.dietaryNote / specialNote (String?)**：自由文字備註，需求分固定 +5
+- **Contact**：只存聯絡資訊（姓名、別名、email、phone），活動相關資料由 Guest 記錄
+- **Table.positionX / positionY (Float)**：畫布自由座標，鄰桌用歐幾里得距離判定
+- **Table.color / note**：桌次顏色與備註
+- **SeatingSnapshot.data**：含賓客座位 + 桌次位置，還原時一併回復
 
-2. **Event 新增 categories 欄位 (String[])**
-   - 定義該活動可用的 category 選項
-   - 例：`["男方", "女方", "共同"]` 或 `["研發部", "業務部"]`
-
-3. **Tag 新增 category 欄位 (String?)**
-   - 有填 category 的 tag → 只對該 category 的賓客顯示
-   - 沒填的 tag → 通用，所有賓客都能選
-   - 例：Tag "大學同學" (category: "男方") 只在 category=男方 的賓客中顯示
-
-4. **Guest 眷屬欄位調整**
-   - 移除 `plusOneName: String?`
-   - `attendeeCount` 語義明確為成人數（含本人，預設 1）
-   - 新增 `infantCount: Int @default(0)`（嬰兒數，不佔座位）
-   - 桌次容量只計算成人，嬰兒不佔正式座位
-
-5. **Table 位置改為自由座標 + 新增備註**
-   - `positionRow/positionCol` (Int) → `positionX/positionY` (Float)
-   - 桌次可在畫布上自由拖曳，模擬實際會場配置
-   - 鄰桌判定改為歐幾里得距離（兩桌中心點距離 ≤ 門檻值）
-   - 新增 `note: String?` — 備註欄位（選填，如「靠窗」「有嬰兒座」「VIP 桌放花」）
-   - 新增 `color: String?` — 桌次顏色（選填，hex 色碼如 `#FF6B6B`，用於畫布和圖表顯示）
-
-6. **SeatingSnapshot data 格式擴充**
-   - 除了賓客座位，也記錄桌次位置資訊
-   - 還原時同時還原「誰坐哪桌」和「桌子怎麼排」
-   - data 格式：`{ guests: [{guestId, tableId, satisfactionScore, isOverflow}], tables: [{tableId, name, positionX, positionY, capacity}] }`
-
-7. **Guest 飲食/特殊需求簡化**
-   - 移除 `dietaryNeeds: String[]` 和 `specialNeeds: String[]`（陣列欄位）
-   - 改為 `dietaryNote: String?` 和 `specialNote: String?`（自由文字備註）
-   - 需求分固定 +5，不再區分「是否被滿足」
-
-8. **Contact 模型精簡**
-   - 移除 `dietaryNeeds`、`specialNeeds`、`tags` 欄位
-   - Contact 只保留聯絡資訊（姓名、別名、email、phone）
-   - 飲食/特殊需求為每次活動不同，由 Guest 記錄
-
-9. **Table 模型精簡**
-   - 移除 `tags: String[]` 欄位
-   - 桌次標註改用 `color` 和 `note` 欄位即可
-
-10. **同步更新 TypeScript 型別與 Zod schemas**
-   - `packages/shared/src/types/guest.ts` — 移除 `Side` type，`side` → `category: string?`，新增 `infantCount`，移除 `plusOneName`、`dietaryNeeds[]`、`specialNeeds[]`、`needsMet`，新增 `dietaryNote?`、`specialNote?`
-   - `packages/shared/src/types/contact.ts` — 移除 `dietaryNeeds`、`specialNeeds`、`tags`
-   - `packages/shared/src/types/event.ts` — 新增 `categories: string[]`
-   - `packages/shared/src/types/tag.ts` — 新增 `category?: string`
-   - `packages/shared/src/types/table.ts` — `positionRow/Col` → `positionX/Y: number`，移除 `tags`
-   - 對應 Zod schemas 更新
-
-**涉及檔案**：
-- `packages/db/prisma/schema.prisma`
-- `packages/shared/src/types/guest.ts`
-- `packages/shared/src/types/event.ts`
-- `packages/shared/src/types/tag.ts`
-- `packages/shared/src/types/table.ts`
-- `packages/shared/src/schemas/event.ts`
-- `packages/shared/src/schemas/guest.ts`
-- `packages/shared/src/schemas/tag.ts`
-- `packages/shared/src/schemas/table.ts`
-
-**驗證**：`npm run typecheck` 通過、`npm run build` 成功
+以 `schema.prisma` 為 source of truth，TypeScript 型別與 Zod schemas 同步更新。
 
 **階段間依賴**：
 
