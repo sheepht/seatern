@@ -43,10 +43,11 @@ model Event {
   name       String
   date       DateTime
   type       EventType   @default(WEDDING)
-  guests     Guest[]
-  tags       Tag[]
-  tables     Table[]
-  edges      Edge[]
+  guests          Guest[]
+  tags            Tag[]
+  tables          Table[]
+  edges           Edge[]
+  seatingSnapshot SeatingSnapshot?
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -161,6 +162,16 @@ model Table {
   updatedAt           DateTime @updatedAt
 
   @@index([eventId])
+}
+
+model SeatingSnapshot {
+  id                  String   @id @default(cuid())
+  eventId             String   @unique
+  event               Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name                String
+  data                Json     // [{ guestId, tableId, satisfactionScore, isOverflow }]
+  averageSatisfaction Float    @default(0)
+  createdAt           DateTime @default(now())
 }
 
 enum EdgeType {

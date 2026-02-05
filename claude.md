@@ -736,6 +736,21 @@ interface Table {
 }
 ```
 
+### 4.7 座位快照（SeatingSnapshot）
+
+```typescript
+interface SeatingSnapshot {
+  id: string
+  eventId: string                 // 所屬活動（每活動最多一份）
+  name: string                    // 快照名稱
+  data: json                      // [{ guestId, tableId, satisfactionScore, isOverflow }]
+  averageSatisfaction: number     // 快照時的全場平均滿意度
+}
+```
+
+工作流程：Guest 上的 `assignedTableId` / `satisfactionScore` 為即時工作狀態。
+新人按「儲存排位」時拍快照到 SeatingSnapshot，不滿意新排位可一鍵回復。
+
 ---
 
 ## 5. 版本規劃
