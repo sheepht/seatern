@@ -1,29 +1,91 @@
 # Seatern 分階段開發計畫
 
-> 版本：1.0
+> 版本：1.2
 > 日期：2026-02-05
 
 ---
 
 ## 概述
 
-將 MVP + V1.1 功能拆分為 **10 個階段**，每個階段結束後系統皆可正常運行並驗證。
+將 MVP + V1.1 功能拆分為 **10 個階段**（含前置階段 0），每個階段結束後系統皆可正常運行並驗證。
 
 **目前狀態**：Monorepo 架構已建立，4 個套件 (shared/db/api/web)、Prisma schema、TypeScript 型別、Zod schemas 皆已完成。尚無任何功能程式碼（僅 health check 端點與 placeholder 首頁）。
+
+### 前置 Schema 變更（階段 0）
+
+在開始階段 1 之前，需先更新資料模型以支援多活動類型：
+
+1. **Guest.side → Guest.category (String?)**
+   - 刪除 `Side` enum（GROOM/BRIDE/MUTUAL）
+   - 改為自訂字串欄位，單選一個主要歸屬
+   - 婚禮：「男方」「女方」「共同」
+   - 公司活動：「研發部」「業務部」「行銷部」
+
+2. **Event 新增 categories 欄位 (String[])**
+   - 定義該活動可用的 category 選項
+   - 例：`["男方", "女方", "共同"]` 或 `["研發部", "業務部"]`
+
+3. **Tag 新增 category 欄位 (String?)**
+   - 有填 category 的 tag → 只對該 category 的賓客顯示
+   - 沒填的 tag → 通用，所有賓客都能選
+   - 例：Tag "大學同學" (category: "男方") 只在 category=男方 的賓客中顯示
+
+4. **Guest 眷屬欄位調整**
+   - 移除 `plusOneName: String?`
+   - `attendeeCount` 語義明確為成人數（含本人，預設 1）
+   - 新增 `infantCount: Int @default(0)`（嬰兒數，不佔座位）
+   - 桌次容量只計算成人，嬰兒不佔正式座位
+
+5. **Table 位置改為自由座標 + 新增備註**
+   - `positionRow/positionCol` (Int) → `positionX/positionY` (Float)
+   - 桌次可在畫布上自由拖曳，模擬實際會場配置
+   - 鄰桌判定改為歐幾里得距離（兩桌中心點距離 ≤ 門檻值）
+   - 新增 `note: String?` — 備註欄位（選填，如「靠窗」「有嬰兒座」「VIP 桌放花」）
+
+6. **SeatingSnapshot data 格式擴充**
+   - 除了賓客座位，也記錄桌次位置資訊
+   - 還原時同時還原「誰坐哪桌」和「桌子怎麼排」
+   - data 格式：`{ guests: [{guestId, tableId, satisfactionScore, isOverflow}], tables: [{tableId, name, positionX, positionY, capacity}] }`
+
+7. **需求分計算調整**
+   - 需求是否「被滿足」改為主端手動勾選確認
+   - Guest 新增 `needsMet: Boolean @default(false)`
+   - 主端在確認安排好飲食/嬰兒座等需求後勾選
+
+8. **同步更新 TypeScript 型別與 Zod schemas**
+   - `packages/shared/src/types/guest.ts` — 移除 `Side` type，`side` → `category: string?`，新增 `infantCount`、`needsMet`，移除 `plusOneName`
+   - `packages/shared/src/types/event.ts` — 新增 `categories: string[]`
+   - `packages/shared/src/types/tag.ts` — 新增 `category?: string`
+   - `packages/shared/src/types/table.ts` — `positionRow/Col` → `positionX/Y: number`
+   - 對應 Zod schemas 更新
+
+**涉及檔案**：
+- `packages/db/prisma/schema.prisma`
+- `packages/shared/src/types/guest.ts`
+- `packages/shared/src/types/event.ts`
+- `packages/shared/src/types/tag.ts`
+- `packages/shared/src/types/table.ts`
+- `packages/shared/src/schemas/event.ts`
+- `packages/shared/src/schemas/guest.ts`
+- `packages/shared/src/schemas/tag.ts`
+- `packages/shared/src/schemas/table.ts`
+
+**驗證**：`npm run typecheck` 通過、`npm run build` 成功
 
 **階段間依賴**：
 
 ```
-1 (DB/Seed)
-  → 2 (CRUD API)
-    → 3 (Auth)
-      → 4 (Guest List UI)
-        → 5 (Guest Form)        ← 可與 6 並行
-        → 6 (Tables & Drag-Drop) ← 可與 5 並行
-          → 7 (Satisfaction Engine)
-            → 8 (Move Preview)     ← 8/9/10 可並行
-            → 9 (Social Graph)     ← 8/9/10 可並行
-            → 10 (Export & Polish) ← 8/9/10 可並行
+0 (Schema 變更)
+  → 1 (DB/Seed)
+    → 2 (CRUD API)
+      → 3 (Auth)
+        → 4 (Guest List UI)
+          → 5 (Guest Form)        ← 可與 6 並行
+          → 6 (Tables & Drag-Drop) ← 可與 5 並行
+            → 7 (Satisfaction Engine)
+              → 8 (Move Preview)     ← 8/9/10 可並行
+              → 9 (Social Graph)     ← 8/9/10 可並行
+              → 10 (Export & Polish) ← 8/9/10 可並行
 ```
 
 ---
@@ -41,7 +103,7 @@
    - 1 位 User（新人帳號）
    - 8-10 位 Contact（含別名，如：主名「陳志明」、別名「小明、阿明、David」）
    - 1 個 Event（婚禮類型）
-   - 8-10 位 Guest（不同 side、relationScore、rsvpStatus）
+   - 8-10 位 Guest（不同 category、relationScore、rsvpStatus、部分含 infantCount）
    - 3-4 個 Tag（大學同學、公司同事、家人、高中同學）
    - GuestTag 關聯資料
    - 2-3 筆 SeatPreference
@@ -122,22 +184,31 @@
 3. 建立 `src/stores/auth.ts`（Zustand：user、session、isLoading、signIn/Out）
 4. 建立 `src/providers/AuthProvider.tsx`（監聽 auth state 變化）
 5. 建立 `src/lib/api.ts`（Axios instance + token interceptor）
-6. 建立 `src/pages/LoginPage.tsx`（Google OAuth 登入按鈕）
+6. 建立 `src/pages/LoginPage.tsx`（多種 OAuth 登入按鈕）：
+   - Google 登入
+   - LINE 登入
+   - Apple 登入
+   - 需在 Supabase Dashboard 設定各 provider 的 OAuth credentials
 7. 設定 `react-router-dom` 路由：
    - `/login` — 公開
    - `/` → 導向 `/events`（需登入）
 8. 新增 `VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY` 到 `.env`
 
+> **注意**：LINE Login 需要在 [LINE Developers Console](https://developers.line.biz/) 建立 channel，Apple Sign In 需要在 [Apple Developer](https://developer.apple.com/) 設定 Service ID。三個 provider 皆透過 Supabase Auth 統一管理，後端 JWT 驗證邏輯不受影響。
+
 **驗證方式**：
 1. `npm run dev` 啟動全端
 2. 開啟 http://localhost:5173 → 應導向 `/login`
-3. 點擊「使用 Google 登入」→ 完成 OAuth 後導向 `/events`
-4. DevTools Network 確認 API 請求帶有 `Authorization: Bearer <token>`
-5. 不帶 token 的 curl 請求 → 回傳 401
-6. Prisma Studio 確認 User 表新增了一筆 Google 帳號記錄
-7. 點擊「登出」→ 導向 `/login`
+3. 確認登入頁顯示三個登入按鈕：Google、LINE、Apple
+4. 點擊「使用 Google 登入」→ 完成 OAuth 後導向 `/events`
+5. 點擊「使用 LINE 登入」→ 完成 LINE OAuth 後導向 `/events`
+6. 點擊「使用 Apple 登入」→ 完成 Apple OAuth 後導向 `/events`
+7. DevTools Network 確認 API 請求帶有 `Authorization: Bearer <token>`
+8. 不帶 token 的 curl 請求 → 回傳 401
+9. Prisma Studio 確認 User 表新增了對應帳號記錄
+10. 點擊「登出」→ 導向 `/login`
 
-**預期結果**：使用者可透過 Google OAuth 登入。API 端點受 JWT 保護。前端自動附加 token。
+**預期結果**：使用者可透過 Google、LINE 或 Apple OAuth 登入。API 端點受 JWT 保護。前端自動附加 token。
 
 ---
 
@@ -163,8 +234,8 @@
    - `src/pages/EventDetailPage.tsx` — 活動詳情（Tabs：賓客、標籤、桌次、排位）
    - `src/pages/ContactsPage.tsx` — 可搜尋的聯絡人表格
 5. 建立賓客元件：
-   - `GuestTable.tsx` — 顯示賓客資訊（姓名、side 標籤、關係分數、RSVP 狀態、標籤）
-   - `AddGuestDialog.tsx` — 從聯絡人搜尋選取 + 設定 side、分數、標籤
+   - `GuestTable.tsx` — 顯示賓客資訊（姓名、category 標籤、關係分數、RSVP 狀態、標籤）
+   - `AddGuestDialog.tsx` — 從聯絡人搜尋選取 + 設定 category、分數、標籤（根據所選 category 過濾可用標籤）
 6. 建立標籤元件：
    - `TagManager.tsx` — 標籤列表（含賓客數）、建立/編輯/刪除
 7. 建立全域 event store（`src/stores/event.ts`）— 當前活動 ID（localStorage 持久化）
@@ -174,7 +245,7 @@
 2. 建立活動「測試婚禮」→ 確認卡片出現
 3. 點擊活動 → 開啟詳情頁含 Tabs
 4. 到「聯絡人」新增「陳小明」（含別名「小明」）→ 確認表格出現
-5. 回到活動 → 賓客 Tab → 新增賓客 → 搜尋「小明」能找到 → 設定 side=男方、分數=4 → 確認列表出現
+5. 回到活動 → 賓客 Tab → 新增賓客 → 搜尋「小明」能找到 → 設定 category=男方、分數=4 → 選擇 category 後確認可用標籤有過濾 → 確認列表出現
 6. 新增 5+ 賓客，確認表格正確顯示所有欄位
 7. 標籤 Tab → 建立標籤、指派賓客、確認計數更新
 8. 編輯聯絡人姓名 → 確認賓客表格同步更新
@@ -206,7 +277,7 @@
 1. 建立 `src/pages/GuestFormPage.tsx`（路由：`/form/:token`，公開頁面）：
    - 顯示活動名稱、日期、賓客問候
    - RSVP 選擇（確認/婉拒）
-   - 出席人數、攜伴姓名（RSVP 確認時才顯示）
+   - 成人數（含本人，預設 1）、嬰兒數（預設 0）（RSVP 確認時才顯示）
    - 想同桌的人（Combobox 模糊搜尋，最多 3 位，可排序）
    - 飲食需求（複選：素食、不吃牛、海鮮過敏、其他）
    - 特殊需求（複選：輪椅、兒童椅、靠近出口、其他）
@@ -219,10 +290,10 @@
 1. 登入 → 活動 → 賓客 → 點「產生表單連結」
 2. 複製某位賓客的連結，用無痕視窗開啟（如 http://localhost:5173/form/abc123）
 3. 確認表單頁顯示正確活動名稱與賓客姓名
-4. 填寫 RSVP=確認、人數=2、攜伴姓名
+4. 填寫 RSVP=確認、成人數=2、嬰兒數=1
 5. 搜尋想同桌的人（輸入別名也能找到）→ 選 2 位
 6. 勾選素食 → 提交 → 確認出現感謝頁面
-7. 回到主端確認賓客 RSVP 狀態更新為「已確認」、人數顯示 2
+7. 回到主端確認賓客 RSVP 狀態更新為「已確認」、成人數 2、嬰兒數 1
 8. 再次開啟表單連結 → 確認顯示先前回覆、可修改
 9. 修改後重新提交 → 確認主端狀態變為「已修改」
 10. 開啟不存在的 token（`/form/invalid`）→ 顯示 404 頁面
@@ -251,13 +322,14 @@
 **Web 端：**
 1. Tables Tab（在 EventDetailPage）：
    - `TableManager.tsx` — 桌次卡片列表
-   - `CreateTableDialog.tsx` — 表單：名稱、容量（預設 10）、位置 row/col
+   - `CreateTableDialog.tsx` — 表單：名稱、容量（預設 10）
    - 快速操作：「批次新增 5 桌」/「批次新增 10 桌」
 2. Seating Tab（新 Tab）：
    - `SeatingBoard.tsx` — @dnd-kit DndContext 包裝
    - 左側面板：`UnassignedGuestList.tsx` — 未指派賓客
-   - 右側面板：各桌 `TableDropZone.tsx`（顯示桌名、容量、已指派賓客）
-   - `GuestChip.tsx` — 可拖曳的賓客標籤（顯示姓名、side 顏色、關係分數）
+   - 右側畫布：自由拖曳桌次平面圖 + 各桌 `TableDropZone.tsx`（顯示桌名、容量、已指派賓客）
+   - 桌次可在畫布上自由拖曳定位（positionX/Y），模擬實際會場配置
+   - `GuestChip.tsx` — 可拖曳的賓客標籤（顯示姓名、category 顏色、關係分數）
 3. 拖曳邏輯：
    - 未指派 → 桌次：指派
    - 桌次 → 桌次：重新指派
@@ -295,9 +367,9 @@
        - 多標籤取最佳匹配
      - **偏好分** (0-25)：想同桌的人配對成功數
        - 3/3 → +25 | 2/3 → +18 | 1/3 → +10 | 0 但鄰桌有 → +5 | 無 → +0
-       - 鄰桌判定：position Manhattan distance ≤ 1
+       - 鄰桌判定：兩桌歐幾里得距離 ≤ 門檻值（根據 positionX/Y 計算）
      - **需求分** (0-5)：
-       - 無需求或已滿足 → +5 | 未滿足 → +0
+       - 無需求或 `needsMet=true` → +5 | 有需求且 `needsMet=false` → +0
    - `calculateTableSatisfaction()` — 桌次賓客平均
    - `calculateEventSatisfaction()` — 全場已指派賓客平均
 2. `POST /api/events/:eventId/recalculate` — 重算所有分數，更新 Guest 和 Table 記錄
@@ -395,7 +467,7 @@
 
 **Web 端：**
 1. `CommunityGraph.tsx` — D3 force-directed graph：
-   - 節點：大小 = relationScore、顏色 = side（藍=男方、紅=女方、紫=共同）
+   - 節點：大小 = relationScore、顏色 = category（每個 category 一個顏色）
    - 邊：粗線 = mutual、細線 = one-way/same-group、虛線 = inferred
    - 社群凸包背景、社群標籤
 2. 互動功能：
@@ -406,7 +478,7 @@
 3. `CommunityPanel.tsx` — 社群詳情：成員列表、平均滿意度、「整組指派到桌」按鈕
 4. `IsolatedGuestAlert.tsx` — 孤立賓客提醒面板
 5. 新增「社交圖譜」Tab 到 EventDetailPage
-6. 色彩模式切換：依 side / 依社群 / 依滿意度
+6. 色彩模式切換：依 category / 依社群 / 依滿意度
 
 **驗證方式**：
 1. 至少 10 位賓客，有重疊標籤和座位偏好
@@ -439,9 +511,9 @@
    - `POST /api/events/:eventId/suggestions/:id/apply` — 套用單一建議
    - `POST /api/events/:eventId/suggestions/apply-all` — 一鍵全部套用
 3. Snapshot 路由：
-   - `POST /api/events/:eventId/snapshot` — 儲存快照（upsert，每活動一份）
+   - `POST /api/events/:eventId/snapshot` — 儲存快照（upsert，每活動一份），同時記錄賓客座位和桌次位置
    - `GET /api/events/:eventId/snapshot` — 取得快照
-   - `POST /api/events/:eventId/snapshot/restore` — 還原快照
+   - `POST /api/events/:eventId/snapshot/restore` — 還原快照（還原賓客座位 + 桌次 positionX/Y）
 
 **Web 端：**
 1. `SuggestionPanel.tsx` — 建議面板：
@@ -455,7 +527,7 @@
    - `AttentionGuestsList.tsx` — 需關注（紅色）賓客列表 + 原因 + 快速操作
 3. 匯出功能：
    - PDF（`jspdf` + `html2canvas`）：活動名、日期、逐桌賓客名單、可選含滿意度
-   - CSV：賓客姓名、桌次、滿意度、side、飲食需求
+   - CSV：賓客姓名、桌次、滿意度、category、飲食需求
    - `ExportDialog.tsx` — 選擇格式 + 選項 + 預覽
 4. `SnapshotControls.tsx`：
    - 「儲存排位」按鈕 + 「還原排位」按鈕
@@ -474,7 +546,7 @@
 4. 儀表板顯示正確的全場平均、四色分佈、各桌排行
 5. 匯出 PDF → 確認下載檔案含正確的活動名、日期、桌次賓客名單
 6. 匯出 CSV → 確認欄位正確
-7. 「儲存排位」→ 打亂排位 → 「還原排位」→ 確認回到儲存狀態
+7. 「儲存排位」→ 打亂排位 + 移動桌次位置 → 「還原排位」→ 確認賓客座位和桌次位置都回到儲存狀態
 8. **端到端完整流程**：
    建活動 → 加聯絡人 → 加賓客 → 設標籤 → 產生表單連結 → 填表單（無痕）→ 建桌次 → 拖曳排位 → 查看滿意度 → 建構圖譜 → 用社群指派 → 套用優化建議 → 匯出 PDF → 儲存快照
 
@@ -502,3 +574,5 @@
 | 版本 | 日期 | 變更內容 |
 |-----|------|---------|
 | 1.0 | 2026-02-05 | 初版建立 |
+| 1.1 | 2026-02-05 | 新增階段 0 (Schema 變更)：side→category、Tag 加 category 欄位、Event 加 categories；登入新增 LINE/Apple OAuth |
+| 1.2 | 2026-02-05 | 階段 0 新增：Guest 眷屬欄位（infantCount）、移除 plusOneName、Table 位置改為 positionX/Y 自由座標、SeatingSnapshot 含桌次位置、需求分改用 needsMet 手動勾選 |
