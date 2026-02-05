@@ -47,7 +47,6 @@ model Event {
   tags       Tag[]
   tables     Table[]
   edges      Edge[]
-  avoidances Avoidance[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -85,7 +84,6 @@ model Guest {
   rsvpStatus        RsvpStatus @default(PENDING)
   attendeeCount     Int        @default(1)
   plusOneName        String?
-  wantToSitWith     String[]   @default([])
   dietaryNeeds      String[]   @default([])
   specialNeeds      String[]   @default([])
   satisfactionScore Float      @default(50)
@@ -93,12 +91,11 @@ model Guest {
   isIsolated        Boolean    @default(false)
   formToken         String?    @unique
 
-  assignedTableId String?
-  assignedTable   Table?  @relation(fields: [assignedTableId], references: [id])
-  tags            GuestTag[]
-  avoidances1     Avoidance[] @relation("AvoidanceGuest1")
-  avoidances2     Avoidance[] @relation("AvoidanceGuest2")
-
+  assignedTableId   String?
+  assignedTable     Table?           @relation(fields: [assignedTableId], references: [id])
+  tags              GuestTag[]
+  preferencesFrom   SeatPreference[] @relation("PreferenceFrom")
+  preferencesTo     SeatPreference[] @relation("PreferenceTo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -136,6 +133,17 @@ model GuestTag {
 
   @@id([guestId, tagId])
   @@index([tagId])
+}
+
+model SeatPreference {
+  guestId     String
+  guest       Guest  @relation("PreferenceFrom", fields: [guestId], references: [id], onDelete: Cascade)
+  preferredId String
+  preferred   Guest  @relation("PreferenceTo", fields: [preferredId], references: [id], onDelete: Cascade)
+  rank        Int    // 1, 2, 3
+
+  @@id([guestId, preferredId])
+  @@index([preferredId])
 }
 
 model Table {
@@ -176,24 +184,4 @@ model Edge {
   @@index([eventId])
 }
 
-enum AvoidanceReason {
-  EX
-  FAMILY_CONFLICT
-  WORK_CONFLICT
-  OTHER
-}
 
-model Avoidance {
-  id       String           @id @default(cuid())
-  eventId  String
-  event    Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  guestId1 String
-  guest1   Guest            @relation("AvoidanceGuest1", fields: [guestId1], references: [id], onDelete: Cascade)
-  guestId2 String
-  guest2   Guest            @relation("AvoidanceGuest2", fields: [guestId2], references: [id], onDelete: Cascade)
-  reason   AvoidanceReason?
-  note     String?
-
-  @@unique([guestId1, guestId2])
-  @@index([eventId])
-}

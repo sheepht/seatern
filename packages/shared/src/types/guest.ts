@@ -12,7 +12,6 @@ export interface Guest {
   rsvpStatus: RsvpStatus
   attendeeCount: number
   plusOneName?: string
-  wantToSitWith: string[]
   dietaryNeeds?: string[]
   specialNeeds?: string[]
   satisfactionScore: number

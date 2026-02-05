@@ -665,7 +665,6 @@ interface Guest {
   rsvpStatus: 'pending' | 'confirmed' | 'declined' | 'modified'
   attendeeCount: number           // 出席人數（含本人）
   plusOneName?: string            // +1 姓名
-  wantToSitWith: string[]         // 想同桌的賓客 ID（最多 3）
   dietaryNeeds?: string[]         // 飲食需求（可覆寫 Contact 預設）
   specialNeeds?: string[]         // 特殊需求（可覆寫 Contact 預設）
 
@@ -710,7 +709,17 @@ interface GuestTag {
 }
 ```
 
-### 4.5 桌次（Table）
+### 4.5 座位偏好（SeatPreference）
+
+```typescript
+interface SeatPreference {
+  guestId: string                 // 選擇者
+  preferredId: string             // 想同桌的賓客
+  rank: number                    // 1, 2, 3（優先順序）
+}
+```
+
+### 4.6 桌次（Table）
 
 ```typescript
 interface Table {
@@ -724,17 +733,6 @@ interface Table {
   }
   averageSatisfaction: number     // 平均滿意度
   tags: string[]                  // 標籤：主桌、素食桌、靠出口...
-}
-```
-
-### 4.6 避免同桌標記（Avoidance）
-
-```typescript
-interface Avoidance {
-  guestId1: string
-  guestId2: string
-  reason?: 'ex' | 'family-conflict' | 'work-conflict' | 'other'
-  note?: string
 }
 ```
 

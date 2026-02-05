@@ -24,14 +24,14 @@
 │   │   ├── tsconfig.json
 │   │   └── src/
 │   │       ├── index.ts
-│   │       ├── types/              # Contact, Guest, Table, Edge, Group, Avoidance, Event, User
+│   │       ├── types/              # Contact, Guest, Table, Edge, Tag, SeatPreference, Event, User
 │   │       └── schemas/            # Zod validation schemas
 │   ├── db/                         # Prisma ORM
 │   │   ├── package.json
 │   │   ├── tsconfig.json
 │   │   ├── src/index.ts            # PrismaClient singleton export
 │   │   └── prisma/
-│   │       ├── schema.prisma       # 9 models: User, Contact, Event, Guest, Group, GuestGroup, Table, Edge, Avoidance
+│   │       ├── schema.prisma       # 9 models: User, Contact, Event, Guest, Tag, GuestTag, SeatPreference, Table, Edge
 │   │       └── seed.ts
 │   ├── api/                        # Hono backend
 │   │   ├── package.json
@@ -115,10 +115,10 @@ git init && git add -A && git commit -m "Initial project setup"
 - `User` / `Event` — 多租戶基礎
 - `Contact` — 持久通訊錄，跨活動共用（姓名、別名、聯絡方式）
 - `Guest` — 活動出席紀錄，透過 `contactId` 連結通訊錄，含 `formToken` 做賓客專屬連結
-- `Group` + `GuestGroup` (join table) — 多對多群組
+- `Tag` + `GuestTag` (join table) — 多對多標籤，含 `assignedBy`（HOST / GUEST）
+- `SeatPreference` — 賓客想同桌偏好（最多 3 位，帶 rank），雙向 FK 到 Guest
 - `Table` — 含 `positionRow`/`positionCol` 做鄰桌計算
 - `Edge` — 關係邊，unique constraint `[eventId, fromGuestId, toGuestId]`
-- `Avoidance` — 避免同桌硬約束
 
 ## Supabase (PostgreSQL) 注意事項
 

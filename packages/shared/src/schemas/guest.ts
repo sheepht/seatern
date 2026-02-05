@@ -15,7 +15,10 @@ export const guestFormSchema = z.object({
   rsvpStatus: z.enum(['confirmed', 'declined']),
   attendeeCount: z.number().int().min(1).max(10),
   plusOneName: z.string().optional(),
-  wantToSitWith: z.array(z.string()).max(3).default([]),
+  seatPreferences: z.array(z.object({
+    preferredId: z.string(),
+    rank: z.number().int().min(1).max(3),
+  })).max(3).default([]),
   dietaryNeeds: z.array(z.string()).default([]),
   specialNeeds: z.array(z.string()).default([]),
   addTagIds: z.array(z.string()).default([]),
