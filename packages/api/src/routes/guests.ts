@@ -2,30 +2,27 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { prisma } from '@seatern/db'
 import { createGuestSchema, guestTagUpdateSchema } from '@seatern/shared'
+import type { AuthEnv } from '../middleware/auth'
+import { requireParam, verifyEvent } from '../helpers'
 
-type Env = { Variables: { userId: string } }
+const GUEST_INCLUDE = {
+  contact: true,
+  tags: { include: { tag: true } },
+} as const
 
-export const guestsRoute = new Hono<Env>()
-
-// Helper: verify event belongs to user
-async function verifyEvent(eventId: string, userId: string) {
-  return prisma.event.findFirst({ where: { id: eventId, userId } })
-}
+export const guestsRoute = new Hono<AuthEnv>()
 
 // List guests for an event
 guestsRoute.get('/', async (c) => {
   const userId = c.get('userId')
-  const eventId = c.req.param('eventId')
+  const eventId = requireParam(c.req.param('eventId'), 'eventId')
 
   const event = await verifyEvent(eventId, userId)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
   const guests = await prisma.guest.findMany({
     where: { eventId },
-    include: {
-      contact: true,
-      tags: { include: { tag: true } },
-    },
+    include: GUEST_INCLUDE,
     orderBy: { createdAt: 'asc' },
   })
   return c.json(guests)
@@ -34,7 +31,7 @@ guestsRoute.get('/', async (c) => {
 // Create guest
 guestsRoute.post('/', zValidator('json', createGuestSchema), async (c) => {
   const userId = c.get('userId')
-  const eventId = c.req.param('eventId')
+  const eventId = requireParam(c.req.param('eventId'), 'eventId')
 
   const event = await verifyEvent(eventId, userId)
   if (!event) return c.json({ error: 'Event not found' }, 404)
@@ -45,14 +42,11 @@ guestsRoute.post('/', zValidator('json', createGuestSchema), async (c) => {
     data: {
       ...guestData,
       eventId,
-      tags: tagIds.length > 0
-        ? { create: tagIds.map((tagId) => ({ tagId, assignedBy: 'HOST' as const })) }
-        : undefined,
+      ...(tagIds.length > 0 && {
+        tags: { create: tagIds.map((tagId) => ({ tagId, assignedBy: 'HOST' as const })) },
+      }),
     },
-    include: {
-      contact: true,
-      tags: { include: { tag: true } },
-    },
+    include: GUEST_INCLUDE,
   })
   return c.json(guest, 201)
 })
@@ -60,8 +54,8 @@ guestsRoute.post('/', zValidator('json', createGuestSchema), async (c) => {
 // Update guest
 guestsRoute.put('/:guestId', zValidator('json', createGuestSchema.partial()), async (c) => {
   const userId = c.get('userId')
-  const eventId = c.req.param('eventId')
-  const guestId = c.req.param('guestId')
+  const eventId = requireParam(c.req.param('eventId'), 'eventId')
+  const guestId = requireParam(c.req.param('guestId'), 'guestId')
 
   const event = await verifyEvent(eventId, userId)
   if (!event) return c.json({ error: 'Event not found' }, 404)
@@ -69,15 +63,12 @@ guestsRoute.put('/:guestId', zValidator('json', createGuestSchema.partial()), as
   const guest = await prisma.guest.findFirst({ where: { id: guestId, eventId } })
   if (!guest) return c.json({ error: 'Guest not found' }, 404)
 
-  const { tagIds, ...guestData } = c.req.valid('json')
+  const { tagIds: _tagIds, ...guestData } = c.req.valid('json')
 
   const updated = await prisma.guest.update({
     where: { id: guestId },
     data: guestData,
-    include: {
-      contact: true,
-      tags: { include: { tag: true } },
-    },
+    include: GUEST_INCLUDE,
   })
   return c.json(updated)
 })
@@ -85,8 +76,8 @@ guestsRoute.put('/:guestId', zValidator('json', createGuestSchema.partial()), as
 // Delete guest
 guestsRoute.delete('/:guestId', async (c) => {
   const userId = c.get('userId')
-  const eventId = c.req.param('eventId')
-  const guestId = c.req.param('guestId')
+  const eventId = requireParam(c.req.param('eventId'), 'eventId')
+  const guestId = requireParam(c.req.param('guestId'), 'guestId')
 
   const event = await verifyEvent(eventId, userId)
   if (!event) return c.json({ error: 'Event not found' }, 404)
@@ -101,8 +92,8 @@ guestsRoute.delete('/:guestId', async (c) => {
 // Update guest tags
 guestsRoute.post('/:guestId/tags', zValidator('json', guestTagUpdateSchema), async (c) => {
   const userId = c.get('userId')
-  const eventId = c.req.param('eventId')
-  const guestId = c.req.param('guestId')
+  const eventId = requireParam(c.req.param('eventId'), 'eventId')
+  const guestId = requireParam(c.req.param('guestId'), 'guestId')
 
   const event = await verifyEvent(eventId, userId)
   if (!event) return c.json({ error: 'Event not found' }, 404)
@@ -112,24 +103,23 @@ guestsRoute.post('/:guestId/tags', zValidator('json', guestTagUpdateSchema), asy
 
   const { addTagIds, removeTagIds } = c.req.valid('json')
 
-  await prisma.$transaction([
-    ...(removeTagIds.length > 0
-      ? [prisma.guestTag.deleteMany({ where: { guestId, tagId: { in: removeTagIds } } })]
-      : []),
-    ...(addTagIds.length > 0
-      ? [prisma.guestTag.createMany({
-          data: addTagIds.map((tagId) => ({ guestId, tagId, assignedBy: 'HOST' as const })),
-          skipDuplicates: true,
-        })]
-      : []),
-  ])
+  const operations = []
+  if (removeTagIds.length > 0) {
+    operations.push(prisma.guestTag.deleteMany({ where: { guestId, tagId: { in: removeTagIds } } }))
+  }
+  if (addTagIds.length > 0) {
+    operations.push(prisma.guestTag.createMany({
+      data: addTagIds.map((tagId) => ({ guestId, tagId, assignedBy: 'HOST' as const })),
+      skipDuplicates: true,
+    }))
+  }
+  if (operations.length > 0) {
+    await prisma.$transaction(operations)
+  }
 
   const updated = await prisma.guest.findUnique({
     where: { id: guestId },
-    include: {
-      contact: true,
-      tags: { include: { tag: true } },
-    },
+    include: GUEST_INCLUDE,
   })
   return c.json(updated)
 })

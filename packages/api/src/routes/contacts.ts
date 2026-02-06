@@ -1,18 +1,17 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { prisma } from '@seatern/db'
+import { prisma, type Prisma } from '@seatern/db'
 import { createContactSchema } from '@seatern/shared'
+import type { AuthEnv } from '../middleware/auth'
 
-type Env = { Variables: { userId: string } }
-
-export const contactsRoute = new Hono<Env>()
+export const contactsRoute = new Hono<AuthEnv>()
 
 // List contacts (with optional ?q= search)
 contactsRoute.get('/', async (c) => {
   const userId = c.get('userId')
   const q = c.req.query('q')
 
-  const where: any = { userId }
+  const where: Prisma.ContactWhereInput = { userId }
   if (q) {
     where.OR = [
       { name: { contains: q, mode: 'insensitive' } },

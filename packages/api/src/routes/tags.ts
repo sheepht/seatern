@@ -2,20 +2,15 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { prisma } from '@seatern/db'
 import { createTagSchema } from '@seatern/shared'
+import type { AuthEnv } from '../middleware/auth'
+import { requireParam, verifyEvent } from '../helpers'
 
-type Env = { Variables: { userId: string } }
-
-export const tagsRoute = new Hono<Env>()
-
-// Helper: verify event belongs to user
-async function verifyEvent(eventId: string, userId: string) {
-  return prisma.event.findFirst({ where: { id: eventId, userId } })
-}
+export const tagsRoute = new Hono<AuthEnv>()
 
 // List tags for an event
 tagsRoute.get('/', async (c) => {
   const userId = c.get('userId')
-  const eventId = c.req.param('eventId')
+  const eventId = requireParam(c.req.param('eventId'), 'eventId')
 
   const event = await verifyEvent(eventId, userId)
   if (!event) return c.json({ error: 'Event not found' }, 404)
@@ -31,7 +26,7 @@ tagsRoute.get('/', async (c) => {
 // Create tag
 tagsRoute.post('/', zValidator('json', createTagSchema), async (c) => {
   const userId = c.get('userId')
-  const eventId = c.req.param('eventId')
+  const eventId = requireParam(c.req.param('eventId'), 'eventId')
 
   const event = await verifyEvent(eventId, userId)
   if (!event) return c.json({ error: 'Event not found' }, 404)
@@ -46,8 +41,8 @@ tagsRoute.post('/', zValidator('json', createTagSchema), async (c) => {
 // Update tag
 tagsRoute.put('/:tagId', zValidator('json', createTagSchema.partial()), async (c) => {
   const userId = c.get('userId')
-  const eventId = c.req.param('eventId')
-  const tagId = c.req.param('tagId')
+  const eventId = requireParam(c.req.param('eventId'), 'eventId')
+  const tagId = requireParam(c.req.param('tagId'), 'tagId')
 
   const event = await verifyEvent(eventId, userId)
   if (!event) return c.json({ error: 'Event not found' }, 404)
@@ -65,8 +60,8 @@ tagsRoute.put('/:tagId', zValidator('json', createTagSchema.partial()), async (c
 // Delete tag
 tagsRoute.delete('/:tagId', async (c) => {
   const userId = c.get('userId')
-  const eventId = c.req.param('eventId')
-  const tagId = c.req.param('tagId')
+  const eventId = requireParam(c.req.param('eventId'), 'eventId')
+  const tagId = requireParam(c.req.param('tagId'), 'tagId')
 
   const event = await verifyEvent(eventId, userId)
   if (!event) return c.json({ error: 'Event not found' }, 404)

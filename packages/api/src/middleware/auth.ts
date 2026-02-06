@@ -1,6 +1,6 @@
 import { createMiddleware } from 'hono/factory'
 
-type AuthEnv = {
+export type AuthEnv = {
   Variables: {
     userId: string
   }
