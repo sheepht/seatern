@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/stores/auth'
 
+const DEV_ACCOUNTS = [
+  { userId: '00000000-0000-0000-0000-000000000001', name: '新郎志明', email: 'wedding@example.com', label: '婚禮' },
+  { userId: '00000000-0000-0000-0000-000000000002', name: '人資部 王小姐', email: 'corporate@example.com', label: '尾牙' },
+  { userId: '00000000-0000-0000-0000-000000000003', name: '行政部 李經理', email: 'large-corp@example.com', label: '大型企業春酒' },
+]
+
 export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -125,24 +131,15 @@ export default function LoginPage() {
               <div className="flex-1 border-t" />
             </div>
             <div className="space-y-2">
-              <button
-                onClick={() => handleDevSignIn('00000000-0000-0000-0000-000000000001', '新郎志明', 'wedding@example.com')}
-                className="w-full py-2 border rounded hover:bg-yellow-50 text-sm bg-yellow-50 text-yellow-800 border-yellow-300"
-              >
-                以 新郎志明 登入（婚禮）
-              </button>
-              <button
-                onClick={() => handleDevSignIn('00000000-0000-0000-0000-000000000002', '人資部 王小姐', 'corporate@example.com')}
-                className="w-full py-2 border rounded hover:bg-yellow-50 text-sm bg-yellow-50 text-yellow-800 border-yellow-300"
-              >
-                以 人資部王小姐 登入（尾牙）
-              </button>
-              <button
-                onClick={() => handleDevSignIn('00000000-0000-0000-0000-000000000003', '行政部 李經理', 'large-corp@example.com')}
-                className="w-full py-2 border rounded hover:bg-yellow-50 text-sm bg-yellow-50 text-yellow-800 border-yellow-300"
-              >
-                以 行政部李經理 登入（大型企業春酒）
-              </button>
+              {DEV_ACCOUNTS.map((account) => (
+                <button
+                  key={account.userId}
+                  onClick={() => handleDevSignIn(account.userId, account.name, account.email)}
+                  className="w-full py-2 border rounded hover:bg-yellow-50 text-sm bg-yellow-50 text-yellow-800 border-yellow-300"
+                >
+                  以 {account.name} 登入（{account.label}）
+                </button>
+              ))}
             </div>
           </>
         )}

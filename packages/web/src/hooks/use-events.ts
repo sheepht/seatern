@@ -37,16 +37,18 @@ export function useUpdateEvent() {
   })
 }
 
+function invalidateCategoryRelated(qc: ReturnType<typeof useQueryClient>, eventId: string): void {
+  qc.invalidateQueries({ queryKey: ['events', eventId] })
+  qc.invalidateQueries({ queryKey: ['guests', eventId] })
+  qc.invalidateQueries({ queryKey: ['tags', eventId] })
+}
+
 export function useRenameCategory(eventId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: { oldName: string; newName: string }) =>
       api.post(`/events/${eventId}/rename-category`, data).then((r) => r.data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['events', eventId] })
-      qc.invalidateQueries({ queryKey: ['guests', eventId] })
-      qc.invalidateQueries({ queryKey: ['tags', eventId] })
-    },
+    onSuccess: () => invalidateCategoryRelated(qc, eventId),
   })
 }
 
@@ -55,11 +57,7 @@ export function useDeleteCategory(eventId: string) {
   return useMutation({
     mutationFn: (name: string) =>
       api.post(`/events/${eventId}/delete-category`, { name }).then((r) => r.data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['events', eventId] })
-      qc.invalidateQueries({ queryKey: ['guests', eventId] })
-      qc.invalidateQueries({ queryKey: ['tags', eventId] })
-    },
+    onSuccess: () => invalidateCategoryRelated(qc, eventId),
   })
 }
 

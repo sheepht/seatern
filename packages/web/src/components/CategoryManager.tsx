@@ -1,8 +1,26 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useUpdateEvent, useRenameCategory, useDeleteCategory } from '@/hooks/use-events'
 import { useGuests } from '@/hooks/use-guests'
 
-export default function CategoryManager({ eventId, categories }: { eventId: string; categories: string[] }) {
+interface CategoryManagerProps {
+  eventId: string
+  categories: string[]
+}
+
+function countGuestsByCategory(guests: Array<{ category?: string | null }>) {
+  const counts = new Map<string, number>()
+  let uncategorized = 0
+  for (const g of guests) {
+    if (g.category) {
+      counts.set(g.category, (counts.get(g.category) || 0) + 1)
+    } else {
+      uncategorized++
+    }
+  }
+  return { counts, uncategorized }
+}
+
+export default function CategoryManager({ eventId, categories }: CategoryManagerProps) {
   const updateEvent = useUpdateEvent()
   const renameCategory = useRenameCategory(eventId)
   const deleteCategory = useDeleteCategory(eventId)
@@ -19,19 +37,10 @@ export default function CategoryManager({ eventId, categories }: { eventId: stri
   const [editError, setEditError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
-  // 每個分類的賓客數
-  const countByCategory = new Map<string, number>()
-  let uncategorized = 0
-  if (guests) {
-    for (const g of guests as any[]) {
-      const cat = g.category
-      if (cat) {
-        countByCategory.set(cat, (countByCategory.get(cat) || 0) + 1)
-      } else {
-        uncategorized++
-      }
-    }
-  }
+  const { counts: countByCategory, uncategorized } = useMemo(
+    () => countGuestsByCategory(guests ?? []),
+    [guests],
+  )
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault()

@@ -7,12 +7,17 @@ import {
   randomRsvpStatus,
   randomDietaryNote,
   randomSpecialNote,
-  computeSatisfaction,
   weightedCategory,
   faker,
   chunk,
 } from './helpers.js'
 import { buildSocialGraph } from './graph-builder.js'
+import {
+  type GuestRecord,
+  computeAndUpdateSatisfaction,
+  buildGuestTagAssociations,
+  buildGuestInfos,
+} from './satisfaction-updater.js'
 
 export async function seedWedding(prisma: PrismaClient) {
   const config = WEDDING_CONFIG
@@ -81,7 +86,7 @@ export async function seedWedding(prisma: PrismaClient) {
 
   // 5. Guests
   console.log(`Step 5: 建立 ${config.guestCount} Guests...`)
-  const guestRecords: Array<{ id: string; contactId: string; category: string | null; tagIds: string[]; assignedTableId: string | null }> = []
+  const guestRecords: GuestRecord[] = []
 
   // 先依 tag estimatedCount 分配 contacts 到 tags
   const tagAssignments = assignContactsToTags(contacts, tags, config)
@@ -127,26 +132,7 @@ export async function seedWedding(prisma: PrismaClient) {
 
   // 6. GuestTags
   console.log('Step 6: 建立 GuestTag 關聯...')
-  const guestTagData: Array<{ guestId: string; tagId: string }> = []
-  const tagGuestMap: Record<string, string[]> = {}
-
-  // Build contactId -> guestId map
-  const contactToGuest = new Map(guestRecords.map(g => [g.contactId, g.id]))
-
-  for (const tag of tags) {
-    tagGuestMap[tag.id] = []
-    const contactIds = tagAssignments.get(tag.id) || []
-    for (const contactId of contactIds) {
-      const guestId = contactToGuest.get(contactId)
-      if (guestId) {
-        guestTagData.push({ guestId, tagId: tag.id })
-        tagGuestMap[tag.id].push(guestId)
-        const gr = guestRecords.find(g => g.id === guestId)
-        if (gr) gr.tagIds.push(tag.id)
-      }
-    }
-  }
-
+  const { guestTagData, tagGuestMap } = buildGuestTagAssociations(guestRecords, tags, tagAssignments)
   await prisma.guestTag.createMany({ data: guestTagData, skipDuplicates: true })
   console.log(`  Created ${guestTagData.length} guest-tag associations`)
 
@@ -174,14 +160,8 @@ export async function seedWedding(prisma: PrismaClient) {
   )
   console.log(`  Created ${tables.length} tables`)
 
-  // 8. 分配 confirmed guests 到桌次（~80% of confirmed）
+  // 8. 分配 confirmed guests 到桌次
   console.log('Step 8: 分配賓客到桌次...')
-  const confirmedGuests = guestRecords.filter(g => {
-    // 需要查回 rsvp
-    return true // 會在下面用 prisma 查
-  })
-
-  // 查 confirmed guests
   const dbGuests = await prisma.guest.findMany({
     where: { eventId: event.id, rsvpStatus: { in: ['CONFIRMED', 'MODIFIED'] } },
     select: { id: true },
@@ -273,24 +253,12 @@ export async function seedWedding(prisma: PrismaClient) {
 
   // 9. Social Graph
   console.log('Step 9: 建立社交圖...')
-  const guestInfos = guestRecords.map(g => ({
-    id: g.id,
-    tagIds: g.tagIds,
-    assignedTableId: null as string | null,
-  }))
-  // Update assignedTableId from tableAssignment
-  for (const [tableId, guestIds] of tableAssignment) {
-    for (const gid of guestIds) {
-      const gi = guestInfos.find(g => g.id === gid)
-      if (gi) gi.assignedTableId = tableId
-    }
-  }
-
+  const guestInfos = buildGuestInfos(guestRecords, tableAssignment)
   const preferenceMap = await buildSocialGraph(prisma, event.id, guestInfos, tagGuestMap)
 
   // 10. 計算 satisfactionScore
   console.log('Step 10: 計算滿意度...')
-  await computeAndUpdateSatisfaction(prisma, event.id, guestRecords, tableAssignment, tagGuestMap, preferenceMap, tables)
+  await computeAndUpdateSatisfaction(prisma, event.id, guestRecords, tableAssignment, preferenceMap, tables)
 
   console.log(`=== 婚禮場景完成 ===\n`)
 }
@@ -337,152 +305,3 @@ function assignContactsToTags(
   return result
 }
 
-/** 計算並更新滿意度分數 */
-async function computeAndUpdateSatisfaction(
-  prisma: PrismaClient,
-  eventId: string,
-  guestRecords: Array<{ id: string; tagIds: string[] }>,
-  tableAssignment: Map<string, string[]>,
-  tagGuestMap: Record<string, string[]>,
-  preferenceMap: Map<string, string[]>,
-  tables: Array<{ id: string }>,
-) {
-  // Build guestId -> tableId
-  const guestToTable = new Map<string, string>()
-  for (const [tableId, guestIds] of tableAssignment) {
-    for (const gid of guestIds) {
-      guestToTable.set(gid, tableId)
-    }
-  }
-
-  // Build tableId -> Set<guestIds>
-  const tableGuestSets = new Map<string, Set<string>>()
-  for (const [tableId, guestIds] of tableAssignment) {
-    tableGuestSets.set(tableId, new Set(guestIds))
-  }
-
-  // Build guestId -> Set<tagIds they share>
-  const guestTags = new Map<string, Set<string>>()
-  for (const g of guestRecords) {
-    guestTags.set(g.id, new Set(g.tagIds))
-  }
-
-  // Compute adjacent tables (nearest 2 by position)
-  const tablePositions = new Map<string, { x: number; y: number }>()
-  const dbTables = await prisma.table.findMany({ where: { eventId }, select: { id: true, positionX: true, positionY: true } })
-  for (const t of dbTables) {
-    tablePositions.set(t.id, { x: t.positionX, y: t.positionY })
-  }
-
-  function getAdjacentTableIds(tableId: string): string[] {
-    const pos = tablePositions.get(tableId)
-    if (!pos) return []
-    const distances = dbTables
-      .filter(t => t.id !== tableId)
-      .map(t => ({ id: t.id, dist: Math.sqrt((t.positionX - pos.x) ** 2 + (t.positionY - pos.y) ** 2) }))
-      .sort((a, b) => a.dist - b.dist)
-    return distances.slice(0, 2).map(d => d.id)
-  }
-
-  // Compute satisfaction for each guest
-  const updates: Array<{ id: string; score: number }> = []
-
-  for (const guest of guestRecords) {
-    const tableId = guestToTable.get(guest.id)
-    if (!tableId) {
-      updates.push({ id: guest.id, score: 55 }) // 基礎分 50 + 需求分 5
-      continue
-    }
-
-    const sameTableGuests = tableGuestSets.get(tableId) || new Set()
-    const myTags = guestTags.get(guest.id) || new Set()
-
-    // 群組分：同桌同 tag 比例
-    let sameTagCount = 0
-    for (const otherId of sameTableGuests) {
-      if (otherId === guest.id) continue
-      const otherTags = guestTags.get(otherId) || new Set()
-      for (const t of myTags) {
-        if (otherTags.has(t)) {
-          sameTagCount++
-          break
-        }
-      }
-    }
-    const tableSize = sameTableGuests.size - 1
-    const sameTagRatio = tableSize > 0 ? sameTagCount / tableSize : 0
-
-    // 偏好分
-    const prefs = preferenceMap.get(guest.id) || []
-    let preferenceMatches = 0
-    let preferenceNearby = false
-    const adjacentTables = getAdjacentTableIds(tableId)
-    const adjacentGuests = new Set<string>()
-    for (const adjId of adjacentTables) {
-      const adjSet = tableGuestSets.get(adjId)
-      if (adjSet) {
-        for (const gid of adjSet) adjacentGuests.add(gid)
-      }
-    }
-
-    for (const prefId of prefs) {
-      if (sameTableGuests.has(prefId)) {
-        preferenceMatches++
-      } else if (adjacentGuests.has(prefId)) {
-        preferenceNearby = true
-      }
-    }
-
-    const score = computeSatisfaction({
-      sameTagRatio,
-      preferenceMatches,
-      totalPreferences: prefs.length,
-      preferenceNearby,
-    })
-
-    updates.push({ id: guest.id, score })
-  }
-
-  // Batch update satisfaction scores
-  for (const batch of chunk(updates, 50)) {
-    await prisma.$transaction(
-      batch.map(u =>
-        prisma.guest.update({
-          where: { id: u.id },
-          data: { satisfactionScore: u.score },
-        }),
-      ),
-    )
-  }
-
-  // Update table average satisfaction
-  for (const table of tables) {
-    const guestIds = tableAssignment.get(table.id) || []
-    if (guestIds.length === 0) continue
-    const scores = updates.filter(u => guestIds.includes(u.id)).map(u => u.score)
-    const avg = scores.reduce((a, b) => a + b, 0) / scores.length
-    await prisma.table.update({
-      where: { id: table.id },
-      data: { averageSatisfaction: Math.round(avg * 10) / 10 },
-    })
-  }
-
-  // Mark isolated guests
-  const isolated = guestRecords.filter(g => {
-    const prefs = preferenceMap.get(g.id)
-    const hasPrefs = prefs && prefs.length > 0
-    const isPreferredBySomeone = [...preferenceMap.values()].some(pids => pids.includes(g.id))
-    return !hasPrefs && !isPreferredBySomeone && g.tagIds.length === 0
-  })
-
-  if (isolated.length > 0) {
-    await prisma.guest.updateMany({
-      where: { id: { in: isolated.map(g => g.id) } },
-      data: { isIsolated: true },
-    })
-    console.log(`  Marked ${isolated.length} guests as isolated`)
-  }
-
-  const avgScore = updates.reduce((a, b) => a + b.score, 0) / updates.length
-  console.log(`  Average satisfaction: ${avgScore.toFixed(1)}`)
-}

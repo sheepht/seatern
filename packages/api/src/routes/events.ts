@@ -16,6 +16,10 @@ function toEventType(type: string): EventType {
   return type.toUpperCase() as EventType
 }
 
+async function findOwnedEvent(userId: string, eventId: string) {
+  return prisma.event.findFirst({ where: { id: eventId, userId } })
+}
+
 export const eventsRoute = new Hono<AuthEnv>()
 
 // List all events for the user
@@ -62,7 +66,7 @@ eventsRoute.put('/:eventId', zValidator('json', createEventSchema.partial()), as
   const eventId = c.req.param('eventId')
   const { date, type, ...rest } = c.req.valid('json')
 
-  const event = await prisma.event.findFirst({ where: { id: eventId, userId } })
+  const event = await findOwnedEvent(userId, eventId)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
   const updated = await prisma.event.update({
@@ -81,7 +85,7 @@ eventsRoute.delete('/:eventId', async (c) => {
   const userId = c.get('userId')
   const eventId = c.req.param('eventId')
 
-  const event = await prisma.event.findFirst({ where: { id: eventId, userId } })
+  const event = await findOwnedEvent(userId, eventId)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
   await prisma.event.delete({ where: { id: eventId } })
@@ -96,7 +100,7 @@ eventsRoute.post('/:eventId/delete-category', zValidator('json', deleteCategoryS
   const eventId = c.req.param('eventId')
   const { name } = c.req.valid('json')
 
-  const event = await prisma.event.findFirst({ where: { id: eventId, userId } })
+  const event = await findOwnedEvent(userId, eventId)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
   await prisma.$transaction([
@@ -123,7 +127,7 @@ eventsRoute.post('/:eventId/rename-category', zValidator('json', renameCategoryS
   const eventId = c.req.param('eventId')
   const { oldName, newName } = c.req.valid('json')
 
-  const event = await prisma.event.findFirst({ where: { id: eventId, userId } })
+  const event = await findOwnedEvent(userId, eventId)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
   const updatedCategories = event.categories.map((cat) => (cat === oldName ? newName : cat))
