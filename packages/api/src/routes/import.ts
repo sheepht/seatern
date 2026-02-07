@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { prisma } from '@seatern/db'
@@ -65,6 +66,7 @@ importRoute.post('/', zValidator('json', importGuestsSchema), async (c) => {
           data: {
             eventId,
             contactId: contact.id,
+            formToken: crypto.randomUUID(),
             category: row.category || null,
             relationScore: row.relationScore,
             ...(row.attendeeCount && { attendeeCount: row.attendeeCount }),

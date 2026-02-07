@@ -5,8 +5,7 @@ import {
   generateChineseName,
   generateTablePositions,
   randomRsvpStatus,
-  randomDietaryNote,
-  randomSpecialNote,
+  rsvpGuestData,
   weightedCategory,
   faker,
   chunk,
@@ -110,6 +109,10 @@ export async function seedLargeCorporate(prisma: PrismaClient) {
         else if (isManager) relationScore = faker.number.int({ min: 2, max: 3 })
         else relationScore = faker.number.int({ min: 1, max: 2 })
 
+        const formData = rsvpGuestData(rsvp, {
+          attendeeWeights: [{ value: 1, weight: 75 }, { value: 2, weight: 25 }],
+          infantRate: 0.02,
+        })
         return prisma.guest.create({
           data: {
             eventId: event.id,
@@ -117,15 +120,7 @@ export async function seedLargeCorporate(prisma: PrismaClient) {
             category,
             relationScore,
             rsvpStatus: rsvp,
-            attendeeCount: rsvp === 'CONFIRMED' || rsvp === 'MODIFIED'
-              ? faker.helpers.weightedArrayElement([
-                { value: 1, weight: 75 },
-                { value: 2, weight: 25 },
-              ])
-              : 1,
-            infantCount: faker.number.float({ min: 0, max: 1 }) < 0.02 ? 1 : 0,
-            dietaryNote: randomDietaryNote(),
-            specialNote: randomSpecialNote(),
+            ...formData,
             formToken: crypto.randomUUID(),
           },
           select: { id: true, contactId: true, category: true },
@@ -187,7 +182,7 @@ export async function seedLargeCorporate(prisma: PrismaClient) {
   // 8. 分配 guests 到桌次（按廠區 category）
   console.log('Step 8: 分配賓客到桌次...')
   const confirmedDb = await prisma.guest.findMany({
-    where: { eventId: event.id, rsvpStatus: { in: ['CONFIRMED', 'MODIFIED'] } },
+    where: { eventId: event.id, rsvpStatus: 'CONFIRMED' },
     select: { id: true, relationScore: true },
   })
   const confirmedIds = new Set(confirmedDb.map(g => g.id))
@@ -265,7 +260,7 @@ export async function seedLargeCorporate(prisma: PrismaClient) {
   // 9. Social Graph
   console.log('Step 9: 建立社交圖...')
   const guestInfos = buildGuestInfos(guestRecords, tableAssignment)
-  const preferenceMap = await buildSocialGraph(prisma, event.id, guestInfos, tagGuestMap)
+  const preferenceMap = await buildSocialGraph(prisma, event.id, guestInfos, tagGuestMap, confirmedIds)
 
   // 10. 計算 satisfactionScore
   console.log('Step 10: 計算滿意度...')

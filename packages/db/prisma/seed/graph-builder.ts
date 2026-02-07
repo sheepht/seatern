@@ -20,6 +20,7 @@ export async function buildSocialGraph(
   eventId: string,
   guests: GuestInfo[],
   tagGuestMap: TagGuestMap,
+  confirmedGuestIds?: Set<string>,
 ): Promise<Map<string, string[]>> {
   const guestSet = new Set(guests.map(g => g.id))
 
@@ -61,12 +62,15 @@ export async function buildSocialGraph(
   })
   console.log(`  Created ${uniqueSameGroupEdges.length} SAME_GROUP edges`)
 
-  // 2. SeatPreferences：~65% guests 填 1-3 個偏好
+  // 2. SeatPreferences：~65% confirmed guests 填 1-3 個偏好
+  //    只有填過表單（CONFIRMED）的賓客才有偏好資料
   console.log('  Building SeatPreferences...')
   const preferences: Array<{ guestId: string; preferredId: string; rank: number }> = []
   const preferenceMap = new Map<string, string[]>() // guestId -> preferredIds
 
   for (const guest of guests) {
+    // 只有 CONFIRMED guests 才會有 seatPreferences
+    if (confirmedGuestIds && !confirmedGuestIds.has(guest.id)) continue
     if (faker.number.float({ min: 0, max: 1 }) > 0.65) continue
 
     const prefCount = faker.number.int({ min: 1, max: 3 })

@@ -66,12 +66,11 @@ export function generateTablePositions(count: number, cols: number): Array<{ x: 
 
 // ─── RSVP 狀態 ───
 
-export function randomRsvpStatus(): 'CONFIRMED' | 'PENDING' | 'DECLINED' | 'MODIFIED' {
+export function randomRsvpStatus(): 'CONFIRMED' | 'PENDING' | 'DECLINED' {
   const r = faker.number.float({ min: 0, max: 1 })
-  if (r < 0.75) return 'CONFIRMED'
+  if (r < 0.70) return 'CONFIRMED'
   if (r < 0.85) return 'PENDING'
-  if (r < 0.95) return 'DECLINED'
-  return 'MODIFIED'
+  return 'DECLINED'
 }
 
 // ─── 飲食/特殊需求備註 ───
@@ -84,6 +83,32 @@ export function randomDietaryNote(): string | undefined {
 export function randomSpecialNote(): string | undefined {
   if (faker.number.float({ min: 0, max: 1 }) > 0.08) return undefined
   return faker.helpers.arrayElement(SPECIAL_NEEDS_OPTIONS)
+}
+
+/** 根據 RSVP 狀態產生合理的賓客表單資料 */
+export function rsvpGuestData(rsvp: 'CONFIRMED' | 'PENDING' | 'DECLINED', opts?: {
+  attendeeWeights?: Array<{ value: number; weight: number }>
+  infantRate?: number
+}) {
+  const attendeeWeights = opts?.attendeeWeights ?? [{ value: 1, weight: 60 }, { value: 2, weight: 40 }]
+  const infantRate = opts?.infantRate ?? 0.05
+
+  if (rsvp === 'CONFIRMED') {
+    return {
+      attendeeCount: faker.helpers.weightedArrayElement(attendeeWeights),
+      infantCount: faker.number.float({ min: 0, max: 1 }) < infantRate ? 1 : 0,
+      dietaryNote: randomDietaryNote(),
+      specialNote: randomSpecialNote(),
+    }
+  }
+  // PENDING: 沒填過表單，全部預設值
+  // DECLINED: 婉拒，人數 0，無需求
+  return {
+    attendeeCount: rsvp === 'PENDING' ? 1 : 0,
+    infantCount: 0,
+    dietaryNote: undefined,
+    specialNote: undefined,
+  }
 }
 
 // ─── 滿意度計算（依 PRD 公式）───

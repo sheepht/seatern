@@ -12,6 +12,8 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
   const updateGuestTags = useUpdateGuestTags(eventId)
   const deleteGuest = useDeleteGuest(eventId)
 
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
   const createRef = useRef<HTMLDialogElement>(null)
   const editRef = useRef<HTMLDialogElement>(null)
   const deleteRef = useRef<HTMLDialogElement>(null)
@@ -119,6 +121,14 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
     )
   }
 
+  function copyFormLink(token: string, guestId: string) {
+    const url = `${window.location.origin}/form/${token}`
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(guestId)
+      setTimeout(() => setCopiedId(null), 2000)
+    })
+  }
+
   function confirmDelete(guestId: string) {
     setDeleteId(guestId)
     deleteRef.current?.showModal()
@@ -163,6 +173,7 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
                 <th className="py-2">標籤</th>
                 <th className="py-2">RSVP</th>
                 <th className="py-2">人數</th>
+                <th className="py-2">表單</th>
                 <th className="py-2">操作</th>
               </tr>
             </thead>
@@ -193,6 +204,14 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
                     </span>
                   </td>
                   <td className="py-2">{g.attendeeCount}{g.infantCount > 0 ? ` +${g.infantCount}嬰` : ''}</td>
+                  <td className="py-2">
+                    <button
+                      onClick={() => copyFormLink(g.formToken, g.id)}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      {copiedId === g.id ? '已複製！' : '複製連結'}
+                    </button>
+                  </td>
                   <td className="py-2 space-x-2">
                     <button onClick={() => openEdit(g)} className="text-blue-600 hover:underline text-sm">編輯</button>
                     <button onClick={() => confirmDelete(g.id)} className="text-red-500 hover:underline text-sm">刪除</button>

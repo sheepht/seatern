@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { prisma } from '@seatern/db'
@@ -43,6 +44,7 @@ guestsRoute.post('/', zValidator('json', createGuestSchema), async (c) => {
     data: {
       ...guestData,
       eventId,
+      formToken: crypto.randomUUID(),
       ...(tagIds.length > 0 && {
         tags: { create: tagIds.map((tagId) => ({ tagId, assignedBy: 'HOST' as const })) },
       }),
