@@ -39,6 +39,17 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
 
   const token = authHeader.slice(7)
 
+  // Dev bypass：非 production 環境允許 dev-bypass-<userId> 格式的 token
+  if (process.env.NODE_ENV !== 'production' && token.startsWith('dev-bypass-')) {
+    const userId = token.slice('dev-bypass-'.length)
+    if (!userId) {
+      return c.json({ error: 'Invalid dev bypass token' }, 401)
+    }
+    c.set('userId', userId)
+    await next()
+    return
+  }
+
   try {
     const payload = await verifyToken(token)
     const userId = payload.sub

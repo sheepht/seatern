@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { seedWedding } from './seed/create-wedding.js'
 import { seedCorporate } from './seed/create-corporate.js'
+import { seedLargeCorporate } from './seed/create-large-corporate.js'
 import { resetUsedNames } from './seed/helpers.js'
 
 const prisma = new PrismaClient()
@@ -31,6 +32,9 @@ async function main() {
 
   // 場景 2：公司尾牙
   await seedCorporate(prisma)
+
+  // 場景 3：大型企業春酒
+  await seedLargeCorporate(prisma)
 
   // 統計
   const elapsed = ((Date.now() - start) / 1000).toFixed(1)

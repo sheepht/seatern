@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client'
 import crypto from 'node:crypto'
-import { WEDDING_CONFIG } from './constants.js'
+import { LARGE_CORPORATE_CONFIG } from './constants.js'
 import {
   generateChineseName,
   generateTablePositions,
@@ -14,17 +14,17 @@ import {
 } from './helpers.js'
 import { buildSocialGraph } from './graph-builder.js'
 
-export async function seedWedding(prisma: PrismaClient) {
-  const config = WEDDING_CONFIG
-  console.log(`\n=== 建立婚禮場景：${config.eventName} ===`)
+export async function seedLargeCorporate(prisma: PrismaClient) {
+  const config = LARGE_CORPORATE_CONFIG
+  console.log(`\n=== 建立大型企業春酒場景：${config.eventName} ===`)
 
   // 1. User（固定 ID 以支援 dev bypass 登入）
   console.log('Step 1: 建立 User...')
   const user = await prisma.user.create({
     data: {
-      id: '00000000-0000-0000-0000-000000000001',
-      email: 'wedding@example.com',
-      name: '新郎志明',
+      id: '00000000-0000-0000-0000-000000000003',
+      email: 'large-corp@example.com',
+      name: '行政部 李經理',
     },
   })
 
@@ -79,11 +79,14 @@ export async function seedWedding(prisma: PrismaClient) {
   )
   console.log(`  Created ${tags.length} tags`)
 
+  // Tag index references (based on LARGE_CORPORATE_CONFIG.tags order)
+  const managerTagIdx = 16  // '高階主管'
+  const vipTagIdx = 17      // 'VIP 貴賓'
+
   // 5. Guests
   console.log(`Step 5: 建立 ${config.guestCount} Guests...`)
   const guestRecords: Array<{ id: string; contactId: string; category: string | null; tagIds: string[]; assignedTableId: string | null }> = []
 
-  // 先依 tag estimatedCount 分配 contacts 到 tags
   const tagAssignments = assignContactsToTags(contacts, tags, config)
 
   for (const batch of chunk(contacts, 50)) {
@@ -91,20 +94,28 @@ export async function seedWedding(prisma: PrismaClient) {
       batch.map(contact => {
         const category = weightedCategory(config.categoryDistribution)
         const rsvp = randomRsvpStatus()
+
+        const isManager = tagAssignments.get(tags[managerTagIdx].id)?.includes(contact.id)
+        const isVip = tagAssignments.get(tags[vipTagIdx].id)?.includes(contact.id)
+        let relationScore: number
+        if (isVip) relationScore = 3
+        else if (isManager) relationScore = faker.number.int({ min: 2, max: 3 })
+        else relationScore = faker.number.int({ min: 1, max: 2 })
+
         return prisma.guest.create({
           data: {
             eventId: event.id,
             contactId: contact.id,
             category,
-            relationScore: faker.number.int({ min: 1, max: 3 }),
+            relationScore,
             rsvpStatus: rsvp,
             attendeeCount: rsvp === 'CONFIRMED' || rsvp === 'MODIFIED'
               ? faker.helpers.weightedArrayElement([
-                { value: 1, weight: 60 },
-                { value: 2, weight: 40 },
+                { value: 1, weight: 75 },
+                { value: 2, weight: 25 },
               ])
               : 1,
-            infantCount: faker.number.float({ min: 0, max: 1 }) < 0.05 ? 1 : 0,
+            infantCount: faker.number.float({ min: 0, max: 1 }) < 0.02 ? 1 : 0,
             dietaryNote: randomDietaryNote(),
             specialNote: randomSpecialNote(),
             formToken: crypto.randomUUID(),
@@ -129,8 +140,6 @@ export async function seedWedding(prisma: PrismaClient) {
   console.log('Step 6: 建立 GuestTag 關聯...')
   const guestTagData: Array<{ guestId: string; tagId: string }> = []
   const tagGuestMap: Record<string, string[]> = {}
-
-  // Build contactId -> guestId map
   const contactToGuest = new Map(guestRecords.map(g => [g.contactId, g.id]))
 
   for (const tag of tags) {
@@ -150,110 +159,101 @@ export async function seedWedding(prisma: PrismaClient) {
   await prisma.guestTag.createMany({ data: guestTagData, skipDuplicates: true })
   console.log(`  Created ${guestTagData.length} guest-tag associations`)
 
-  // 7. Tables
+  // 7. Tables — 10 columns layout for 80 tables
   console.log(`Step 7: 建立 ${config.tableCount} Tables...`)
-  const positions = generateTablePositions(config.tableCount, 5) // 5 columns
-  const tableNames = [
-    '主桌', '家人桌A', '家人桌B', '大學同學桌', '高中同學桌',
-    '男方同事桌A', '男方同事桌B', '女方同事桌A', '女方同事桌B', '教會桌',
-    '社團桌', '共同好友桌', '鄰居桌', '混合桌A', '混合桌B',
-  ]
+  const positions = generateTablePositions(config.tableCount, 10)
+
+  // 桌名：依廠區分區
+  const tableData = positions.map((pos, i) => {
+    let name: string
+    if (i === 0) name = '主桌'
+    // 新竹總部 1-20
+    else if (i <= 20) name = `新竹${String(i).padStart(2, '0')}`
+    // 台中廠區 21-44
+    else if (i <= 44) name = `台中${String(i - 20).padStart(2, '0')}`
+    // 台南廠區 45-64
+    else if (i <= 64) name = `台南${String(i - 44).padStart(2, '0')}`
+    // 海外 + 混合
+    else name = `混合${String.fromCharCode(65 + i - 65)}`
+    return { name, positionX: pos.x, positionY: pos.y }
+  })
 
   const tables = await prisma.$transaction(
-    positions.map((pos, i) =>
+    tableData.map(t =>
       prisma.table.create({
         data: {
           eventId: event.id,
-          name: tableNames[i] || `第${i + 1}桌`,
+          name: t.name,
           capacity: config.tableCapacity,
-          positionX: pos.x,
-          positionY: pos.y,
+          positionX: t.positionX,
+          positionY: t.positionY,
         },
       }),
     ),
   )
   console.log(`  Created ${tables.length} tables`)
 
-  // 8. 分配 confirmed guests 到桌次（~80% of confirmed）
+  // 8. 分配 guests 到桌次（按廠區 category）
   console.log('Step 8: 分配賓客到桌次...')
-  const confirmedGuests = guestRecords.filter(g => {
-    // 需要查回 rsvp
-    return true // 會在下面用 prisma 查
-  })
-
-  // 查 confirmed guests
-  const dbGuests = await prisma.guest.findMany({
+  const confirmedDb = await prisma.guest.findMany({
     where: { eventId: event.id, rsvpStatus: { in: ['CONFIRMED', 'MODIFIED'] } },
-    select: { id: true },
+    select: { id: true, relationScore: true },
   })
-  const confirmedIds = new Set(dbGuests.map(g => g.id))
+  const confirmedIds = new Set(confirmedDb.map(g => g.id))
 
-  // 分配：先按 tag 分到對應桌，溢出放混合桌
-  const tableAssignment = new Map<string, string[]>() // tableId -> guestIds
+  const tableAssignment = new Map<string, string[]>()
   for (const t of tables) {
     tableAssignment.set(t.id, [])
   }
-
   const assignedGuestIds = new Set<string>()
-  const tagToTableHint: Record<string, number> = {
-    [tags[0].id]: 1, // 男方家人 -> 家人桌A
-    [tags[1].id]: 2, // 女方家人 -> 家人桌B
-    [tags[2].id]: 3, // 大學同學
-    [tags[3].id]: 4, // 高中同學
-    [tags[4].id]: 5, // 男方同事A
-    [tags[5].id]: 7, // 女方同事A
-    [tags[6].id]: 9, // 教會
-    [tags[7].id]: 10, // 社團
-    [tags[8].id]: 12, // 鄰居
-    [tags[9].id]: 11, // 共同好友
-  }
 
-  // 主桌：relationScore 3 的人
-  const vipGuests = guestRecords.filter(g => confirmedIds.has(g.id))
-  const vipFromDb = await prisma.guest.findMany({
-    where: { id: { in: vipGuests.map(g => g.id) }, relationScore: 3 },
-    select: { id: true },
-    take: config.tableCapacity,
-  })
-  for (const g of vipFromDb) {
+  // 主桌：VIP + 高階主管
+  const vipGuests = confirmedDb
+    .filter(g => g.relationScore >= 3)
+    .slice(0, config.tableCapacity)
+  for (const g of vipGuests) {
     tableAssignment.get(tables[0].id)!.push(g.id)
     assignedGuestIds.add(g.id)
   }
 
-  // 按 tag 分配
-  for (const [tagId, hintIdx] of Object.entries(tagToTableHint)) {
-    const table = tables[hintIdx]
-    if (!table) continue
-    const guestIds = tagGuestMap[tagId] || []
-    for (const gid of guestIds) {
-      if (assignedGuestIds.has(gid) || !confirmedIds.has(gid)) continue
-      const assigned = tableAssignment.get(table.id)!
-      if (assigned.length >= config.tableCapacity) {
-        // 溢出到下一桌
-        const nextTable = tables[hintIdx + 1] || tables[tables.length - 1]
-        const nextAssigned = tableAssignment.get(nextTable.id)!
-        if (nextAssigned.length < config.tableCapacity) {
-          nextAssigned.push(gid)
-          assignedGuestIds.add(gid)
-          // 標記溢出
-          await prisma.guest.update({ where: { id: gid }, data: { isOverflow: true } })
-        }
-        continue
-      }
-      assigned.push(gid)
-      assignedGuestIds.add(gid)
-    }
+  // 按廠區（category）分配到對應桌號範圍
+  const categoryToTableRange: Record<string, [number, number]> = {
+    '新竹總部': [1, 20],
+    '台中廠區': [21, 44],
+    '台南廠區': [45, 64],
+    '海外據點': [65, 72],
   }
 
-  // 剩餘 confirmed 但未分配的放混合桌
-  for (const g of guestRecords) {
-    if (assignedGuestIds.has(g.id) || !confirmedIds.has(g.id)) continue
-    for (const table of tables) {
-      const assigned = tableAssignment.get(table.id)!
-      if (assigned.length < config.tableCapacity) {
-        assigned.push(g.id)
-        assignedGuestIds.add(g.id)
-        break
+  for (const guest of guestRecords) {
+    if (assignedGuestIds.has(guest.id) || !confirmedIds.has(guest.id)) continue
+
+    const range = categoryToTableRange[guest.category || '']
+    let placed = false
+
+    if (range) {
+      for (let idx = range[0]; idx <= range[1] && idx < tables.length; idx++) {
+        const table = tables[idx]
+        const assigned = tableAssignment.get(table.id)!
+        if (assigned.length < config.tableCapacity) {
+          assigned.push(guest.id)
+          assignedGuestIds.add(guest.id)
+          placed = true
+          break
+        }
+      }
+    }
+
+    if (!placed) {
+      // 溢出到混合桌（尾部）
+      for (let i = 73; i < tables.length; i++) {
+        const table = tables[i]
+        const assigned = tableAssignment.get(table.id)!
+        if (assigned.length < config.tableCapacity) {
+          assigned.push(guest.id)
+          assignedGuestIds.add(guest.id)
+          await prisma.guest.update({ where: { id: guest.id }, data: { isOverflow: true } })
+          break
+        }
       }
     }
   }
@@ -278,7 +278,6 @@ export async function seedWedding(prisma: PrismaClient) {
     tagIds: g.tagIds,
     assignedTableId: null as string | null,
   }))
-  // Update assignedTableId from tableAssignment
   for (const [tableId, guestIds] of tableAssignment) {
     for (const gid of guestIds) {
       const gi = guestInfos.find(g => g.id === gid)
@@ -292,45 +291,35 @@ export async function seedWedding(prisma: PrismaClient) {
   console.log('Step 10: 計算滿意度...')
   await computeAndUpdateSatisfaction(prisma, event.id, guestRecords, tableAssignment, tagGuestMap, preferenceMap, tables)
 
-  console.log(`=== 婚禮場景完成 ===\n`)
+  console.log(`=== 大型企業春酒場景完成 ===\n`)
 }
 
 /** 將 contacts 分配到 tags（按 estimatedCount） */
 function assignContactsToTags(
   contacts: Array<{ id: string }>,
   tags: Array<{ id: string }>,
-  config: typeof WEDDING_CONFIG,
+  config: typeof LARGE_CORPORATE_CONFIG,
 ): Map<string, string[]> {
   const result = new Map<string, string[]>()
-  const assigned = new Set<string>()
+  const usedCounts = new Map<string, number>()
+
+  for (const tag of tags) {
+    result.set(tag.id, [])
+  }
 
   for (let i = 0; i < tags.length; i++) {
     const tag = tags[i]
     const tagConfig = config.tags[i]
     const count = tagConfig.estimatedCount
-    result.set(tag.id, [])
 
-    const available = contacts.filter(c => !assigned.has(c.id))
+    const available = contacts
+      .filter(c => (usedCounts.get(c.id) || 0) < 2)
+      .sort(() => Math.random() - 0.5)
+
     const selected = available.slice(0, Math.min(count, available.length))
     for (const c of selected) {
       result.get(tag.id)!.push(c.id)
-      assigned.add(c.id)
-    }
-  }
-
-  // 部分 guest 給 2 個 tags（~20%）
-  const multiTagCount = Math.ceil(contacts.length * 0.2)
-  const tagIds = tags.map(t => t.id)
-  for (let i = 0; i < multiTagCount; i++) {
-    const contact = contacts[i]
-    // 找已有的 tag
-    const currentTags = tagIds.filter(tid => result.get(tid)?.includes(contact.id))
-    if (currentTags.length >= 2) continue
-    // 加一個額外 tag
-    const otherTags = tagIds.filter(tid => !currentTags.includes(tid))
-    if (otherTags.length > 0) {
-      const randomTag = otherTags[Math.floor(Math.random() * otherTags.length)]
-      result.get(randomTag)!.push(contact.id)
+      usedCounts.set(c.id, (usedCounts.get(c.id) || 0) + 1)
     }
   }
 
@@ -347,7 +336,6 @@ async function computeAndUpdateSatisfaction(
   preferenceMap: Map<string, string[]>,
   tables: Array<{ id: string }>,
 ) {
-  // Build guestId -> tableId
   const guestToTable = new Map<string, string>()
   for (const [tableId, guestIds] of tableAssignment) {
     for (const gid of guestIds) {
@@ -355,64 +343,53 @@ async function computeAndUpdateSatisfaction(
     }
   }
 
-  // Build tableId -> Set<guestIds>
   const tableGuestSets = new Map<string, Set<string>>()
   for (const [tableId, guestIds] of tableAssignment) {
     tableGuestSets.set(tableId, new Set(guestIds))
   }
 
-  // Build guestId -> Set<tagIds they share>
   const guestTags = new Map<string, Set<string>>()
   for (const g of guestRecords) {
     guestTags.set(g.id, new Set(g.tagIds))
   }
 
-  // Compute adjacent tables (nearest 2 by position)
-  const tablePositions = new Map<string, { x: number; y: number }>()
   const dbTables = await prisma.table.findMany({ where: { eventId }, select: { id: true, positionX: true, positionY: true } })
-  for (const t of dbTables) {
-    tablePositions.set(t.id, { x: t.positionX, y: t.positionY })
-  }
+  const tablePositions = new Map(dbTables.map(t => [t.id, { x: t.positionX, y: t.positionY }]))
 
   function getAdjacentTableIds(tableId: string): string[] {
     const pos = tablePositions.get(tableId)
     if (!pos) return []
-    const distances = dbTables
+    return dbTables
       .filter(t => t.id !== tableId)
       .map(t => ({ id: t.id, dist: Math.sqrt((t.positionX - pos.x) ** 2 + (t.positionY - pos.y) ** 2) }))
       .sort((a, b) => a.dist - b.dist)
-    return distances.slice(0, 2).map(d => d.id)
+      .slice(0, 2)
+      .map(d => d.id)
   }
 
-  // Compute satisfaction for each guest
   const updates: Array<{ id: string; score: number }> = []
 
   for (const guest of guestRecords) {
     const tableId = guestToTable.get(guest.id)
     if (!tableId) {
-      updates.push({ id: guest.id, score: 55 }) // 基礎分 50 + 需求分 5
+      updates.push({ id: guest.id, score: 55 })
       continue
     }
 
     const sameTableGuests = tableGuestSets.get(tableId) || new Set()
     const myTags = guestTags.get(guest.id) || new Set()
 
-    // 群組分：同桌同 tag 比例
     let sameTagCount = 0
     for (const otherId of sameTableGuests) {
       if (otherId === guest.id) continue
       const otherTags = guestTags.get(otherId) || new Set()
       for (const t of myTags) {
-        if (otherTags.has(t)) {
-          sameTagCount++
-          break
-        }
+        if (otherTags.has(t)) { sameTagCount++; break }
       }
     }
     const tableSize = sameTableGuests.size - 1
     const sameTagRatio = tableSize > 0 ? sameTagCount / tableSize : 0
 
-    // 偏好分
     const prefs = preferenceMap.get(guest.id) || []
     let preferenceMatches = 0
     let preferenceNearby = false
@@ -420,17 +397,12 @@ async function computeAndUpdateSatisfaction(
     const adjacentGuests = new Set<string>()
     for (const adjId of adjacentTables) {
       const adjSet = tableGuestSets.get(adjId)
-      if (adjSet) {
-        for (const gid of adjSet) adjacentGuests.add(gid)
-      }
+      if (adjSet) for (const gid of adjSet) adjacentGuests.add(gid)
     }
 
     for (const prefId of prefs) {
-      if (sameTableGuests.has(prefId)) {
-        preferenceMatches++
-      } else if (adjacentGuests.has(prefId)) {
-        preferenceNearby = true
-      }
+      if (sameTableGuests.has(prefId)) preferenceMatches++
+      else if (adjacentGuests.has(prefId)) preferenceNearby = true
     }
 
     const score = computeSatisfaction({
@@ -443,7 +415,6 @@ async function computeAndUpdateSatisfaction(
     updates.push({ id: guest.id, score })
   }
 
-  // Batch update satisfaction scores
   for (const batch of chunk(updates, 50)) {
     await prisma.$transaction(
       batch.map(u =>
@@ -455,7 +426,6 @@ async function computeAndUpdateSatisfaction(
     )
   }
 
-  // Update table average satisfaction
   for (const table of tables) {
     const guestIds = tableAssignment.get(table.id) || []
     if (guestIds.length === 0) continue
@@ -467,7 +437,6 @@ async function computeAndUpdateSatisfaction(
     })
   }
 
-  // Mark isolated guests
   const isolated = guestRecords.filter(g => {
     const prefs = preferenceMap.get(g.id)
     const hasPrefs = prefs && prefs.length > 0

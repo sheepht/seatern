@@ -1,7 +1,7 @@
 # Seatern 分階段開發計畫
 
-> 版本：1.2
-> 日期：2026-02-05
+> 版本：1.5
+> 日期：2026-02-07
 
 ---
 
@@ -113,7 +113,7 @@
    → 回傳 201 + Event JSON
 3. 測試建立 Contact、Guest、Tag（類似 curl 指令）
 4. 測試列表：`GET /api/events/<eventId>/guests` → 回傳含 Contact 資訊的賓客陣列
-5. 測試驗證：送出 `relationScore: 6` → 回傳 400 + Zod 錯誤
+5. 測試驗證：送出 `relationScore: 4` → 回傳 400 + Zod 錯誤（關係分數上限為 3）
 
 **預期結果**：完整的 CRUD API 可透過 curl 操作。系統作為功能正常的 API 伺服器運行。
 
@@ -186,39 +186,42 @@
 **涉及套件**：`packages/web`
 
 **具體任務**：
-1. 安裝 shadcn/ui 元件（button、input、dialog、table、badge、select、form、card、command 等）
-2. 建立 Layout 元件：
-   - `src/components/layout/AppLayout.tsx` — sidebar + main content
-   - `src/components/layout/Sidebar.tsx` — 導航：活動、聯絡人
-   - `src/components/layout/Header.tsx` — 使用者頭像、登出
-3. 建立 React Query hooks（`src/hooks/`）：
+1. 建立 React Query hooks（`src/hooks/`）：
    - `useEvents()`, `useCreateEvent()`, `useUpdateEvent()`, `useDeleteEvent()`
    - `useContacts()`, `useCreateContact()`, `useUpdateContact()`, `useDeleteContact()`
    - `useGuests(eventId)`, `useCreateGuest()`, `useUpdateGuest()`, `useDeleteGuest()`
    - `useTags(eventId)`, `useCreateTag()`, `useUpdateTag()`, `useDeleteTag()`
-4. 建立頁面：
+2. 建立頁面：
    - `src/pages/EventsPage.tsx` — 活動卡片列表 + 建立活動 Dialog
    - `src/pages/EventDetailPage.tsx` — 活動詳情（Tabs：賓客、標籤、桌次、排位）
    - `src/pages/ContactsPage.tsx` — 可搜尋的聯絡人表格
-5. 建立賓客元件：
-   - `GuestTable.tsx` — 顯示賓客資訊（姓名、category 標籤、關係分數、RSVP 狀態、標籤）
-   - `AddGuestDialog.tsx` — 從聯絡人搜尋選取 + 設定 category、分數、標籤（根據所選 category 過濾可用標籤）
-6. 建立標籤元件：
-   - `TagManager.tsx` — 標籤列表（含賓客數）、建立/編輯/刪除
-7. 建立全域 event store（`src/stores/event.ts`）— 當前活動 ID（localStorage 持久化）
+3. 建立賓客元件：
+   - `GuestList.tsx` — 賓客表格（姓名、category、關係分數 1-3、RSVP 狀態、人數、標籤）+ 新增/編輯/刪除 Dialog
+   - 新增賓客：搜尋聯絡人 → 設定 category、關係分數、標籤（根據所選 category 過濾可用標籤）
+   - 編輯賓客：修改 category、關係分數、標籤
+4. 建立標籤元件：
+   - `TagManager.tsx` — 標籤列表（含賓客數）、建立/編輯/刪除、可綁定 category
+5. CSV 匯入功能：
+   - `ImportGuestsDialog.tsx` — 前端 CSV parse → 預覽表格（驗證警告）→ 確認匯入
+   - CSV 欄位：姓名, 別名, 分類, 關係分數(1-3), 人數(1-2), 嬰兒數(0-5), 飲食備註, 標籤
+   - 提供下載範例 CSV（含 BOM 給 Excel 開啟）
+   - API：`POST /events/:eventId/guests/import` — 批次建立 Contact + Guest + Tag（跨 category 標籤自動綁定「共同」）
+
+> **注意**：UI 使用原生 `<dialog>` + 純 Tailwind CSS，不使用 shadcn/ui。
 
 **驗證方式**：
 1. `npm run dev`，登入後導航到「活動」
 2. 建立活動「測試婚禮」→ 確認卡片出現
 3. 點擊活動 → 開啟詳情頁含 Tabs
 4. 到「聯絡人」新增「陳小明」（含別名「小明」）→ 確認表格出現
-5. 回到活動 → 賓客 Tab → 新增賓客 → 搜尋「小明」能找到 → 設定 category=男方、分數=4 → 選擇 category 後確認可用標籤有過濾 → 確認列表出現
+5. 回到活動 → 賓客 Tab → 新增賓客 → 搜尋「小明」能找到 → 設定 category=男方、分數=3 → 選擇 category 後確認可用標籤有過濾 → 確認列表出現
 6. 新增 5+ 賓客，確認表格正確顯示所有欄位
-7. 標籤 Tab → 建立標籤、指派賓客、確認計數更新
-8. 編輯聯絡人姓名 → 確認賓客表格同步更新
+7. 編輯賓客 → 修改 category、分數、標籤 → 確認更新正確
+8. 標籤 Tab → 建立標籤、指派賓客、確認計數更新
 9. 刪除賓客 → 確認移除 + 確認對話框正常
+10. CSV 匯入 → 下載範例 CSV → 修改 → 上傳 → 預覽（超出範圍值紅色警告）→ 確認匯入 → 列表更新
 
-**預期結果**：完整的活動/聯絡人/賓客/標籤 CRUD 前端。使用者可建立完整的賓客清單。
+**預期結果**：完整的活動/聯絡人/賓客/標籤 CRUD 前端 + CSV 匯入。使用者可建立完整的賓客清單。
 
 ---
 
@@ -473,7 +476,6 @@
 | `packages/api/src/index.ts` | API 進入點（註冊路由） |
 | `packages/api/src/routes/health.ts` | 現有路由模式（新路由參考） |
 | `packages/web/src/App.tsx` | 前端進入點（路由設定） |
-| `packages/web/components.json` | shadcn/ui 設定（New York style） |
 | `.env.example` | 環境變數模板 |
 
 ---
@@ -487,3 +489,4 @@
 | 1.2 | 2026-02-05 | 階段 0 新增：Guest 眷屬欄位（infantCount）、移除 plusOneName、Table 位置改為 positionX/Y 自由座標、SeatingSnapshot 含桌次位置 |
 | 1.3 | 2026-02-05 | Schema 精簡：Contact 移除 dietaryNeeds/specialNeeds/tags、Guest 移除 dietaryNeeds[]/specialNeeds[]/needsMet 改用 dietaryNote/specialNote (String?)、Table 移除 tags、需求分固定 +5 |
 | 1.4 | 2026-02-05 | 排位工作區改為 in-memory 架構：合併階段 6/7/8 為階段 6、移除 assign/unassign/recalculate/preview 端點改用 GET/POST seating、滿意度計算移至 shared、新增 / landing page 和 /demo 路由、總階段數 10→8 |
+| 1.5 | 2026-02-07 | 關係分數上限 5→3、出席人數上限 10→2、移除 shadcn/ui 改用原生 dialog + Tailwind、階段 4 加入 CSV 匯入（8 欄位）、標籤跨 category 自動綁定「共同」 |

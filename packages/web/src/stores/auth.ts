@@ -11,6 +11,7 @@ interface AuthState {
   signUpWithEmail: (email: string, password: string) => Promise<void>
   signInWithGoogle: () => Promise<void>
   signInWithLINE: () => Promise<void>
+  devSignIn: (userId: string, name: string, email: string) => void
   signOut: () => Promise<void>
 }
 
@@ -45,6 +46,27 @@ export const useAuthStore = create<AuthState>((set) => ({
     // LINE OAuth 由後端處理（Supabase 沒有內建 LINE provider）
     // 跳轉到 API 發起 LINE OAuth 流程
     window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/line`
+  },
+
+  devSignIn: (userId, name, email) => {
+    const fakeUser = {
+      id: userId,
+      email,
+      user_metadata: { name },
+      app_metadata: {},
+      aud: 'authenticated',
+      created_at: new Date().toISOString(),
+    } as unknown as User
+
+    const fakeSession = {
+      access_token: `dev-bypass-${userId}`,
+      token_type: 'bearer',
+      expires_in: 86400,
+      refresh_token: '',
+      user: fakeUser,
+    } as unknown as Session
+
+    set({ user: fakeUser, session: fakeSession, isLoading: false })
   },
 
   signOut: async () => {

@@ -18,10 +18,11 @@ export async function seedCorporate(prisma: PrismaClient) {
   const config = CORPORATE_CONFIG
   console.log(`\n=== 建立公司尾牙場景：${config.eventName} ===`)
 
-  // 1. User
+  // 1. User（固定 ID 以支援 dev bypass 登入）
   console.log('Step 1: 建立 User...')
   const user = await prisma.user.create({
     data: {
+      id: '00000000-0000-0000-0000-000000000002',
       email: 'corporate@example.com',
       name: '人資部 王小姐',
     },
@@ -92,12 +93,12 @@ export async function seedCorporate(prisma: PrismaClient) {
         const rsvp = randomRsvpStatus()
 
         // 主管給較高 relationScore
-        const isManager = tagAssignments.get(tags[2].id)?.includes(contact.id) // '主管' tag
-        const isVip = tagAssignments.get(tags[5].id)?.includes(contact.id) // 'VIP' tag
+        const isManager = tagAssignments.get(tags[7].id)?.includes(contact.id) // '主管' tag
+        const isVip = tagAssignments.get(tags[8].id)?.includes(contact.id) // 'VIP' tag
         let relationScore: number
-        if (isVip) relationScore = 5
-        else if (isManager) relationScore = faker.number.int({ min: 4, max: 5 })
-        else relationScore = faker.number.int({ min: 2, max: 3 })
+        if (isVip) relationScore = 3
+        else if (isManager) relationScore = faker.number.int({ min: 2, max: 3 })
+        else relationScore = faker.number.int({ min: 1, max: 2 })
 
         return prisma.guest.create({
           data: {
@@ -109,8 +110,7 @@ export async function seedCorporate(prisma: PrismaClient) {
             attendeeCount: rsvp === 'CONFIRMED' || rsvp === 'MODIFIED'
               ? faker.helpers.weightedArrayElement([
                 { value: 1, weight: 70 },
-                { value: 2, weight: 25 },
-                { value: 3, weight: 5 },
+                { value: 2, weight: 35 },
               ])
               : 1,
             infantCount: faker.number.float({ min: 0, max: 1 }) < 0.03 ? 1 : 0,
@@ -207,7 +207,7 @@ export async function seedCorporate(prisma: PrismaClient) {
 
   // 主桌：VIP + 高分主管
   const vipGuests = confirmedDb
-    .filter(g => g.relationScore >= 4)
+    .filter(g => g.relationScore >= 3)
     .slice(0, config.tableCapacity)
   for (const g of vipGuests) {
     tableAssignment.get(tables[0].id)!.push(g.id)

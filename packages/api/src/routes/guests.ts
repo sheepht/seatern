@@ -4,6 +4,7 @@ import { prisma } from '@seatern/db'
 import { createGuestSchema, guestTagUpdateSchema } from '@seatern/shared'
 import type { AuthEnv } from '../middleware/auth'
 import { requireParam, verifyEvent } from '../helpers'
+import { importRoute } from './import'
 
 const GUEST_INCLUDE = {
   contact: true,
@@ -123,3 +124,6 @@ guestsRoute.post('/:guestId/tags', zValidator('json', guestTagUpdateSchema), asy
   })
   return c.json(updated)
 })
+
+// Mount import sub-route
+guestsRoute.route('/import', importRoute)

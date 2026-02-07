@@ -72,14 +72,16 @@ export const CORPORATE_CONFIG: ScenarioConfig = {
   eventType: 'CORPORATE',
   categories: ['研發部', '業務部', '行銷部', '人資部', '財務部', '管理層'],
   tags: [
-    { name: '新人', estimatedCount: 60 },
-    { name: '資深員工', estimatedCount: 120 },
+    { name: '研發-後端組', category: '研發部', estimatedCount: 50 },
+    { name: '研發-前端組', category: '研發部', estimatedCount: 40 },
+    { name: '研發-QA組', category: '研發部', estimatedCount: 30 },
+    { name: '業務-北區', category: '業務部', estimatedCount: 50 },
+    { name: '業務-南區', category: '業務部', estimatedCount: 50 },
+    { name: '行銷-品牌組', category: '行銷部', estimatedCount: 30 },
+    { name: '行銷-數位組', category: '行銷部', estimatedCount: 30 },
     { name: '主管', estimatedCount: 50 },
-    { name: '特約人員', estimatedCount: 30 },
-    { name: '眷屬', estimatedCount: 80 },
     { name: 'VIP', estimatedCount: 20 },
     { name: '表演者', estimatedCount: 22 },
-    { name: '素食', estimatedCount: 20 },
   ],
   guestCount: 402,
   tableCount: 40,
@@ -91,6 +93,50 @@ export const CORPORATE_CONFIG: ScenarioConfig = {
     '人資部': 0.10,
     '財務部': 0.10,
     '管理層': 0.10,
+  },
+}
+
+// ─── 大型企業春酒場景設定 ───
+// 模擬台灣半導體大廠：多廠區 × 部門，約 800 人規模
+export const LARGE_CORPORATE_CONFIG: ScenarioConfig = {
+  eventName: '鼎鑫半導體 2026 春酒',
+  eventDate: '2026-02-28',
+  eventType: 'CORPORATE',
+  categories: ['新竹總部', '台中廠區', '台南廠區', '海外據點'],
+  tags: [
+    // 新竹總部（研發 + 管理）
+    { name: '研發一部（邏輯設計）', category: '新竹總部', estimatedCount: 60 },
+    { name: '研發二部（類比設計）', category: '新竹總部', estimatedCount: 45 },
+    { name: '研發三部（先進製程）', category: '新竹總部', estimatedCount: 40 },
+    { name: '業務部', category: '新竹總部', estimatedCount: 35 },
+    { name: '財務部', category: '新竹總部', estimatedCount: 20 },
+    { name: '人資部', category: '新竹總部', estimatedCount: 15 },
+    { name: '法務/智財', category: '新竹總部', estimatedCount: 10 },
+    // 台中廠區（製造）
+    { name: '製造一課', category: '台中廠區', estimatedCount: 80 },
+    { name: '製造二課', category: '台中廠區', estimatedCount: 70 },
+    { name: '設備部', category: '台中廠區', estimatedCount: 50 },
+    { name: '品保部', category: '台中廠區', estimatedCount: 35 },
+    // 台南廠區（封測）
+    { name: '封裝課', category: '台南廠區', estimatedCount: 65 },
+    { name: '測試課', category: '台南廠區', estimatedCount: 55 },
+    { name: '廠務部', category: '台南廠區', estimatedCount: 40 },
+    // 海外據點
+    { name: '上海辦公室', category: '海外據點', estimatedCount: 20 },
+    { name: '矽谷辦公室', category: '海外據點', estimatedCount: 15 },
+    // 跨廠區角色
+    { name: '高階主管', estimatedCount: 30 },
+    { name: 'VIP 貴賓', estimatedCount: 20 },
+    { name: '表演者/主持人', estimatedCount: 15 },
+  ],
+  guestCount: 800,
+  tableCount: 80,
+  tableCapacity: 10,
+  categoryDistribution: {
+    '新竹總部': 0.30,
+    '台中廠區': 0.30,
+    '台南廠區': 0.25,
+    '海外據點': 0.15,
   },
 }
 
