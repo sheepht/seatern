@@ -1,14 +1,24 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/stores/auth'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { signInWithEmail, signInWithGoogle, signInWithLINE } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // 讀取 URL 上的 error 參數（LINE 登入失敗時會帶上）
+  useEffect(() => {
+    const urlError = searchParams.get('error')
+    if (urlError) {
+      setError(urlError)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

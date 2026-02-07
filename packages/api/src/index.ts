@@ -6,6 +6,7 @@ import { healthRoute } from './routes/health'
 import { authMiddleware } from './middleware/auth'
 import { eventsRoute } from './routes/events'
 import { contactsRoute } from './routes/contacts'
+import { authLineRoute } from './routes/auth-line'
 
 const app = new Hono()
 
@@ -20,6 +21,7 @@ app.use(
 
 // Public routes
 app.route('/api/health', healthRoute)
+app.route('/api/auth/line', authLineRoute)
 app.get('/', (c) => c.json({ name: 'Seatern API', version: '0.0.1' }))
 
 // Auth-protected routes

@@ -42,14 +42,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   signInWithLINE: async () => {
-    // LINE Login 需在 Supabase Dashboard 設定為自訂 OIDC provider
-    // Dashboard → Authentication → Providers → 新增 LINE 的 OIDC 設定
-    // provider name 需與 Dashboard 設定一致
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'kakao' as any, // placeholder — 替換為 Dashboard 設定的 LINE provider name
-      options: { redirectTo: `${window.location.origin}/events` },
-    })
-    if (error) throw error
+    // LINE OAuth 由後端處理（Supabase 沒有內建 LINE provider）
+    // 跳轉到 API 發起 LINE OAuth 流程
+    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/line`
   },
 
   signOut: async () => {
