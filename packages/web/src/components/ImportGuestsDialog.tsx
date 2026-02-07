@@ -99,8 +99,7 @@ const ImportGuestsDialog = forwardRef<HTMLDialogElement, { eventId: string }>(
         }))).then((r) => r.data),
       onSuccess: (data) => {
         setResult(data)
-        qc.invalidateQueries({ queryKey: ['events', eventId, 'guests'] })
-        qc.invalidateQueries({ queryKey: ['events', eventId, 'tags'] })
+        qc.invalidateQueries({ queryKey: ['events', eventId] })
         qc.invalidateQueries({ queryKey: ['contacts'] })
       },
     })

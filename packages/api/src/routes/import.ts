@@ -23,9 +23,13 @@ importRoute.post('/', zValidator('json', importGuestsSchema), async (c) => {
 
   // Process in a transaction
   await prisma.$transaction(async (tx) => {
+    // 收集所有匯入的 category，結束後自動加入 event.categories
+    const importedCategories = new Set<string>()
+
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i]
       try {
+        if (row.category) importedCategories.add(row.category)
         // Create or find contact
         const aliases = row.aliases
           ? row.aliases.split(/[,，]/).map((s) => s.trim()).filter(Boolean)
@@ -76,6 +80,16 @@ importRoute.post('/', zValidator('json', importGuestsSchema), async (c) => {
       } catch (err: any) {
         errors.push({ row: i + 1, message: err.message ?? 'Unknown error' })
       }
+    }
+
+    // 把匯入中出現的新 category 加到 event.categories
+    const existingCategories = new Set((event.categories as string[]) ?? [])
+    const newCategories = [...importedCategories].filter((c) => !existingCategories.has(c))
+    if (newCategories.length > 0) {
+      await tx.event.update({
+        where: { id: eventId },
+        data: { categories: [...existingCategories, ...newCategories] },
+      })
     }
   })
 
