@@ -13,6 +13,7 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
   const deleteGuest = useDeleteGuest(eventId)
 
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [copiedEvent, setCopiedEvent] = useState(false)
 
   const createRef = useRef<HTMLDialogElement>(null)
   const editRef = useRef<HTMLDialogElement>(null)
@@ -154,6 +155,18 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
         </button>
         <button onClick={() => importRef.current?.showModal()} className="px-4 py-2 border rounded hover:bg-gray-50 text-sm">
           CSV 匯入
+        </button>
+        <button
+          onClick={() => {
+            const url = `${window.location.origin}/form/event/${eventId}`
+            navigator.clipboard.writeText(url).then(() => {
+              setCopiedEvent(true)
+              setTimeout(() => setCopiedEvent(false), 2000)
+            })
+          }}
+          className="px-4 py-2 border rounded hover:bg-gray-50 text-sm"
+        >
+          {copiedEvent ? '已複製！' : '複製統一表單連結'}
         </button>
         <span className="text-sm text-gray-500 ml-auto">共 {guests?.length ?? 0} 位賓客</span>
       </div>

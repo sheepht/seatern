@@ -25,3 +25,20 @@ export function useFormGuestSearch(token: string, query: string) {
     enabled: !!token && query.length >= 1,
   })
 }
+
+export function useEventInfo(eventId: string) {
+  return useQuery({
+    queryKey: ['form', 'event', eventId],
+    queryFn: () => publicApi.get(`/form/event/${eventId}`).then((r) => r.data),
+    enabled: !!eventId,
+    retry: false,
+  })
+}
+
+export function useEventGuestSearch(eventId: string, query: string) {
+  return useQuery({
+    queryKey: ['form', 'event', eventId, 'search', query],
+    queryFn: () => publicApi.get(`/form/event/${eventId}/search`, { params: { q: query } }).then((r) => r.data),
+    enabled: !!eventId && query.length >= 1,
+  })
+}

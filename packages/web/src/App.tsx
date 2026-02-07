@@ -11,6 +11,7 @@ import EventDetailPage from '@/pages/EventDetailPage'
 import SeatingPage from '@/pages/SeatingPage'
 import ContactsPage from '@/pages/ContactsPage'
 import GuestFormPage from '@/pages/GuestFormPage'
+import EventFormEntryPage from '@/pages/EventFormEntryPage'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -27,6 +28,7 @@ function App() {
             <Route path="/demo" element={<DemoPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/form/event/:eventId" element={<EventFormEntryPage />} />
             <Route path="/form/:token" element={<GuestFormPage />} />
 
             {/* Protected routes */}

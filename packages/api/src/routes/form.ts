@@ -5,6 +5,52 @@ import { guestFormSchema } from '@seatern/shared'
 
 export const formRoute = new Hono()
 
+// GET /event/:eventId — Public event info
+formRoute.get('/event/:eventId', async (c) => {
+  const eventId = c.req.param('eventId')
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, name: true, date: true },
+  })
+  if (!event) return c.json({ error: '找不到此活動' }, 404)
+  return c.json({ eventId: event.id, eventName: event.name, eventDate: event.date })
+})
+
+// GET /event/:eventId/search?q= — Search guests in event (public)
+formRoute.get('/event/:eventId/search', async (c) => {
+  const eventId = c.req.param('eventId')
+  const q = c.req.query('q') ?? ''
+
+  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true } })
+  if (!event) return c.json({ error: '找不到此活動' }, 404)
+
+  if (q.length < 1) return c.json([])
+
+  const results = await prisma.guest.findMany({
+    where: {
+      eventId,
+      contact: {
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { aliases: { hasSome: [q] } },
+        ],
+      },
+    },
+    include: { contact: true },
+    take: 10,
+  })
+
+  return c.json(
+    results.map((g) => ({
+      guestId: g.id,
+      name: g.contact.name,
+      aliases: g.contact.aliases,
+      formToken: g.formToken,
+      isSubmitted: g.rsvpStatus !== 'PENDING',
+    })),
+  )
+})
+
 const FORM_GUEST_INCLUDE = {
   contact: true,
   event: true,

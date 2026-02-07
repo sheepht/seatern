@@ -123,10 +123,11 @@ function SeatPreferenceInput({
   )
 }
 
-export default function GuestFormPage() {
-  const { token } = useParams<{ token: string }>()
-  const { data, isLoading, isError } = useFormData(token ?? '')
-  const submit = useFormSubmit(token ?? '')
+export default function GuestFormPage({ tokenProp }: { tokenProp?: string }) {
+  const { token: paramToken } = useParams<{ token: string }>()
+  const token = tokenProp ?? paramToken ?? ''
+  const { data, isLoading, isError } = useFormData(token)
+  const submit = useFormSubmit(token)
 
   const [rsvp, setRsvp] = useState<'confirmed' | 'declined' | ''>('')
   const [attendeeCount, setAttendeeCount] = useState(1)
