@@ -42,6 +42,24 @@ export function useDeleteGuest(eventId: string) {
   })
 }
 
+export function useApproveGuest(eventId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (guestId: string) =>
+      api.post(`/events/${eventId}/guests/${guestId}/approve`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['events', eventId, 'guests'] }),
+  })
+}
+
+export function useRejectGuest(eventId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (guestId: string) =>
+      api.post(`/events/${eventId}/guests/${guestId}/reject`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['events', eventId, 'guests'] }),
+  })
+}
+
 export function useUpdateGuestTags(eventId: string) {
   const qc = useQueryClient()
   return useMutation({

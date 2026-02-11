@@ -84,6 +84,8 @@ model Guest {
   isOverflow        Boolean    @default(false)
   isIsolated        Boolean    @default(false)
   formToken         String?    @unique
+  pendingSubmission  Json?
+  pendingSubmittedAt DateTime?
 
   assignedTableId   String?
   assignedTable     Table?           @relation(fields: [assignedTableId], references: [id])

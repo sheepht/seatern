@@ -147,6 +147,100 @@ export function computeSatisfaction(input: SatisfactionInput): number {
   return score
 }
 
+// ─── 待審核 seed ───
+
+interface PendingSubmissionSeedOpts {
+  /** PENDING guests 中有多少比例會有 pendingSubmission (0-1) */
+  pendingRate?: number
+  /** CONFIRMED guests 中有多少比例會有 pendingSubmission (0-1) */
+  modifiedRate?: number
+}
+
+/**
+ * 為部分賓客加入 pendingSubmission，模擬「表單已提交但主辦人尚未審核」的狀態。
+ * - PENDING guests：首次提交等待審核
+ * - CONFIRMED guests：修改後等待審核（原資料不動）
+ */
+export async function addPendingSubmissions(
+  prisma: import('@prisma/client').PrismaClient,
+  eventId: string,
+  opts?: PendingSubmissionSeedOpts,
+): Promise<number> {
+  const pendingRate = opts?.pendingRate ?? 0.07
+  const modifiedRate = opts?.modifiedRate ?? 0.04
+
+  const guests = await prisma.guest.findMany({
+    where: { eventId },
+    include: {
+      contact: { select: { name: true } },
+      preferencesFrom: {
+        include: { preferred: { include: { contact: { select: { name: true } } } } },
+        orderBy: { rank: 'asc' },
+      },
+    },
+  })
+
+  // 同場所有 guestIds，用來隨機選 seatPreference 對象
+  const allGuestIds = guests.map(g => g.id)
+
+  const updates: Array<{ id: string; data: object }> = []
+
+  for (const guest of guests) {
+    const shouldPend =
+      (guest.rsvpStatus === 'PENDING' && faker.number.float({ min: 0, max: 1 }) < pendingRate) ||
+      (guest.rsvpStatus === 'CONFIRMED' && faker.number.float({ min: 0, max: 1 }) < modifiedRate)
+
+    if (!shouldPend) continue
+
+    // 生成 seatPreferences（1-3 人，含 preferredName 快照）
+    const prefCount = faker.number.int({ min: 0, max: 3 })
+    const candidates = allGuestIds.filter(id => id !== guest.id)
+    const selectedPrefs = faker.helpers.arrayElements(candidates, Math.min(prefCount, candidates.length))
+
+    // 查 preferredName
+    const seatPreferences: Array<{ preferredId: string; preferredName: string; rank: number }> = []
+    for (let i = 0; i < selectedPrefs.length; i++) {
+      const prefGuest = guests.find(g => g.id === selectedPrefs[i])
+      seatPreferences.push({
+        preferredId: selectedPrefs[i],
+        preferredName: prefGuest?.contact.name ?? '(未知)',
+        rank: i + 1,
+      })
+    }
+
+    const isConfirmed = faker.number.float({ min: 0, max: 1 }) < 0.85
+    const rsvpStatus = isConfirmed ? 'confirmed' : 'declined'
+
+    const pendingSubmission = {
+      rsvpStatus,
+      attendeeCount: isConfirmed ? faker.helpers.arrayElement([1, 2]) : 1,
+      infantCount: isConfirmed && faker.number.float({ min: 0, max: 1 }) < 0.08 ? 1 : 0,
+      dietaryNote: isConfirmed ? randomDietaryNote() : undefined,
+      specialNote: isConfirmed ? randomSpecialNote() : undefined,
+      seatPreferences: isConfirmed ? seatPreferences : [],
+      addTagIds: [] as string[],
+      removeTagIds: [] as string[],
+    }
+
+    updates.push({
+      id: guest.id,
+      data: {
+        pendingSubmission,
+        pendingSubmittedAt: faker.date.recent({ days: 3 }),
+      },
+    })
+  }
+
+  // Batch update
+  for (const batch of chunk(updates, 50)) {
+    await prisma.$transaction(
+      batch.map(u => prisma.guest.update({ where: { id: u.id }, data: u.data })),
+    )
+  }
+
+  return updates.length
+}
+
 // ─── 工具函式 ───
 
 /** 從陣列中加權隨機選擇 category */

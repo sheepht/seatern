@@ -7,6 +7,7 @@ import {
   randomRsvpStatus,
   rsvpGuestData,
   weightedCategory,
+  addPendingSubmissions,
   faker,
   chunk,
 } from './helpers.js'
@@ -265,6 +266,11 @@ export async function seedLargeCorporate(prisma: PrismaClient) {
   // 10. 計算 satisfactionScore
   console.log('Step 10: 計算滿意度...')
   await computeAndUpdateSatisfaction(prisma, event.id, guestRecords, tableAssignment, preferenceMap, tables)
+
+  // 11. 待審核 submissions
+  console.log('Step 11: 建立待審核提交...')
+  const pendingCount = await addPendingSubmissions(prisma, event.id)
+  console.log(`  Created ${pendingCount} pending submissions`)
 
   console.log(`=== 大型企業春酒場景完成 ===\n`)
 }

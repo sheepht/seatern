@@ -139,10 +139,28 @@ export default function GuestFormPage({ tokenProp }: { tokenProp?: string }) {
   const [specialOther, setSpecialOther] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  // Pre-fill from existing data
+  // Pre-fill from existing data — prefer pending submission if present
   useEffect(() => {
     if (!data) return
-    if (data.isSubmitted) {
+    if (data.hasPending && data.pendingSubmission) {
+      const p = data.pendingSubmission
+      setRsvp(p.rsvpStatus)
+      setAttendeeCount(p.attendeeCount)
+      setInfantCount(p.infantCount)
+      setPreferences(
+        (p.seatPreferences ?? []).map((sp: any) => ({
+          preferredId: sp.preferredId,
+          preferredName: sp.preferredName,
+          rank: sp.rank,
+        })),
+      )
+      const dietary = parseDietaryNote(p.dietaryNote)
+      setDietaryChecks(dietary.checks)
+      setDietaryOther(dietary.other)
+      const special = parseSpecialNote(p.specialNote)
+      setSpecialChecks(special.checks)
+      setSpecialOther(special.other)
+    } else if (data.isSubmitted) {
       const status = data.rsvpStatus as string
       if (status === 'confirmed' || status === 'modified') {
         setRsvp('confirmed')
@@ -222,9 +240,7 @@ export default function GuestFormPage({ tokenProp }: { tokenProp?: string }) {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-8">
         <h1 className="text-2xl font-bold mb-2">感謝您的回覆！</h1>
         <p className="text-gray-500">
-          {rsvp === 'confirmed'
-            ? `期待在「${data.eventName}」見到您！`
-            : '已收到您的回覆，感謝通知。'}
+          已收到您的回覆，待主辦人確認後生效。
         </p>
         <button
           onClick={() => setSubmitted(false)}
@@ -252,7 +268,12 @@ export default function GuestFormPage({ tokenProp }: { tokenProp?: string }) {
           <p className="text-gray-600 mt-2">
             {data.guestName}，您好！請填寫以下表單。
           </p>
-          {data.isSubmitted && (
+          {data.hasPending && (
+            <p className="text-amber-600 text-sm mt-2 bg-amber-50 rounded px-3 py-2 inline-block">
+              您有一份待審核的回覆，主辦人尚未處理。您可以修改後重新提交。
+            </p>
+          )}
+          {!data.hasPending && data.isSubmitted && (
             <p className="text-amber-600 text-sm mt-2 bg-amber-50 rounded px-3 py-1.5 inline-block">
               您已填寫過此表單，可修改後重新提交。
             </p>
@@ -378,7 +399,7 @@ export default function GuestFormPage({ tokenProp }: { tokenProp?: string }) {
             disabled={!rsvp || submit.isPending}
             className="w-full py-2.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 font-medium"
           >
-            {submit.isPending ? '提交中...' : data.isSubmitted ? '更新回覆' : '送出'}
+            {submit.isPending ? '提交中...' : (data.hasPending || data.isSubmitted) ? '更新回覆' : '送出'}
           </button>
           {submit.isError && (
             <p className="text-red-600 text-sm text-center">提交失敗，請稍後再試。</p>

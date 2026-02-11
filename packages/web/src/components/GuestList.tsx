@@ -1,5 +1,5 @@
 import { useState, useRef, useDeferredValue } from 'react'
-import { useGuests, useCreateGuest, useUpdateGuest, useUpdateGuestTags, useDeleteGuest } from '@/hooks/use-guests'
+import { useGuests, useCreateGuest, useUpdateGuest, useUpdateGuestTags, useDeleteGuest, useApproveGuest, useRejectGuest } from '@/hooks/use-guests'
 import { useTags } from '@/hooks/use-tags'
 import { useContacts } from '@/hooks/use-contacts'
 import ImportGuestsDialog from './ImportGuestsDialog'
@@ -11,6 +11,8 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
   const updateGuest = useUpdateGuest(eventId)
   const updateGuestTags = useUpdateGuestTags(eventId)
   const deleteGuest = useDeleteGuest(eventId)
+  const approveGuest = useApproveGuest(eventId)
+  const rejectGuest = useRejectGuest(eventId)
 
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [copiedEvent, setCopiedEvent] = useState(false)
@@ -19,6 +21,8 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
   const editRef = useRef<HTMLDialogElement>(null)
   const deleteRef = useRef<HTMLDialogElement>(null)
   const importRef = useRef<HTMLDialogElement>(null)
+  const reviewRef = useRef<HTMLDialogElement>(null)
+  const [reviewGuest, setReviewGuest] = useState<any>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [editGuest, setEditGuest] = useState<any>(null)
   const [editCategory, setEditCategory] = useState('')
@@ -145,6 +149,33 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
     })
   }
 
+  function openReview(g: any) {
+    setReviewGuest(g)
+    reviewRef.current?.showModal()
+  }
+
+  function handleApprove() {
+    if (!reviewGuest) return
+    approveGuest.mutate(reviewGuest.id, {
+      onSuccess: () => {
+        reviewRef.current?.close()
+        setReviewGuest(null)
+      },
+    })
+  }
+
+  function handleReject() {
+    if (!reviewGuest) return
+    rejectGuest.mutate(reviewGuest.id, {
+      onSuccess: () => {
+        reviewRef.current?.close()
+        setReviewGuest(null)
+      },
+    })
+  }
+
+  const pendingCount = guests?.filter((g: any) => g.pendingSubmission != null).length ?? 0
+
   if (isLoading) return <p className="text-gray-500">載入中...</p>
 
   return (
@@ -168,6 +199,11 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
         >
           {copiedEvent ? '已複製！' : '複製統一表單連結'}
         </button>
+        {pendingCount > 0 && (
+          <span className="text-sm text-amber-600 bg-amber-50 px-2 py-1 rounded">
+            {pendingCount} 位賓客待審核
+          </span>
+        )}
         <span className="text-sm text-gray-500 ml-auto">共 {guests?.length ?? 0} 位賓客</span>
       </div>
 
@@ -215,6 +251,14 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
                        g.rsvpStatus === 'DECLINED' ? '婉拒' :
                        g.rsvpStatus === 'MODIFIED' ? '已修改' : '待回覆'}
                     </span>
+                    {g.pendingSubmission && (
+                      <button
+                        onClick={() => openReview(g)}
+                        className="ml-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 hover:bg-amber-200"
+                      >
+                        待審核
+                      </button>
+                    )}
                   </td>
                   <td className="py-2">{g.attendeeCount}{g.infantCount > 0 ? ` +${g.infantCount}嬰` : ''}</td>
                   <td className="py-2">
@@ -226,6 +270,9 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
                     </button>
                   </td>
                   <td className="py-2 space-x-2">
+                    {g.pendingSubmission && (
+                      <button onClick={() => openReview(g)} className="text-amber-600 hover:underline text-sm">審核</button>
+                    )}
                     <button onClick={() => openEdit(g)} className="text-blue-600 hover:underline text-sm">編輯</button>
                     <button onClick={() => confirmDelete(g.id)} className="text-red-500 hover:underline text-sm">刪除</button>
                   </td>
@@ -413,6 +460,115 @@ export default function GuestList({ eventId, categories }: { eventId: string; ca
 
       {/* CSV Import dialog */}
       <ImportGuestsDialog ref={importRef} eventId={eventId} />
+
+      {/* Review pending submission dialog */}
+      <dialog ref={reviewRef} className="rounded-lg p-6 w-full max-w-lg backdrop:bg-black/30">
+        {reviewGuest && (() => {
+          const pending = reviewGuest.pendingSubmission
+          const isFirstSubmission = reviewGuest.rsvpStatus === 'PENDING'
+          const rsvpLabel = (s: string) =>
+            s === 'confirmed' || s === 'CONFIRMED' ? '確認出席' :
+            s === 'declined' || s === 'DECLINED' ? '婉拒' :
+            s === 'modified' || s === 'MODIFIED' ? '已修改' : '待回覆'
+
+          const currentPrefs = (reviewGuest.preferencesFrom ?? []).map((p: any) =>
+            p.preferred?.contact?.name ?? '(未知)'
+          ).join('、') || '(無)'
+          const pendingPrefs = (pending.seatPreferences ?? []).map((p: any) =>
+            p.preferredName
+          ).join('、') || '(無)'
+
+          const currentTags = (reviewGuest.tags ?? []).map((gt: any) => gt.tag.name).join('、') || '(無)'
+
+          type DiffRow = { label: string; current: string; pending: string }
+          const diffs: DiffRow[] = []
+
+          const curRsvp = rsvpLabel(reviewGuest.rsvpStatus)
+          const pendRsvp = rsvpLabel(pending.rsvpStatus)
+          if (isFirstSubmission || curRsvp !== pendRsvp) {
+            diffs.push({ label: '出席意願', current: isFirstSubmission ? '(未回覆)' : curRsvp, pending: pendRsvp })
+          }
+          if (isFirstSubmission || reviewGuest.attendeeCount !== pending.attendeeCount) {
+            diffs.push({ label: '成人人數', current: isFirstSubmission ? '(未回覆)' : String(reviewGuest.attendeeCount), pending: String(pending.attendeeCount) })
+          }
+          if (isFirstSubmission || reviewGuest.infantCount !== pending.infantCount) {
+            diffs.push({ label: '嬰兒人數', current: isFirstSubmission ? '(未回覆)' : String(reviewGuest.infantCount), pending: String(pending.infantCount) })
+          }
+          const curDietary = reviewGuest.dietaryNote || '(無)'
+          const pendDietary = pending.dietaryNote || '(無)'
+          if (isFirstSubmission || curDietary !== pendDietary) {
+            diffs.push({ label: '飲食需求', current: isFirstSubmission ? '(未回覆)' : curDietary, pending: pendDietary })
+          }
+          const curSpecial = reviewGuest.specialNote || '(無)'
+          const pendSpecial = pending.specialNote || '(無)'
+          if (isFirstSubmission || curSpecial !== pendSpecial) {
+            diffs.push({ label: '特殊需求', current: isFirstSubmission ? '(未回覆)' : curSpecial, pending: pendSpecial })
+          }
+          if (isFirstSubmission || currentPrefs !== pendingPrefs) {
+            diffs.push({ label: '想同桌', current: isFirstSubmission ? '(未回覆)' : currentPrefs, pending: pendingPrefs })
+          }
+
+          return (
+            <>
+              <h2 className="text-lg font-semibold mb-1">
+                審核回覆 — {reviewGuest.contact?.name ?? '?'}
+              </h2>
+              <p className="text-xs text-gray-500 mb-4">
+                提交時間：{reviewGuest.pendingSubmittedAt ? new Date(reviewGuest.pendingSubmittedAt).toLocaleString('zh-TW') : '-'}
+              </p>
+
+              {diffs.length === 0 ? (
+                <p className="text-gray-500 mb-4">內容與目前資料完全相同。</p>
+              ) : (
+                <table className="w-full text-sm mb-4 border">
+                  <thead>
+                    <tr className="border-b bg-gray-50">
+                      <th className="py-2 px-3 text-left">欄位</th>
+                      <th className="py-2 px-3 text-left">目前</th>
+                      <th className="py-2 px-3 text-left">待審核</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {diffs.map((row) => (
+                      <tr key={row.label} className="border-b">
+                        <td className="py-2 px-3 font-medium">{row.label}</td>
+                        <td className="py-2 px-3 text-gray-500">{row.current}</td>
+                        <td className="py-2 px-3 text-blue-700">{row.pending}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => { reviewRef.current?.close(); setReviewGuest(null) }}
+                  className="px-4 py-2 border rounded"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReject}
+                  disabled={rejectGuest.isPending}
+                  className="px-4 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
+                >
+                  {rejectGuest.isPending ? '處理中...' : '拒絕'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApprove}
+                  disabled={approveGuest.isPending}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                >
+                  {approveGuest.isPending ? '處理中...' : '核准'}
+                </button>
+              </div>
+            </>
+          )
+        })()}
+      </dialog>
     </div>
   )
 }

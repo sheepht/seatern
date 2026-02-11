@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { prisma, type RsvpStatus } from '@seatern/db'
+import { prisma } from '@seatern/db'
 import { guestFormSchema } from '@seatern/shared'
 
 export const formRoute = new Hono()
@@ -70,6 +70,7 @@ formRoute.get('/:token', async (c) => {
   if (!guest) return c.json({ error: '找不到此表單' }, 404)
 
   const isSubmitted = guest.rsvpStatus !== 'PENDING'
+  const hasPending = guest.pendingSubmission != null
 
   return c.json({
     guestName: guest.contact.name,
@@ -92,71 +93,63 @@ formRoute.get('/:token', async (c) => {
       assignedBy: gt.assignedBy.toLowerCase(),
     })),
     isSubmitted,
+    hasPending,
+    ...(hasPending && {
+      pendingSubmission: guest.pendingSubmission,
+      pendingSubmittedAt: guest.pendingSubmittedAt?.toISOString(),
+    }),
   })
 })
 
-// POST /:token — Submit form
+// POST /:token — Submit form (saves as pending for host review)
 formRoute.post('/:token', zValidator('json', guestFormSchema), async (c) => {
   const token = c.req.param('token')
   const data = c.req.valid('json')
 
   const guest = await prisma.guest.findUnique({
     where: { formToken: token },
-    include: { event: true },
+    include: {
+      event: { select: { id: true } },
+    },
   })
 
   if (!guest) return c.json({ error: '找不到此表單' }, 404)
 
-  // Determine RSVP status
-  let rsvpStatus: RsvpStatus
-  if (data.rsvpStatus === 'declined') {
-    rsvpStatus = 'DECLINED'
-  } else if (guest.rsvpStatus === 'PENDING') {
-    rsvpStatus = 'CONFIRMED'
-  } else {
-    rsvpStatus = 'MODIFIED'
+  // Resolve preferredName for each seat preference (snapshot for review display)
+  const seatPrefsWithNames = await Promise.all(
+    data.seatPreferences.map(async (p) => {
+      const preferred = await prisma.guest.findUnique({
+        where: { id: p.preferredId },
+        include: { contact: { select: { name: true } } },
+      })
+      return {
+        preferredId: p.preferredId,
+        preferredName: preferred?.contact.name ?? '(未知)',
+        rank: p.rank,
+      }
+    }),
+  )
+
+  const pendingSubmission = {
+    rsvpStatus: data.rsvpStatus,
+    attendeeCount: data.rsvpStatus === 'confirmed' ? data.attendeeCount : 1,
+    infantCount: data.rsvpStatus === 'confirmed' ? data.infantCount : 0,
+    dietaryNote: data.rsvpStatus === 'confirmed' ? data.dietaryNote : undefined,
+    specialNote: data.rsvpStatus === 'confirmed' ? data.specialNote : undefined,
+    seatPreferences: data.rsvpStatus === 'confirmed' ? seatPrefsWithNames : [],
+    addTagIds: data.addTagIds,
+    removeTagIds: data.removeTagIds,
   }
 
-  await prisma.$transaction(async (tx) => {
-    // 1. Update guest fields
-    await tx.guest.update({
-      where: { id: guest.id },
-      data: {
-        rsvpStatus,
-        attendeeCount: data.rsvpStatus === 'confirmed' ? data.attendeeCount : 0,
-        infantCount: data.rsvpStatus === 'confirmed' ? data.infantCount : 0,
-        dietaryNote: data.rsvpStatus === 'confirmed' ? data.dietaryNote : null,
-        specialNote: data.rsvpStatus === 'confirmed' ? data.specialNote : null,
-      },
-    })
-
-    // 2. Delete old seat preferences + create new ones (only if confirmed)
-    await tx.seatPreference.deleteMany({ where: { guestId: guest.id } })
-    if (data.rsvpStatus === 'confirmed' && data.seatPreferences.length > 0) {
-      await tx.seatPreference.createMany({
-        data: data.seatPreferences.map((p) => ({
-          guestId: guest.id,
-          preferredId: p.preferredId,
-          rank: p.rank,
-        })),
-      })
-    }
-
-    // 3. Handle tag changes (assignedBy: GUEST)
-    if (data.removeTagIds.length > 0) {
-      await tx.guestTag.deleteMany({
-        where: { guestId: guest.id, tagId: { in: data.removeTagIds }, assignedBy: 'GUEST' },
-      })
-    }
-    if (data.addTagIds.length > 0) {
-      await tx.guestTag.createMany({
-        data: data.addTagIds.map((tagId) => ({ guestId: guest.id, tagId, assignedBy: 'GUEST' as const })),
-        skipDuplicates: true,
-      })
-    }
+  await prisma.guest.update({
+    where: { id: guest.id },
+    data: {
+      pendingSubmission,
+      pendingSubmittedAt: new Date(),
+    },
   })
 
-  return c.json({ success: true })
+  return c.json({ success: true, isPending: true })
 })
 
 // GET /:token/guests?q= — Search guests in same event (for seat preference combobox)
