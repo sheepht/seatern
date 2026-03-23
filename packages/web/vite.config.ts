@@ -5,6 +5,7 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   envDir: path.resolve(__dirname, '../..'),
+  // @ts-expect-error vite version mismatch between root and workspace
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

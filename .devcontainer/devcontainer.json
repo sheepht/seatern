@@ -11,7 +11,14 @@
 	"forwardPorts": [5173, 3001],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sh ./.devcontainer/postCreateCommand.sh"
+	"postCreateCommand": "sh ./.devcontainer/postCreateCommand.sh",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"Prisma.prisma"
+			]
+		}
+	}
 
 	// Configure tool-specific properties.
 	// "customizations": {},

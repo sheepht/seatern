@@ -7,20 +7,12 @@ export default function LandingPage() {
       <p className="text-lg text-gray-600 mb-8 text-center max-w-md">
         智慧座位安排系統 — 從賓客管理到滿意度最佳化，一站完成。
       </p>
-      <div className="flex gap-4">
-        <Link
-          to="/demo"
-          className="px-6 py-2 border rounded hover:bg-gray-100"
-        >
-          體驗 Demo
-        </Link>
-        <Link
-          to="/login"
-          className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          登入
-        </Link>
-      </div>
+      <Link
+        to="/login"
+        className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+      >
+        登入
+      </Link>
     </div>
   )
 }

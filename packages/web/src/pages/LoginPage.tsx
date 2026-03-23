@@ -3,9 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/stores/auth'
 
 const DEV_ACCOUNTS = [
-  { userId: '00000000-0000-0000-0000-000000000001', name: '新郎志明', email: 'wedding@example.com', label: '婚禮' },
-  { userId: '00000000-0000-0000-0000-000000000002', name: '人資部 王小姐', email: 'corporate@example.com', label: '尾牙' },
-  { userId: '00000000-0000-0000-0000-000000000003', name: '行政部 李經理', email: 'large-corp@example.com', label: '大型企業春酒' },
+  { userId: '00000000-0000-0000-0000-000000000001', name: '測試用戶', email: 'test@example.com', label: '測試' },
 ]
 
 export default function LoginPage() {
@@ -17,7 +15,6 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // 讀取 URL 上的 error 參數（LINE 登入失敗時會帶上）
   useEffect(() => {
     const urlError = searchParams.get('error')
     if (urlError) {
@@ -32,7 +29,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await signInWithEmail(email, password)
-      navigate('/events')
+      navigate('/dashboard')
     } catch (err: any) {
       setError(err.message || '登入失敗')
     } finally {
@@ -58,7 +55,7 @@ export default function LoginPage() {
 
   const handleDevSignIn = (userId: string, name: string, email: string) => {
     devSignIn(userId, name, email)
-    navigate('/events')
+    navigate('/dashboard')
   }
 
   return (
