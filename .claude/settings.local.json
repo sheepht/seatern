@@ -7,5 +7,9 @@
       "WebSearch",
       "WebFetch(*)"
     ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash /workspaces/seatern/.claude/statusline-command.sh"
   }
 }
