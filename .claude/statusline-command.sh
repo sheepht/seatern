@@ -14,6 +14,8 @@ RED="\033[31m"
 CYAN="\033[36m"
 WHITE="\033[37m"
 
+BG_BLUE="\033[44m"
+
 # --- Helper: pick color by percentage (0-100) ---
 pct_color() {
   local pct="${1:-0}"
@@ -41,6 +43,23 @@ progress_bar() {
 
 # --- Extract fields from JSON ---
 model=$(echo "$input" | jq -r '.model.display_name // "Unknown"')
+cwd=$(echo "$input" | jq -r '.cwd // empty')
+
+# --- Git info (skip lock files to avoid blocking) ---
+git_branch=""
+git_changes=""
+if [ -n "$cwd" ]; then
+  git_branch=$(git -C "$cwd" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null)
+  if [ -n "$git_branch" ]; then
+    # Count staged + unstaged changed files (excludes untracked)
+    changed=$(git -C "$cwd" --no-optional-locks diff --name-only HEAD 2>/dev/null | wc -l | tr -d ' ')
+    # Count untracked files
+    untracked=$(git -C "$cwd" --no-optional-locks ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$changed" -gt 0 ] || [ "$untracked" -gt 0 ]; then
+      git_changes="${changed}~ ${untracked}?"
+    fi
+  fi
+fi
 
 
 # Context window used percentage
@@ -57,10 +76,22 @@ seven_resets=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty'
 # --- Build output ---
 parts=()
 
-# Model name (cyan, bold)
-parts+=("$(printf "${BOLD}${CYAN}%s${RESET}" "$model")")
+sep="$(printf "${DIM} | ${RESET}")"
 
-# Context window with progress bar
+# 1. Git branch and local changes
+if [ -n "$git_branch" ]; then
+  branch_str="$(printf "${BOLD}${WHITE}${BG_BLUE} %s ${RESET}" "$git_branch")"
+  if [ "$changed" -gt 0 ] || [ "$untracked" -gt 0 ]; then
+    change_str=""
+    [ "$changed" -gt 0 ] && change_str="${YELLOW}${changed}~${RESET}"
+    [ "$untracked" -gt 0 ] && { [ -n "$change_str" ] && change_str+=" "; change_str+="${GREEN}${untracked}?${RESET}"; }
+    parts+=("$(printf "${branch_str} ${change_str}")")
+  else
+    parts+=("$(printf "${branch_str}")")
+  fi
+fi
+
+# 2. Context window with progress bar
 if [ -n "$ctx_pct" ]; then
   ctx_int=$(printf '%.0f' "$ctx_pct")
   col=$(pct_color "$ctx_pct" 50 80)
@@ -68,7 +99,7 @@ if [ -n "$ctx_pct" ]; then
   parts+=("$(printf "ctx:${col}%s %d%%${RESET}" "$bar" "$ctx_int")")
 fi
 
-# 5-hour rate limit
+# 3. 5-hour rate limit
 if [ -n "$five_pct" ]; then
   five_int=$(printf '%.0f' "$five_pct")
   col=$(pct_color "$five_pct" 50 80)
@@ -90,7 +121,7 @@ if [ -n "$five_pct" ]; then
   parts+=("$(printf "5h:${col}%s %d%%${DIM}%s${RESET}" "$bar" "$five_int" "$reset_str")")
 fi
 
-# 7-day rate limit
+# 4. 7-day rate limit
 if [ -n "$seven_pct" ]; then
   seven_int=$(printf '%.0f' "$seven_pct")
   col=$(pct_color "$seven_pct" 50 80)
@@ -102,15 +133,13 @@ if [ -n "$seven_pct" ]; then
   parts+=("$(printf "7d:${col}%s %d%%${DIM}%s${RESET}" "$bar" "$seven_int" "$reset_str")")
 fi
 
+# 5. Model name (cyan, bold) — last
+parts+=("$(printf "${BOLD}${CYAN}%s${RESET}" "$model")")
+
 # Join with separator
-sep="$(printf "${DIM} | ${RESET}")"
 result=""
 for part in "${parts[@]}"; do
-  if [ -z "$result" ]; then
-    result="$part"
-  else
-    result="${result}${sep}${part}"
-  fi
+  if [ -z "$result" ]; then result="$part"; else result="${result}${sep}${part}"; fi
 done
 
 printf '%b\n' "$result"
