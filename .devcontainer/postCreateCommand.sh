@@ -5,6 +5,9 @@ npm install
 
 curl -fsSL https://claude.ai/install.sh | bash
 
+# gstack - Claude Code skills framework
+git clone https://github.com/garrytan/gstack.git .claude/skills/gstack && cd .claude/skills/gstack && ./setup && cd -
+
 # Powerlevel10k
 git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/powerlevel10k
 echo 'source ~/powerlevel10k/powerlevel10k.zsh-theme' >> ~/.zshrc
