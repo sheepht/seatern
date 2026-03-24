@@ -16,7 +16,10 @@
 		"vscode": {
 			"extensions": [
 				"Prisma.prisma"
-			]
+			],
+			"settings": {
+				"terminal.integrated.defaultProfile.linux": "zsh"
+			}
 		}
 	}
 
