@@ -8,6 +8,8 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ─── 使用者 ──────────────────────────────────────────
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -15,6 +17,230 @@ model User {
   avatarUrl String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  events Event[] @relation("UserEvents")
 }
 
+// ─── 活動 ────────────────────────────────────────────
 
+model Event {
+  id         String    @id @default(uuid())
+  name       String
+  date       String?
+  type       EventType @default(wedding)
+  categories String[]  @default(["男方", "女方", "共同"])
+
+  // 擁有者：登入用戶或匿名 session
+  ownerType OwnerType @default(anonymous)
+  ownerId   String    // User.id 或 anonymous session UUID
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User?             @relation("UserEvents", fields: [ownerId], references: [id], map: "event_user_fk")
+  guests    Guest[]
+  tables    Table[]
+  tags      Tag[]
+  edges     Edge[]
+  avoidPairs AvoidPair[]
+  snapshots SeatingSnapshot[]
+
+  @@index([ownerType, ownerId])
+}
+
+enum EventType {
+  wedding
+  banquet
+  corporate
+  other
+}
+
+enum OwnerType {
+  user
+  anonymous
+}
+
+// ─── 賓客 ────────────────────────────────────────────
+// LocalGuest 概念：姓名/別名直接嵌入，不依賴 Contact
+
+model Guest {
+  id      String @id @default(uuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  // 基本資料（從 Google Sheet 匯入）
+  name         String
+  aliases      String[]  @default([])
+  category     String?
+  relationScore Int       @default(2) // 1-3
+
+  // 賓客填寫
+  rsvpStatus    RsvpStatus @default(pending)
+  attendeeCount Int        @default(1) // 含本人 + 眷屬（成人+小孩）
+  dietaryNote   String?
+  specialNote   String?    // 嬰兒椅、輪椅等
+
+  // 系統計算
+  satisfactionScore Float   @default(0)
+  assignedTableId   String?
+  assignedTable     Table?  @relation(fields: [assignedTableId], references: [id], onDelete: SetNull)
+  isOverflow        Boolean @default(false)
+  isIsolated        Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  seatPreferences SeatPreference[] @relation("PreferenceFrom")
+  preferredBy     SeatPreference[] @relation("PreferenceTo")
+  edgesFrom       Edge[]           @relation("EdgeFrom")
+  edgesTo         Edge[]           @relation("EdgeTo")
+  guestTags       GuestTag[]
+  avoidPairsA     AvoidPair[]      @relation("AvoidA")
+  avoidPairsB     AvoidPair[]      @relation("AvoidB")
+
+  @@index([eventId])
+  @@index([assignedTableId])
+}
+
+enum RsvpStatus {
+  pending
+  confirmed
+  declined
+  modified
+}
+
+// ─── 桌次 ────────────────────────────────────────────
+
+model Table {
+  id      String @id @default(uuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  name     String
+  capacity Int    @default(10)
+
+  // 邏輯座標（世界座標系，縮放不影響）
+  positionX Float @default(0)
+  positionY Float @default(0)
+
+  averageSatisfaction Float   @default(0)
+  color               String?
+  note                String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  guests Guest[]
+
+  @@index([eventId])
+}
+
+// ─── 關係邊 ──────────────────────────────────────────
+
+model Edge {
+  id      String @id @default(uuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  fromGuestId String
+  fromGuest   Guest  @relation("EdgeFrom", fields: [fromGuestId], references: [id], onDelete: Cascade)
+  toGuestId   String
+  toGuest     Guest  @relation("EdgeTo", fields: [toGuestId], references: [id], onDelete: Cascade)
+
+  weight Float    @default(1)
+  type   EdgeType @default(same_group)
+
+  @@unique([fromGuestId, toGuestId])
+  @@index([eventId])
+}
+
+enum EdgeType {
+  mutual    // 雙向都選想同桌
+  one_way   // 單向選擇
+  same_group // 同群組自動建立
+  inferred  // 系統推測
+}
+
+// ─── 標籤 ────────────────────────────────────────────
+
+model Tag {
+  id       String  @id @default(uuid())
+  eventId  String
+  event    Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name     String
+  category String? // 綁定特定分類
+
+  guestTags GuestTag[]
+
+  @@unique([eventId, name])
+}
+
+model GuestTag {
+  id      String @id @default(uuid())
+  guestId String
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  tagId   String
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  assignedBy AssignedBy @default(host)
+
+  @@unique([guestId, tagId])
+}
+
+enum AssignedBy {
+  host
+  guest
+}
+
+// ─── 座位偏好 ────────────────────────────────────────
+
+model SeatPreference {
+  id      String @id @default(uuid())
+  guestId String
+  guest   Guest  @relation("PreferenceFrom", fields: [guestId], references: [id], onDelete: Cascade)
+
+  preferredGuestId String
+  preferredGuest   Guest @relation("PreferenceTo", fields: [preferredGuestId], references: [id], onDelete: Cascade)
+
+  rank Int // 1, 2, 3
+
+  @@unique([guestId, preferredGuestId])
+  @@index([guestId])
+}
+
+// ─── 避免同桌 ────────────────────────────────────────
+
+model AvoidPair {
+  id      String @id @default(uuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  guestAId String
+  guestA   Guest  @relation("AvoidA", fields: [guestAId], references: [id], onDelete: Cascade)
+  guestBId String
+  guestB   Guest  @relation("AvoidB", fields: [guestBId], references: [id], onDelete: Cascade)
+
+  reason String? // 前任、家庭糾紛、工作嫌隙、其他
+
+  @@unique([guestAId, guestBId])
+  @@index([eventId])
+}
+
+// ─── 座位快照 ────────────────────────────────────────
+
+model SeatingSnapshot {
+  id      String @id @default(uuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  name String
+  data Json // { guests: [{guestId, tableId, satisfactionScore, isOverflow}], tables: [{tableId, positionX, positionY}] }
+
+  averageSatisfaction Float @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([eventId])
+}
