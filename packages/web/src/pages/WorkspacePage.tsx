@@ -70,7 +70,9 @@ export default function WorkspacePage() {
 
     if (!over || !active.data.current) return
 
-    const guestId = active.id as string
+    // 支援兩種 ID 格式：直接 guestId（從清單拖）或 seat-guestId（從桌內拖）
+    const rawId = active.id as string
+    const guestId = rawId.startsWith('seat-') ? rawId.slice(5) : rawId
     const overData = over.data.current
 
     if (overData?.type === 'table') {

@@ -86,12 +86,19 @@ export function FloorPlan() {
       const tableCenterX = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - containerRect.left
       const tableCenterY = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - containerRect.top
 
-      // 計算每個座位的位置（跟 TableNode 裡的 buildSeatLayout 一樣的邏輯）
+      // 計算 totalSlots — 跟 TableNode buildSeatLayout 完全一致
+      let totalOccupied = 0
+      for (const g of tableGuests) {
+        totalOccupied += g.attendeeCount
+      }
+      const totalSlots = Math.max(t.capacity, totalOccupied)
+
+      // 計算每個座位的位置
       let posIndex = 0
       for (const guest of tableGuests) {
-        if (posIndex >= t.capacity) break
+        if (posIndex >= totalSlots) break
         // 本人座位
-        const angle = ((2 * Math.PI) / t.capacity) * posIndex - Math.PI / 2
+        const angle = ((2 * Math.PI) / totalSlots) * posIndex - Math.PI / 2
         guestSeats.push({
           guest,
           x: tableCenterX + Math.cos(angle) * seatRadius * scale,
@@ -101,7 +108,7 @@ export function FloorPlan() {
         posIndex++
         // 跳過眷屬位
         for (let c = 1; c < guest.attendeeCount; c++) {
-          if (posIndex >= t.capacity) break
+          if (posIndex >= totalSlots) break
           posIndex++
         }
       }
@@ -170,6 +177,7 @@ export function FloorPlan() {
         ref={svgRef}
         viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
         className="w-full h-full bg-[#FAFAFA]"
+        style={{ userSelect: 'none' }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
@@ -182,11 +190,21 @@ export function FloorPlan() {
         </defs>
         <rect width={CANVAS_WIDTH} height={CANVAS_HEIGHT} fill="url(#grid)" />
 
-        {tables.map((table) => (
+        {/* 選中的桌子最後畫（最上層） */}
+        {tables.filter((t) => t.id !== selectedTableId).map((table) => (
           <TableNode
             key={table.id}
             table={table}
-            isSelected={selectedTableId === table.id}
+            isSelected={false}
+            isDragging={draggingTableId === table.id}
+            onMouseDown={(e) => handleMouseDown(table.id, e)}
+          />
+        ))}
+        {selectedTableId && tables.filter((t) => t.id === selectedTableId).map((table) => (
+          <TableNode
+            key={table.id}
+            table={table}
+            isSelected={true}
             isDragging={draggingTableId === table.id}
             onMouseDown={(e) => handleMouseDown(table.id, e)}
           />
@@ -200,26 +218,29 @@ export function FloorPlan() {
       </svg>
 
       {/* HTML drop zone overlay（透明，用於 @dnd-kit 偵測） */}
-      {screenTables.map((st) => (
-        <TableDropZone
-          key={st.id}
-          tableId={st.id}
-          x={st.x}
-          y={st.y}
-          radius={st.radius}
-        />
-      ))}
+      {/* 拖桌子時禁用所有 HTML overlay 的滑鼠事件 */}
+      <div style={{ pointerEvents: draggingTableId ? 'none' : undefined }}>
+        {screenTables.map((st) => (
+          <TableDropZone
+            key={st.id}
+            tableId={st.id}
+            x={st.x}
+            y={st.y}
+            radius={st.radius}
+          />
+        ))}
 
-      {/* 賓客座位 draggable overlay（透明，用於從桌內拖曳賓客） */}
-      {screenGuestSeats.map((gs) => (
-        <GuestSeatOverlay
-          key={gs.guest.id}
-          guest={gs.guest}
+        {/* 賓客座位 draggable overlay（透明，用於從桌內拖曳賓客） */}
+        {screenGuestSeats.map((gs) => (
+          <GuestSeatOverlay
+            key={gs.guest.id}
+            guest={gs.guest}
           x={gs.x}
           y={gs.y}
           radius={gs.radius}
         />
       ))}
+      </div>
     </div>
   )
 }
