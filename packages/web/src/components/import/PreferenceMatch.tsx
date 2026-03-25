@@ -38,17 +38,18 @@ export function PreferenceMatch({ matches, onConfirm, onSkipAll, onBack }: Props
   if (summary.fuzzy === 0 && summary.unmatched === 0) {
     return (
       <div className="space-y-4">
-        <div className="p-4 bg-green-50 text-green-700 rounded-lg text-center">
+        <div className="p-4 text-center" style={{ background: '#F0FDF4', color: 'var(--success)', borderRadius: 'var(--radius-md)' }}>
           <p className="font-medium">所有偏好已自動配對！</p>
-          <p className="text-sm mt-1">{summary.exact} 個「想同桌」偏好全部找到對應的人</p>
+          <p className="text-sm mt-1"><span className="font-data">{summary.exact}</span> 個「想同桌」偏好全部找到對應的人</p>
         </div>
         <div className="flex justify-between">
-          <button onClick={onBack} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">
+          <button onClick={onBack} className="px-4 py-2 text-sm hover:opacity-80" style={{ color: 'var(--text-secondary)' }}>
             返回
           </button>
           <button
             onClick={() => onConfirm(resolved)}
-            className="px-6 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+            className="px-6 py-2 text-white text-sm hover:opacity-90"
+            style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
           >
             繼續
           </button>
@@ -62,18 +63,18 @@ export function PreferenceMatch({ matches, onConfirm, onSkipAll, onBack }: Props
       {/* 統計 */}
       <div className="flex items-center gap-3 flex-wrap">
         {summary.exact > 0 && (
-          <span className="px-2.5 py-1 bg-green-50 text-green-700 rounded text-sm">
-            自動配對 {summary.exact} 個
+          <span className="px-2.5 py-1 text-sm" style={{ background: '#F0FDF4', color: 'var(--success)', borderRadius: 'var(--radius-sm)' }}>
+            自動配對 <span className="font-data">{summary.exact}</span> 個
           </span>
         )}
         {summary.fuzzy > 0 && (
-          <span className="px-2.5 py-1 bg-yellow-50 text-yellow-700 rounded text-sm">
-            需確認 {summary.fuzzy} 個
+          <span className="px-2.5 py-1 text-sm" style={{ background: 'var(--accent-light)', color: 'var(--accent-dark)', borderRadius: 'var(--radius-sm)' }}>
+            需確認 <span className="font-data">{summary.fuzzy}</span> 個
           </span>
         )}
         {summary.unmatched > 0 && (
-          <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded text-sm">
-            無匹配 {summary.unmatched} 個
+          <span className="px-2.5 py-1 text-sm" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)' }}>
+            無匹配 <span className="font-data">{summary.unmatched}</span> 個
           </span>
         )}
       </div>
@@ -87,17 +88,18 @@ export function PreferenceMatch({ matches, onConfirm, onSkipAll, onBack }: Props
           if (match.selectedIndex === -1) return null
 
           return (
-            <div key={idx} className="p-3 border border-gray-200 rounded-lg">
+            <div key={idx} className="p-3" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)' }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm">
-                  <span className="font-medium">{match.fromName}</span>
-                  <span className="text-gray-400 mx-1">想跟</span>
-                  <span className="font-medium text-blue-600">「{match.rawText}」</span>
-                  <span className="text-gray-400 ml-1">同桌</span>
+                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{match.fromName}</span>
+                  <span className="mx-1" style={{ color: 'var(--text-muted)' }}>想跟</span>
+                  <span className="font-medium" style={{ color: 'var(--accent)' }}>「{match.rawText}」</span>
+                  <span className="ml-1" style={{ color: 'var(--text-muted)' }}>同桌</span>
                 </span>
                 <button
                   onClick={() => handleDismiss(idx)}
-                  className="text-xs text-gray-400 hover:text-gray-600"
+                  className="text-xs hover:opacity-80"
+                  style={{ color: 'var(--text-muted)' }}
                 >
                   跳過
                 </button>
@@ -109,17 +111,20 @@ export function PreferenceMatch({ matches, onConfirm, onSkipAll, onBack }: Props
                     <button
                       key={c.guestIndex}
                       onClick={() => handleSelect(idx, c.guestIndex)}
-                      className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-blue-50 hover:border-blue-400"
+                      className="px-3 py-1 text-sm hover:opacity-90"
+                      style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-light)'; e.currentTarget.style.borderColor = 'var(--accent)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = ''; e.currentTarget.style.borderColor = 'var(--border)' }}
                     >
                       {c.name}
-                      <span className="text-gray-400 ml-1 text-xs">
+                      <span className="ml-1 text-xs font-data" style={{ color: 'var(--text-muted)' }}>
                         {Math.round(c.score * 100)}%
                       </span>
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-400">找不到匹配的賓客</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>找不到匹配的賓客</p>
               )}
             </div>
           )
@@ -127,12 +132,12 @@ export function PreferenceMatch({ matches, onConfirm, onSkipAll, onBack }: Props
 
         {/* 已處理的摘要 */}
         {resolved.filter((m) => m.selectedIndex !== null && m.selectedIndex >= 0 && m.status !== 'exact').length > 0 && (
-          <div className="text-sm text-gray-500 pt-2 border-t">
+          <div className="text-sm pt-2" style={{ color: 'var(--text-secondary)', borderTop: '1px solid var(--border)' }}>
             已確認配對：
             {resolved
               .filter((m) => m.selectedIndex !== null && m.selectedIndex >= 0 && m.status !== 'exact')
               .map((m, i) => (
-                <span key={i} className="ml-2 text-green-600">
+                <span key={i} className="ml-2" style={{ color: 'var(--success)' }}>
                   {m.fromName} → {m.candidates.find((c) => c.guestIndex === m.selectedIndex)?.name}
                 </span>
               ))}
@@ -142,23 +147,21 @@ export function PreferenceMatch({ matches, onConfirm, onSkipAll, onBack }: Props
 
       {/* 按鈕 */}
       <div className="flex justify-between items-center">
-        <button onClick={onBack} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">
+        <button onClick={onBack} className="px-4 py-2 text-sm hover:opacity-80" style={{ color: 'var(--text-secondary)' }}>
           返回
         </button>
         <div className="flex gap-3">
           <button
             onClick={onSkipAll}
-            className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded"
+            className="px-4 py-2 text-sm hover:opacity-80"
+            style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}
           >
             全部跳過
           </button>
           <button
             onClick={() => onConfirm(resolved)}
-            className={`px-6 py-2 text-sm rounded ${
-              allResolved
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            }`}
+            className="px-6 py-2 text-sm text-white hover:opacity-90"
+            style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
           >
             {allResolved ? '確認並繼續' : `繼續（剩 ${needsAction.length} 個未處理）`}
           </button>

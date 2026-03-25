@@ -58,7 +58,7 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
       <circle
         r={radius + 4}
         fill="none"
-        stroke={hasViolation ? '#DC2626' : guests.length > 0 ? satisfactionColor : '#E5E7EB'}
+        stroke={hasViolation ? '#DC2626' : guests.length > 0 ? satisfactionColor : '#E7E5E4'}
         strokeWidth={isSelected ? 4 : 2}
         opacity={0.8}
       />
@@ -67,7 +67,7 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
       <circle
         r={radius}
         fill={hasViolation ? '#FEF2F2' : 'white'}
-        stroke={isSelected ? '#2563EB' : hasViolation ? '#DC2626' : isOverCapacity ? '#DC2626' : '#D1D5DB'}
+        stroke={isSelected ? '#B08D57' : hasViolation ? '#DC2626' : isOverCapacity ? '#DC2626' : '#D6D3D1'}
         strokeWidth={isSelected ? 2 : hasViolation ? 2 : 1}
       />
 
@@ -75,9 +75,10 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
       <text
         y={-14}
         textAnchor="middle"
-        fill="#1A1A1A"
+        fill="#1C1917"
         fontSize="13"
         fontWeight="bold"
+        fontFamily="'Plus Jakarta Sans', sans-serif"
       >
         {table.name}
       </text>
@@ -90,6 +91,7 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
           fill={satisfactionColor}
           fontSize="16"
           fontWeight="bold"
+          fontFamily="'Plus Jakarta Sans', sans-serif"
         >
           {Math.round(table.averageSatisfaction)}
         </text>
@@ -99,8 +101,9 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
       <text
         y={20}
         textAnchor="middle"
-        fill={isOverCapacity ? '#DC2626' : '#9CA3AF'}
+        fill={isOverCapacity ? '#DC2626' : '#A8A29E'}
         fontSize="11"
+        fontFamily="'Plus Jakarta Sans', sans-serif"
       >
         {seatCount}/{table.capacity} 席
       </text>
@@ -124,6 +127,7 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
               textAnchor="middle"
               fill="#374151"
               fontSize="10"
+              fontFamily="'Noto Sans TC', 'Plus Jakarta Sans', system-ui, sans-serif"
             >
               {g.name.length > 4 ? g.name.slice(0, 4) + '…' : g.name}
             </text>
@@ -134,7 +138,7 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
         <text
           y={32 + 4 * 16 + 4}
           textAnchor="middle"
-          fill="#9CA3AF"
+          fill="#A8A29E"
           fontSize="10"
         >
           +{guests.length - 4} 人

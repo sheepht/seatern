@@ -49,26 +49,42 @@ export function Toolbar() {
 
   return (
     <>
-      <div className="h-12 border-b border-gray-200 bg-white px-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-sm font-bold text-gray-900">{eventName || 'Seatern'}</h1>
+      <div
+        className="h-14 border-b bg-white px-5 flex items-center justify-between"
+        style={{ borderColor: 'var(--border)' }}
+      >
+        {/* Left: Brand + Event name */}
+        <div className="flex items-center gap-3">
+          <span
+            className="text-lg font-extrabold tracking-tight"
+            style={{ fontFamily: 'var(--font-display)', color: 'var(--accent)' }}
+          >
+            Seatern
+          </span>
+          <span style={{ color: 'var(--border-strong)' }}>|</span>
+          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            {eventName || '未命名活動'}
+          </span>
         </div>
 
+        {/* Right: Actions */}
         <div className="flex items-center gap-2">
           <button
             onClick={handleAddTable}
             disabled={adding}
-            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="px-3.5 py-1.5 text-xs font-semibold text-white rounded cursor-pointer disabled:opacity-50 hover:brightness-90"
+            style={{ fontFamily: 'var(--font-display)', background: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
           >
             + 新增桌次
           </button>
 
-          <div className="w-px h-5 bg-gray-200" />
+          <div className="w-px h-5" style={{ background: 'var(--border)' }} />
 
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+            className="px-3 py-1.5 text-xs font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
+            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
           >
             {saving ? '儲存中...' : '儲存快照'}
           </button>
@@ -76,24 +92,26 @@ export function Toolbar() {
           <button
             onClick={handleRestore}
             disabled={snapshots.length === 0}
-            className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+            className="px-3 py-1.5 text-xs font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
+            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
             title={snapshots.length > 0 ? `還原：${snapshots[0].name}` : '尚無快照'}
           >
             還原快照
-            {snapshots.length > 0 && (
-              <span className="text-gray-400 ml-1">({snapshots[0].name})</span>
-            )}
           </button>
 
-          <div className="w-px h-5 bg-gray-200" />
+          <div className="w-px h-5" style={{ background: 'var(--border)' }} />
 
           <button
             onClick={() => setShowAvoidModal(true)}
-            className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 relative"
+            className="px-3 py-1.5 text-xs font-medium rounded border cursor-pointer relative hover:bg-[var(--accent-light)]"
+            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
           >
             避免同桌
             {avoidPairs.length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+              <span
+                className="absolute -top-1.5 -right-1.5 w-4 h-4 text-white text-[10px] rounded-full flex items-center justify-center"
+                style={{ background: 'var(--error)' }}
+              >
                 {avoidPairs.length}
               </span>
             )}
@@ -102,7 +120,8 @@ export function Toolbar() {
           <button
             onClick={undo}
             disabled={undoStack.length === 0}
-            className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+            className="px-3 py-1.5 text-xs font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
+            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
             title="Ctrl+Z"
           >
             撤銷
@@ -110,7 +129,8 @@ export function Toolbar() {
 
           <button
             onClick={() => navigate('/import')}
-            className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+            className="px-3 py-1.5 text-xs font-medium rounded border cursor-pointer hover:bg-[var(--accent-light)]"
+            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
           >
             匯入
           </button>
@@ -119,30 +139,37 @@ export function Toolbar() {
 
       {showAvoidModal && <AvoidPairModal onClose={() => setShowAvoidModal(false)} />}
 
-      {/* 還原確認 modal */}
       {showRestoreConfirm && snapshots.length > 0 && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowRestoreConfirm(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">還原快照</h2>
-            <p className="text-sm text-gray-600 mb-1">
-              還原到：<span className="font-medium">{snapshots[0].name}</span>
+          <div
+            className="bg-white w-full max-w-sm p-6"
+            style={{ borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-bold mb-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+              還原快照
+            </h2>
+            <p className="text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>
+              還原到：<span className="font-medium" style={{ color: 'var(--text-primary)' }}>{snapshots[0].name}</span>
             </p>
-            <p className="text-sm text-gray-500 mb-1">
-              當時全場平均滿意度：{snapshots[0].averageSatisfaction}
+            <p className="text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>
+              當時全場平均滿意度：<span className="font-data font-bold">{snapshots[0].averageSatisfaction}</span>
             </p>
-            <p className="text-sm text-orange-600 mb-4">
+            <p className="text-sm mb-5" style={{ color: 'var(--warning)' }}>
               目前的排位將被覆蓋，撤銷記錄會清空。
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowRestoreConfirm(false)}
-                className="flex-1 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                className="flex-1 py-2 text-sm font-medium rounded border cursor-pointer hover:bg-[var(--bg-primary)]"
+                style={{ borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)' }}
               >
                 取消
               </button>
               <button
                 onClick={confirmRestore}
-                className="flex-1 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="flex-1 py-2 text-sm font-semibold text-white rounded cursor-pointer hover:brightness-90"
+                style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-display)' }}
               >
                 還原
               </button>

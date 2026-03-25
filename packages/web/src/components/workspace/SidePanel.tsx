@@ -17,7 +17,8 @@ function ClearTableButton({ tableId, guestCount }: { tableId: string; guestCount
   return (
     <button
       onClick={handleClear}
-      className="text-[10px] text-red-400 hover:text-red-600"
+      className="text-[10px] hover:opacity-80"
+      style={{ color: 'var(--error)' }}
     >
       清空此桌
     </button>
@@ -55,32 +56,34 @@ export function SidePanel() {
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4">
       {/* 全場滿意度 */}
-      <div className="p-3 bg-white rounded-lg border border-gray-200">
-        <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">全場統計</h3>
-        <div className="text-2xl font-bold text-gray-900">
+      <div className="p-3" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+        <h3 className="text-xs font-medium uppercase tracking-wide mb-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}>全場統計</h3>
+        <div className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          <span className="font-data">
           {confirmed.length > 0
             ? Math.round((confirmed.reduce((s, g) => s + g.satisfactionScore, 0) / confirmed.length) * 10) / 10
             : '—'
           }
-          <span className="text-sm text-gray-400 font-normal ml-1">/ 100</span>
+          </span>
+          <span className="text-sm font-normal ml-1" style={{ color: 'var(--text-muted)' }}>/ 100</span>
         </div>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500">
-          <div>已安排 <span className="font-medium text-gray-700">{assigned}</span> 席</div>
-          <div>未安排 <span className="font-medium text-orange-600">{unassigned}</span> 席</div>
-          <div>賓客 <span className="font-medium text-gray-700">{confirmed.length}</span> 人</div>
-          <div>桌次 <span className="font-medium text-gray-700">{tables.length}</span> 桌</div>
+        <div className="mt-2 grid grid-cols-2 gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+          <div>已安排 <span className="font-medium font-data" style={{ color: 'var(--text-primary)' }}>{assigned}</span> 席</div>
+          <div>未安排 <span className="font-medium font-data" style={{ color: '#EA580C' }}>{unassigned}</span> 席</div>
+          <div>賓客 <span className="font-medium font-data" style={{ color: 'var(--text-primary)' }}>{confirmed.length}</span> 人</div>
+          <div>桌次 <span className="font-medium font-data" style={{ color: 'var(--text-primary)' }}>{tables.length}</span> 桌</div>
         </div>
       </div>
 
       {/* 選中桌詳情 */}
       {selectedTable && (
-        <div className="p-3 bg-white rounded-lg border border-blue-200">
+        <div className="p-3" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '2px solid var(--accent)', boxShadow: 'var(--shadow-sm)' }}>
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h3 className="text-xs font-medium text-blue-600 uppercase tracking-wide">
+              <h3 className="text-xs font-medium uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)', color: 'var(--accent)' }}>
                 {selectedTable.name}
               </h3>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm font-data" style={{ color: 'var(--text-secondary)' }}>
                 {selectedSeatCount}/{selectedTable.capacity} 席
               </div>
             </div>
@@ -107,12 +110,15 @@ export function SidePanel() {
                   <GuestChip guest={g} />
                 </div>
                 <div className="flex items-center gap-1 ml-2 shrink-0">
-                  <span className={`text-xs font-medium ${getSatisfactionClass(g.satisfactionScore)}`}>
+                  <span className="text-xs font-medium font-data" style={{ color: getSatisfactionHex(g.satisfactionScore) }}>
                     {g.satisfactionScore || '—'}
                   </span>
                   <button
                     onClick={() => moveGuest(g.id, null)}
-                    className="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-red-500 rounded hover:bg-red-50"
+                    className="w-4 h-4 flex items-center justify-center rounded"
+                    style={{ color: 'var(--text-muted)' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error)'; e.currentTarget.style.backgroundColor = '#FEF2F2' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.backgroundColor = '' }}
                     title="移除此人"
                   >
                     ×
@@ -122,34 +128,34 @@ export function SidePanel() {
               )
             })}
             {selectedGuests.length === 0 && (
-              <p className="text-xs text-gray-400">尚未安排賓客</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>尚未安排賓客</p>
             )}
           </div>
         </div>
       )}
 
       {/* 警示區 */}
-      <div className="p-3 bg-white rounded-lg border border-gray-200">
-        <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">警示</h3>
+      <div className="p-3" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+        <h3 className="text-xs font-medium uppercase tracking-wide mb-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}>警示</h3>
         <div className="space-y-1.5 text-sm">
           {violations.length > 0 && violations.map((v) => {
             const a = guests.find((g) => g.id === v.guestAId)
             const b = guests.find((g) => g.id === v.guestBId)
             return (
-              <div key={v.id} className="flex items-start gap-1.5 text-red-600">
+              <div key={v.id} className="flex items-start gap-1.5" style={{ color: 'var(--error)' }}>
                 <span className="shrink-0">⚠</span>
                 <span>{a?.name} 與 {b?.name} 避免同桌{v.reason ? `（${v.reason}）` : ''}</span>
               </div>
             )
           })}
           {unassigned > 0 && (
-            <div className="flex items-start gap-1.5 text-orange-600">
+            <div className="flex items-start gap-1.5" style={{ color: '#EA580C' }}>
               <span className="shrink-0">⚠</span>
               <span>尚有 {unassigned} 席未安排</span>
             </div>
           )}
           {violations.length === 0 && unassigned === 0 && (
-            <p className="text-xs text-gray-400">目前無警示</p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>目前無警示</p>
           )}
         </div>
       </div>
@@ -157,9 +163,9 @@ export function SidePanel() {
   )
 }
 
-function getSatisfactionClass(score: number): string {
-  if (score >= 85) return 'text-green-600'
-  if (score >= 70) return 'text-yellow-600'
-  if (score >= 55) return 'text-orange-600'
-  return 'text-red-600'
+function getSatisfactionHex(score: number): string {
+  if (score >= 85) return '#16A34A'
+  if (score >= 70) return '#CA8A04'
+  if (score >= 55) return '#EA580C'
+  return '#DC2626'
 }

@@ -41,7 +41,8 @@ export function PasteArea({ onParsed }: Props) {
   return (
     <div>
       <textarea
-        className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        className="w-full h-32 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:border-transparent"
+        style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', '--tw-ring-color': 'var(--accent)' } as React.CSSProperties}
         placeholder="從 Google Sheet 複製表格資料，貼上到這裡...&#10;（Ctrl+V / Cmd+V）"
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -50,13 +51,14 @@ export function PasteArea({ onParsed }: Props) {
       {text && (
         <button
           onClick={handleParse}
-          className="mt-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+          className="mt-2 px-4 py-1.5 text-white text-sm hover:opacity-90"
+          style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
         >
           解析資料
         </button>
       )}
       {error && (
-        <p className="mt-2 text-sm text-red-600">{error}</p>
+        <p className="mt-2 text-sm" style={{ color: 'var(--error)' }}>{error}</p>
       )}
     </div>
   )

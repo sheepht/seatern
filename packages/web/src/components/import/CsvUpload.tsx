@@ -48,11 +48,12 @@ export function CsvUpload({ onParsed }: Props) {
   return (
     <div>
       <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-          isDragging
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-300 hover:border-gray-400'
-        }`}
+        className="border-2 border-dashed p-8 text-center cursor-pointer transition-colors"
+        style={{
+          borderRadius: 'var(--radius-lg)',
+          borderColor: isDragging ? 'var(--accent)' : 'var(--border)',
+          background: isDragging ? 'var(--accent-light)' : 'transparent',
+        }}
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
@@ -69,16 +70,16 @@ export function CsvUpload({ onParsed }: Props) {
           }}
         />
         {loading ? (
-          <p className="text-gray-500">解析中...</p>
+          <p style={{ color: 'var(--text-secondary)' }}>解析中...</p>
         ) : (
           <>
-            <p className="text-gray-700 font-medium">上傳 CSV 檔案</p>
-            <p className="text-gray-500 text-sm mt-1">拖曳檔案到此處或點擊選擇</p>
+            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>上傳 CSV 檔案</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>拖曳檔案到此處或點擊選擇</p>
           </>
         )}
       </div>
       {error && (
-        <p className="mt-2 text-sm text-red-600">{error}</p>
+        <p className="mt-2 text-sm" style={{ color: 'var(--error)' }}>{error}</p>
       )}
     </div>
   )

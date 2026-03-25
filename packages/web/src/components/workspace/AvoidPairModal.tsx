@@ -34,25 +34,26 @@ export function AvoidPairModal({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold text-gray-900 mb-4">避免同桌管理</h2>
+      <div className="w-full max-w-md p-6" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)' }} onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold mb-4" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>避免同桌管理</h2>
 
         {/* 現有的避免同桌 */}
         <div className="space-y-2 mb-6">
           {avoidPairs.length === 0 && (
-            <p className="text-sm text-gray-400">尚未設定</p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>尚未設定</p>
           )}
           {avoidPairs.map((ap) => (
-            <div key={ap.id} className="flex items-center justify-between p-2 bg-red-50 rounded text-sm">
+            <div key={ap.id} className="flex items-center justify-between p-2 text-sm" style={{ background: '#FEF2F2', borderRadius: 'var(--radius-sm)' }}>
               <span>
-                <span className="font-medium">{getName(ap.guestAId)}</span>
-                <span className="text-gray-400 mx-1">與</span>
-                <span className="font-medium">{getName(ap.guestBId)}</span>
-                {ap.reason && <span className="text-gray-400 ml-1">（{ap.reason}）</span>}
+                <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{getName(ap.guestAId)}</span>
+                <span className="mx-1" style={{ color: 'var(--text-muted)' }}>與</span>
+                <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{getName(ap.guestBId)}</span>
+                {ap.reason && <span className="ml-1" style={{ color: 'var(--text-muted)' }}>（{ap.reason}）</span>}
               </span>
               <button
                 onClick={() => removeAvoidPair(ap.id)}
-                className="text-red-400 hover:text-red-600 text-xs"
+                className="text-xs hover:opacity-80"
+                style={{ color: 'var(--error)' }}
               >
                 移除
               </button>
@@ -61,13 +62,14 @@ export function AvoidPairModal({ onClose }: Props) {
         </div>
 
         {/* 新增 */}
-        <div className="border-t pt-4 space-y-3">
-          <h3 className="text-sm font-medium text-gray-700">新增避免同桌</h3>
+        <div className="pt-4 space-y-3" style={{ borderTop: '1px solid var(--border)' }}>
+          <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>新增避免同桌</h3>
           <div className="grid grid-cols-2 gap-2">
             <select
               value={guestAId}
               onChange={(e) => setGuestAId(e.target.value)}
-              className="text-sm px-2 py-1.5 border border-gray-300 rounded"
+              className="text-sm px-2 py-1.5"
+              style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}
             >
               <option value="">選擇賓客 A</option>
               {confirmed.map((g) => (
@@ -77,7 +79,8 @@ export function AvoidPairModal({ onClose }: Props) {
             <select
               value={guestBId}
               onChange={(e) => setGuestBId(e.target.value)}
-              className="text-sm px-2 py-1.5 border border-gray-300 rounded"
+              className="text-sm px-2 py-1.5"
+              style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}
             >
               <option value="">選擇賓客 B</option>
               {confirmed.filter((g) => g.id !== guestAId).map((g) => (
@@ -88,7 +91,8 @@ export function AvoidPairModal({ onClose }: Props) {
           <select
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            className="w-full text-sm px-2 py-1.5 border border-gray-300 rounded"
+            className="w-full text-sm px-2 py-1.5"
+            style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}
           >
             <option value="">原因（選填）</option>
             {REASONS.map((r) => (
@@ -98,7 +102,8 @@ export function AvoidPairModal({ onClose }: Props) {
           <button
             onClick={handleAdd}
             disabled={!guestAId || !guestBId || guestAId === guestBId || adding}
-            className="w-full py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:opacity-50"
+            className="w-full py-1.5 text-white text-sm disabled:opacity-50 hover:opacity-90"
+            style={{ background: 'var(--error)', borderRadius: 'var(--radius-sm)' }}
           >
             新增避免同桌
           </button>
@@ -106,7 +111,8 @@ export function AvoidPairModal({ onClose }: Props) {
 
         <button
           onClick={onClose}
-          className="mt-4 w-full py-1.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded"
+          className="mt-4 w-full py-1.5 text-sm hover:opacity-80"
+          style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}
         >
           關閉
         </button>

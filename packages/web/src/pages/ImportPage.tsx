@@ -144,37 +144,37 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-white rounded-lg shadow-sm p-8">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg-primary)' }}>
+      <div className="w-full max-w-2xl p-8" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
         {step === 'input' && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">開始安排座位</h1>
-              <p className="text-gray-500 mt-1">匯入你的賓客名單</p>
+              <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>開始安排座位</h1>
+              <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>匯入你的賓客名單</p>
             </div>
 
             <CsvUpload onParsed={handleParsed} />
 
             <div className="flex items-center gap-3">
-              <div className="flex-1 border-t border-gray-200" />
-              <span className="text-sm text-gray-400">或者直接貼上表格資料</span>
-              <div className="flex-1 border-t border-gray-200" />
+              <div className="flex-1" style={{ borderTop: '1px solid var(--border)' }} />
+              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>或者直接貼上表格資料</span>
+              <div className="flex-1" style={{ borderTop: '1px solid var(--border)' }} />
             </div>
 
             <PasteArea onParsed={handleParsed} />
 
             <details className="text-sm">
-              <summary className="text-gray-500 cursor-pointer hover:text-gray-700">
+              <summary className="cursor-pointer hover:opacity-80" style={{ color: 'var(--text-secondary)' }}>
                 進階：貼上 Google Sheet 網址
               </summary>
-              <div className="mt-3 p-3 bg-gray-50 rounded text-gray-500 text-xs">
+              <div className="mt-3 p-3 text-xs" style={{ background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)' }}>
                 此功能在 Phase 2 加入。目前請使用 CSV 上傳或複製貼上。
               </div>
             </details>
 
-            <div className="text-sm text-gray-500">
+            <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               沒有 Google Sheet？{' '}
-              <span className="text-blue-600 cursor-pointer hover:underline">
+              <span className="cursor-pointer hover:underline" style={{ color: 'var(--accent)' }}>
                 使用我們的範本 →
               </span>
             </div>
@@ -183,7 +183,7 @@ export default function ImportPage() {
 
         {step === 'preview' && parseResult && (
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">確認匯入資料</h1>
+            <h1 className="text-2xl font-bold mb-6" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>確認匯入資料</h1>
             <ImportPreview
               data={parseResult}
               onConfirm={handlePreviewConfirm}
@@ -194,8 +194,8 @@ export default function ImportPage() {
 
         {step === 'preferences' && (
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">確認「想同桌」配對</h1>
-            <p className="text-gray-500 text-sm mb-6">
+            <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>確認「想同桌」配對</h1>
+            <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
               系統已自動比對賓客填寫的「想同桌人選」，以下需要你確認
             </p>
             <PreferenceMatch
@@ -208,10 +208,10 @@ export default function ImportPage() {
         )}
 
         {importing && (
-          <div className="mt-4 text-center text-sm text-gray-500">匯入中...</div>
+          <div className="mt-4 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>匯入中...</div>
         )}
         {error && (
-          <div className="mt-4 p-3 bg-red-50 text-red-700 rounded text-sm">{error}</div>
+          <div className="mt-4 p-3 text-sm" style={{ background: '#FEF2F2', color: 'var(--error)', borderRadius: 'var(--radius-sm)' }}>{error}</div>
         )}
       </div>
     </div>
