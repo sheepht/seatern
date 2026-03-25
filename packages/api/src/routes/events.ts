@@ -4,6 +4,23 @@ import type { SessionEnv } from '../middleware/session'
 
 const events = new Hono<SessionEnv>()
 
+/** Dev 模式下放寬 owner 檢查：先用 owner 查，找不到就用 ID 查 */
+async function findEventWithDevFallback(
+  eventId: string,
+  ownerId: string,
+  ownerType: string,
+) {
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, ownerId, ownerType },
+  })
+  if (event) return event
+
+  if (process.env.NODE_ENV !== 'production') {
+    return prisma.event.findUnique({ where: { id: eventId } })
+  }
+  return null
+}
+
 // GET /events — 列出當前用戶的所有活動
 events.get('/', async (c) => {
   const ownerId = c.get('ownerId')
@@ -22,23 +39,26 @@ events.get('/:id', async (c) => {
   const ownerType = c.get('ownerType')
   const id = c.req.param('id')
 
-  const event = await prisma.event.findFirst({
-    where: { id, ownerId, ownerType },
-    include: {
-      guests: {
-        include: {
-          seatPreferences: true,
-          guestTags: { include: { tag: true } },
-        },
-        orderBy: { name: 'asc' },
+  const include = {
+    guests: {
+      include: {
+        seatPreferences: true,
+        guestTags: { include: { tag: true } },
       },
-      tables: { orderBy: { name: 'asc' } },
-      tags: { orderBy: { name: 'asc' } },
-      edges: true,
-      avoidPairs: true,
-      snapshots: { orderBy: { createdAt: 'desc' } },
+      orderBy: { name: 'asc' } as const,
     },
-  })
+    tables: { orderBy: { name: 'asc' } as const },
+    tags: { orderBy: { name: 'asc' } as const },
+    edges: true,
+    avoidPairs: true,
+    snapshots: { orderBy: { createdAt: 'desc' } as const },
+  }
+
+  // 先用 owner 過濾，dev 模式 fallback 到 ID 查
+  const eventBase = await findEventWithDevFallback(id, ownerId, ownerType)
+  const event = eventBase
+    ? await prisma.event.findUnique({ where: { id: eventBase.id }, include })
+    : null
 
   if (!event) return c.json({ error: 'Event not found' }, 404)
   return c.json(event)
@@ -72,7 +92,7 @@ events.post('/:id/guests/batch', async (c) => {
   const eventId = c.req.param('id')
 
   // 驗證活動歸屬
-  const event = await prisma.event.findFirst({ where: { id: eventId, ownerId, ownerType } })
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
   const body = await c.req.json<{
@@ -115,7 +135,7 @@ events.patch('/:eventId/guests/:guestId/table', async (c) => {
   const ownerType = c.get('ownerType')
   const { eventId, guestId } = c.req.param()
 
-  const event = await prisma.event.findFirst({ where: { id: eventId, ownerId, ownerType } })
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
   const body = await c.req.json<{ tableId: string | null }>()
@@ -136,7 +156,7 @@ events.post('/:id/tables', async (c) => {
   const ownerType = c.get('ownerType')
   const eventId = c.req.param('id')
 
-  const event = await prisma.event.findFirst({ where: { id: eventId, ownerId, ownerType } })
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
   const body = await c.req.json<{ name: string; capacity?: number; positionX?: number; positionY?: number }>()
@@ -160,7 +180,7 @@ events.patch('/:eventId/tables/:tableId', async (c) => {
   const ownerType = c.get('ownerType')
   const { eventId, tableId } = c.req.param()
 
-  const event = await prisma.event.findFirst({ where: { id: eventId, ownerId, ownerType } })
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
   const body = await c.req.json<{ name?: string; capacity?: number; positionX?: number; positionY?: number }>()
@@ -173,6 +193,47 @@ events.patch('/:eventId/tables/:tableId', async (c) => {
   return c.json(table)
 })
 
+// ─── 座位偏好 ────────────────────────────────────────
+
+// POST /events/:id/preferences/batch — 批次建立座位偏好
+events.post('/:id/preferences/batch', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const eventId = c.req.param('id')
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  const body = await c.req.json<{
+    preferences: Array<{ guestId: string; preferredGuestId: string; rank: number }>
+  }>()
+
+  // 先清除該活動的所有舊偏好
+  const guestIds = await prisma.guest.findMany({
+    where: { eventId },
+    select: { id: true },
+  })
+  const ids = guestIds.map((g) => g.id)
+  await prisma.seatPreference.deleteMany({
+    where: { guestId: { in: ids } },
+  })
+
+  // 建立新偏好
+  const created = await prisma.$transaction(
+    body.preferences.map((p) =>
+      prisma.seatPreference.create({
+        data: {
+          guestId: p.guestId,
+          preferredGuestId: p.preferredGuestId,
+          rank: p.rank,
+        },
+      })
+    )
+  )
+
+  return c.json({ count: created.length }, 201)
+})
+
 // ─── 避免同桌 ────────────────────────────────────────
 
 // POST /events/:id/avoid-pairs
@@ -181,7 +242,7 @@ events.post('/:id/avoid-pairs', async (c) => {
   const ownerType = c.get('ownerType')
   const eventId = c.req.param('id')
 
-  const event = await prisma.event.findFirst({ where: { id: eventId, ownerId, ownerType } })
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
   const body = await c.req.json<{ guestAId: string; guestBId: string; reason?: string }>()
@@ -213,7 +274,7 @@ events.post('/:id/snapshots', async (c) => {
   const ownerType = c.get('ownerType')
   const eventId = c.req.param('id')
 
-  const event = await prisma.event.findFirst({ where: { id: eventId, ownerId, ownerType } })
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
   const body = await c.req.json<{ name: string; data: any; averageSatisfaction: number }>()

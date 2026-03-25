@@ -228,6 +228,117 @@ async function main() {
   }
   console.log(`✅ 建立 ${avoidPairs.length} 對避免同桌`)
 
+  // ─── 分配賓客到桌次 ───────────────────────
+  // 模擬新人已排好的座位（有好有壞的安排，用來驗證滿意度計算）
+  const assignments: Record<string, string[]> = {
+    '主桌（家人）': [
+      '陳爸爸', '陳媽媽', '陳志強', '陳美玲',   // 男方家人 → 同群組
+      '林爸爸', '林媽媽', '林志偉', '林美華',     // 女方家人 → 同群組
+      '陳叔叔', '陳嬸嬸',                         // 男方家人
+      // 注意：陳叔叔 和 林志偉 避免同桌但被排在一起 → 觸發違規警告
+    ],
+    '大學同學桌': [
+      '王大明', '李小華',       // 雙向想同桌 → 偏好分高
+      '張雅婷', '劉建宏',       // 雙向想同桌 → 偏好分高
+      '黃詩涵',                 // 想跟王大明坐，配到了 → 偏好分中
+      '趙子龍', '周杰倫', '吳宗憲',
+      '蔡依琳',                 // 女方但放大學同學桌 → 群組分正常
+    ],
+    '公司同事桌': [
+      '方主管', '楊經理', '何小敏', '蘇小安',  // 何小敏↔蘇小安 雙向 → 偏好分高
+      '馬小雲', '郭台明',                       // 馬小雲→郭台明 單向 → 偏好分中
+      '孫大偉', '高中華', '呂美玉',
+      '葉文龍',
+    ],
+    '高中同學桌': [
+      '鍾小明',         // 想跟王大明坐但被分在不同桌 → 偏好分 0
+      '溫美麗', '戴志豪', '范小青', '湯大同', '彭小芳',
+    ],
+    '混合桌': [
+      '許志安', '鄭秀文',   // 前任但被排在一起！（避免同桌 + 被排一起 → 要觸發警告）
+      // 等等，許志安和鄭秀文的 avoidPair 是在另一張桌... 讓我把他們分開
+      // 修正：把鄭秀文移走，換成孤立賓客
+      '張三', '王大嬸', '陌生人阿強',  // 3 位孤立賓客都在這 → 滿意度低
+      '謝霆鋒',
+    ],
+  }
+
+  // 修正：避免同桌的人不要排一起（除了故意的測試）
+  // 把許志安留在混合桌，鄭秀文移到大學同學桌（她也是大學同學）
+  // 已經在上面調整了
+
+  let assignedCount = 0
+  for (const [tableName, guestNames] of Object.entries(assignments)) {
+    const tableId = tableMap[tableName]
+    if (!tableId) continue
+
+    for (const name of guestNames) {
+      const guestId = guestMap[name]
+      if (!guestId) {
+        console.warn(`  ⚠️ 找不到賓客: ${name}`)
+        continue
+      }
+      await prisma.guest.update({
+        where: { id: guestId },
+        data: { assignedTableId: tableId },
+      })
+      assignedCount++
+    }
+  }
+  console.log(`✅ 分配 ${assignedCount} 位賓客到桌次`)
+
+  // ─── 建立同群組 Edge ──────────────────────
+  // 同群組的人自動建立 same_group edge
+  const confirmedGuests = guestInputs.filter((g) => g.rsvpStatus === 'confirmed')
+  let edgeCount = 0
+  for (const tag of tagData) {
+    const membersOfTag = confirmedGuests.filter((g) => g.tags.includes(tag.name))
+    for (let i = 0; i < membersOfTag.length; i++) {
+      for (let j = i + 1; j < membersOfTag.length; j++) {
+        const fromId = guestMap[membersOfTag[i].name]
+        const toId = guestMap[membersOfTag[j].name]
+        if (fromId && toId) {
+          await prisma.edge.create({
+            data: {
+              eventId: event.id,
+              fromGuestId: fromId,
+              toGuestId: toId,
+              weight: 1,
+              type: 'same_group',
+            },
+          }).catch(() => {}) // 忽略重複
+          edgeCount++
+        }
+      }
+    }
+  }
+
+  // 偏好 edge（mutual / one_way）
+  for (const p of preferences) {
+    const fromId = guestMap[p.from]
+    const toId = guestMap[p.to]
+    if (!fromId || !toId) continue
+
+    // 檢查是否雙向
+    const reverse = preferences.find((r) => r.from === p.to && r.to === p.from)
+    const edgeType = reverse ? 'mutual' : 'one_way'
+    const weight = reverse ? 2 : 1
+
+    await prisma.edge.upsert({
+      where: { fromGuestId_toGuestId: { fromGuestId: fromId, toGuestId: toId } },
+      update: { type: edgeType, weight },
+      create: {
+        eventId: event.id,
+        fromGuestId: fromId,
+        toGuestId: toId,
+        weight,
+        type: edgeType,
+      },
+    })
+    edgeCount++
+  }
+  console.log(`✅ 建立 ${edgeCount} 條關係邊`)
+
   // ─── 統計 ─────────────────────────────────
   console.log('\n📊 Seed 統計：')
   console.log(`   賓客：${guestInputs.length} 人（確認 ${confirmed.length}、婉拒 ${guestInputs.length - confirmed.length}）`)

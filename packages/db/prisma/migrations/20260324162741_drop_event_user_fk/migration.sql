@@ -1,0 +1,1 @@
+ALTER TABLE "Event" DROP CONSTRAINT IF EXISTS "event_user_fk";

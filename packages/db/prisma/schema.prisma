@@ -17,8 +17,6 @@ model User {
   avatarUrl String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  events Event[] @relation("UserEvents")
 }
 
 // ─── 活動 ────────────────────────────────────────────
@@ -37,8 +35,8 @@ model Event {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  user      User?             @relation("UserEvents", fields: [ownerId], references: [id], map: "event_user_fk")
+  // Relations（user 關聯僅在 ownerType=user 時有意義，不建外鍵約束）
+  // user 查詢透過 ownerId 手動 join，不用 Prisma relation
   guests    Guest[]
   tables    Table[]
   tags      Tag[]

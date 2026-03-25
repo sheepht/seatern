@@ -1,0 +1,211 @@
+/**
+ * 欄位自動偵測：將 Google Sheet 的欄位名稱對應到系統欄位
+ *
+ * 比對演算法：case-insensitive 子字串包含
+ * 例如欄位名稱包含「姓名」就對應到 name
+ */
+
+export type SystemField =
+  | 'name'
+  | 'aliases'
+  | 'rsvpStatus'
+  | 'category'
+  | 'attendeeCount'
+  | 'dietaryNote'
+  | 'specialNote'
+  | 'seatPreferences'
+
+export interface FieldMapping {
+  field: SystemField
+  label: string
+  required: boolean
+}
+
+/** 系統欄位定義 */
+export const SYSTEM_FIELDS: FieldMapping[] = [
+  { field: 'rsvpStatus', label: '是否參加', required: true },
+  { field: 'name', label: '姓名', required: true },
+  { field: 'aliases', label: '外號/暱稱', required: false },
+  { field: 'category', label: '分類（男方/女方）', required: false },
+  { field: 'attendeeCount', label: '帶眷屬', required: false },
+  { field: 'dietaryNote', label: '葷素/飲食', required: false },
+  { field: 'specialNote', label: '備註/特殊需求', required: false },
+  { field: 'seatPreferences', label: '想同桌人選', required: false },
+]
+
+/** 每個系統欄位的關鍵字（用於子字串比對） */
+const FIELD_KEYWORDS: Record<SystemField, string[]> = {
+  rsvpStatus: ['參加', '出席', '是否參加', 'rsvp', 'attend'],
+  name: ['姓名', '名字', 'name', '全名'],
+  aliases: ['外號', '暱稱', '別名', 'alias', 'nickname'],
+  category: ['分類', '男方女方', '類別', 'category', '來賓分類'],
+  attendeeCount: ['眷屬', '+1', '攜伴', '帶人', 'plus one', 'guest count'],
+  dietaryNote: ['葷素', '飲食', 'dietary', '素食', '忌口'],
+  specialNote: ['備註', '需求', '特殊', 'note', '其他'],
+  seatPreferences: ['同桌', '想跟誰坐', 'preference', '想坐', '同桌人選'],
+}
+
+/** 想同桌的多欄位模式（「想同桌 1」「想同桌 2」「想同桌 3」） */
+const SEAT_PREF_MULTI_KEYWORDS = ['想同桌', '同桌人選', 'preference']
+
+export type ColumnMapping = Record<SystemField, string | null>
+export type MultiColumnMapping = Record<SystemField, string[]>
+
+export interface DetectionResult {
+  /** 單欄位對應 */
+  mapping: ColumnMapping
+  /** 多欄位對應（目前只有 seatPreferences 可能有多欄） */
+  multiMapping: MultiColumnMapping
+  /** 未成功對應的系統欄位 */
+  unmapped: SystemField[]
+  /** 未被對應的 Sheet 欄位 */
+  unusedHeaders: string[]
+}
+
+/**
+ * 自動偵測欄位對應
+ */
+export function detectColumns(headers: string[]): DetectionResult {
+  const mapping: ColumnMapping = {
+    name: null,
+    aliases: null,
+    rsvpStatus: null,
+    category: null,
+    attendeeCount: null,
+    dietaryNote: null,
+    specialNote: null,
+    seatPreferences: null,
+  }
+
+  const multiMapping: MultiColumnMapping = {
+    name: [],
+    aliases: [],
+    rsvpStatus: [],
+    category: [],
+    attendeeCount: [],
+    dietaryNote: [],
+    specialNote: [],
+    seatPreferences: [],
+  }
+
+  const usedHeaders = new Set<string>()
+
+  // 先檢查「想同桌」多欄位模式（想同桌 1, 想同桌 2, 想同桌 3）
+  const seatPrefHeaders = headers.filter((h) => {
+    const lower = h.toLowerCase()
+    return SEAT_PREF_MULTI_KEYWORDS.some((kw) => lower.includes(kw))
+  })
+
+  if (seatPrefHeaders.length > 1) {
+    // 多欄位模式
+    multiMapping.seatPreferences = seatPrefHeaders
+    seatPrefHeaders.forEach((h) => usedHeaders.add(h))
+    mapping.seatPreferences = '__multi__' // 標記為多欄位
+  }
+
+  // 對每個系統欄位嘗試比對
+  for (const sysField of SYSTEM_FIELDS) {
+    if (mapping[sysField.field] !== null) continue // 已被多欄位模式處理
+
+    const keywords = FIELD_KEYWORDS[sysField.field]
+
+    for (const header of headers) {
+      if (usedHeaders.has(header)) continue
+
+      const headerLower = header.toLowerCase()
+      const matched = keywords.some((kw) => headerLower.includes(kw.toLowerCase()))
+
+      if (matched) {
+        mapping[sysField.field] = header
+        usedHeaders.add(header)
+        break
+      }
+    }
+  }
+
+  const unmapped = SYSTEM_FIELDS
+    .filter((f) => mapping[f.field] === null)
+    .map((f) => f.field)
+
+  const unusedHeaders = headers.filter((h) => !usedHeaders.has(h))
+
+  return { mapping, multiMapping, unmapped, unusedHeaders }
+}
+
+/**
+ * 將原始列轉換成標準化的賓客資料
+ */
+export interface RawGuest {
+  name: string
+  aliases: string[]
+  category: string
+  rsvpStatus: 'confirmed' | 'declined' | 'pending'
+  attendeeCount: number
+  dietaryNote: string
+  specialNote: string
+  rawPreferences: string[] // 未配對的原始文字
+}
+
+export function normalizeGuest(
+  row: Record<string, string>,
+  mapping: ColumnMapping,
+  multiMapping: MultiColumnMapping,
+): RawGuest | null {
+  const get = (field: SystemField): string => {
+    const col = mapping[field]
+    if (!col || col === '__multi__') return ''
+    return (row[col] || '').trim()
+  }
+
+  const name = get('name')
+  if (!name) return null // 姓名為空，跳過
+
+  // 解析別名
+  const aliasStr = get('aliases')
+  const aliases = aliasStr
+    ? aliasStr.split(/[,，、]/).map((a) => a.trim()).filter(Boolean)
+    : []
+
+  // 解析 RSVP
+  const rsvpRaw = get('rsvpStatus').toLowerCase()
+  let rsvpStatus: 'confirmed' | 'declined' | 'pending' = 'pending'
+  if (['是', '確認', '出席', 'yes', 'y', '1', 'true', '會'].some((k) => rsvpRaw.includes(k))) {
+    rsvpStatus = 'confirmed'
+  } else if (['否', '不', '婉拒', 'no', 'n', '0', 'false', '不會'].some((k) => rsvpRaw.includes(k))) {
+    rsvpStatus = 'declined'
+  }
+
+  // 解析眷屬：Form 填的是額外數（0 或 1），系統 +1
+  const extraRaw = get('attendeeCount')
+  const extra = parseInt(extraRaw, 10)
+  const attendeeCount = isNaN(extra) ? 1 : 1 + Math.max(0, extra)
+
+  // 解析想同桌人選
+  let rawPreferences: string[] = []
+  if (mapping.seatPreferences === '__multi__') {
+    // 多欄位模式
+    rawPreferences = multiMapping.seatPreferences
+      .map((col) => (row[col] || '').trim())
+      .filter(Boolean)
+  } else {
+    const prefStr = get('seatPreferences')
+    if (prefStr) {
+      rawPreferences = prefStr
+        .split(/[,，\n]/)
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .slice(0, 3) // 最多 3 位
+    }
+  }
+
+  return {
+    name,
+    aliases,
+    category: get('category') || '',
+    rsvpStatus,
+    attendeeCount,
+    dietaryNote: get('dietaryNote'),
+    specialNote: get('specialNote'),
+    rawPreferences,
+  }
+}

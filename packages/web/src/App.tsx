@@ -5,6 +5,8 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 import LandingPage from '@/pages/LandingPage'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
+import ImportPage from '@/pages/ImportPage'
+import WorkspacePage from '@/pages/WorkspacePage'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -20,6 +22,10 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+
+            {/* Import + Workspace（Phase 1 不需要登入） */}
+            <Route path="/import" element={<ImportPage />} />
+            <Route path="/workspace/:eventId" element={<WorkspacePage />} />
 
             {/* Protected routes */}
             <Route path="/dashboard" element={<ProtectedRoute><DashboardPlaceholder /></ProtectedRoute>} />
