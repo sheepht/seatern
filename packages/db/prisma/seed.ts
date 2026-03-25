@@ -76,7 +76,7 @@ async function main() {
     // ─── 男方家人 (8人) ─────────
     { name: '陳爸爸', aliases: ['老陳'], category: '男方', relationScore: 3, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['家人'] },
     { name: '陳媽媽', aliases: ['陳太太'], category: '男方', relationScore: 3, rsvpStatus: 'confirmed', attendeeCount: 1, dietaryNote: '素食', tags: ['家人'] },
-    { name: '陳志強', aliases: ['大哥'], category: '男方', relationScore: 3, rsvpStatus: 'confirmed', attendeeCount: 2, tags: ['家人'] },
+    { name: '陳志強', aliases: ['大哥'], category: '男方', relationScore: 3, rsvpStatus: 'confirmed', attendeeCount: 3, tags: ['家人'] }, // 帶太太+小孩
     { name: '陳美玲', aliases: ['大姐'], category: '男方', relationScore: 3, rsvpStatus: 'confirmed', attendeeCount: 1, specialNote: '需要嬰兒椅', tags: ['家人'] },
     { name: '陳叔叔', aliases: ['二叔'], category: '男方', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 2, tags: ['家人'] },
     { name: '陳嬸嬸', aliases: [], category: '男方', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['家人'] },
@@ -84,14 +84,14 @@ async function main() {
     { name: '林爸爸', aliases: ['林伯'], category: '女方', relationScore: 3, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['家人'] },
     { name: '林媽媽', aliases: ['林太太'], category: '女方', relationScore: 3, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['家人'] },
     { name: '林志偉', aliases: ['小偉', '阿偉'], category: '女方', relationScore: 3, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['家人'] },
-    { name: '林美華', aliases: ['小華'], category: '女方', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 2, specialNote: '需要嬰兒椅', tags: ['家人'] },
+    { name: '林美華', aliases: ['小華'], category: '女方', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 4, specialNote: '需要嬰兒椅，帶老公+2小孩', tags: ['家人'] }, // 帶老公+2小孩
     // ─── 大學同學 (12人) ────────
     { name: '王大明', aliases: ['大明', 'David'], category: '男方', relationScore: 3, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['大學同學'] },
     { name: '李小華', aliases: ['小華', 'Lisa'], category: '男方', relationScore: 3, rsvpStatus: 'confirmed', attendeeCount: 2, tags: ['大學同學'] },
     { name: '張雅婷', aliases: ['婷婷'], category: '男方', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['大學同學'] },
     { name: '劉建宏', aliases: ['阿宏'], category: '男方', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 1, dietaryNote: '不吃牛', tags: ['大學同學'] },
     { name: '黃詩涵', aliases: ['涵涵'], category: '男方', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['大學同學'] },
-    { name: '趙子龍', aliases: ['子龍'], category: '男方', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 2, tags: ['大學同學'] },
+    { name: '趙子龍', aliases: ['子龍'], category: '男方', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 3, tags: ['大學同學'] }, // 帶太太+小孩
     { name: '周杰倫', aliases: ['Jay'], category: '男方', relationScore: 1, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['大學同學'] },
     { name: '吳宗憲', aliases: ['憲哥'], category: '男方', relationScore: 1, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['大學同學'] },
     { name: '蔡依琳', aliases: ['Jolin'], category: '女方', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['大學同學'] },
@@ -100,7 +100,7 @@ async function main() {
     { name: '謝霆鋒', aliases: ['霆鋒'], category: '男方', relationScore: 1, rsvpStatus: 'confirmed', attendeeCount: 1, dietaryNote: '素食', tags: ['大學同學'] },
     // ─── 公司同事 (10人) ────────
     { name: '方主管', aliases: ['方姐'], category: '共同', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['公司同事'] },
-    { name: '楊經理', aliases: ['楊哥'], category: '共同', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 2, tags: ['公司同事'] },
+    { name: '楊經理', aliases: ['楊哥'], category: '共同', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 3, tags: ['公司同事'] }, // 帶太太+小孩
     { name: '何小敏', aliases: ['小敏'], category: '共同', relationScore: 2, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['公司同事'] },
     { name: '孫大偉', aliases: ['大偉'], category: '共同', relationScore: 1, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['公司同事'] },
     { name: '馬小雲', aliases: ['小雲', 'Jack'], category: '共同', relationScore: 1, rsvpStatus: 'confirmed', attendeeCount: 1, tags: ['公司同事'] },

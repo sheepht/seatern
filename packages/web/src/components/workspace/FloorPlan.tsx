@@ -1,7 +1,8 @@
 import { useCallback, useState, useRef, useEffect } from 'react'
-import { useSeatingStore } from '@/stores/seating'
+import { useSeatingStore, type Guest } from '@/stores/seating'
 import { TableNode } from './TableNode'
 import { TableDropZone } from './TableDropZone'
+import { GuestSeatOverlay } from './GuestSeatOverlay'
 
 const CANVAS_WIDTH = 1200
 const CANVAS_HEIGHT = 800
@@ -13,8 +14,16 @@ interface ScreenTable {
   radius: number
 }
 
+interface ScreenGuestSeat {
+  guest: Guest
+  x: number
+  y: number
+  radius: number
+}
+
 export function FloorPlan() {
   const tables = useSeatingStore((s) => s.tables)
+  const guests = useSeatingStore((s) => s.guests)
   const selectedTableId = useSeatingStore((s) => s.selectedTableId)
   const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
   const updateTablePosition = useSeatingStore((s) => s.updateTablePosition)
@@ -29,6 +38,7 @@ export function FloorPlan() {
 
   // 螢幕座標的桌次位置（給 HTML drop zone 用）
   const [screenTables, setScreenTables] = useState<ScreenTable[]>([])
+  const [screenGuestSeats, setScreenGuestSeats] = useState<ScreenGuestSeat[]>([])
 
   const getSvgPoint = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current
@@ -43,7 +53,7 @@ export function FloorPlan() {
   }, [])
 
   // 把 SVG 座標轉成容器內的螢幕座標（給 HTML overlay 定位）
-  const updateScreenTables = useCallback(() => {
+  const updateScreenPositions = useCallback(() => {
     const svg = svgRef.current
     const container = containerRef.current
     if (!svg || !container) return
@@ -52,23 +62,59 @@ export function FloorPlan() {
     if (!ctm) return
     const containerRect = container.getBoundingClientRect()
 
-    const mapped = tables.map((t) => {
-      const radius = 40 + Math.min(t.capacity, 12) * 2
+    const scale = ctm.a // 均勻縮放係數
+
+    // 桌次 drop zone
+    const mappedTables = tables.map((t) => {
+      const tableGuests = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')
+      const guestCount = Math.max(tableGuests.length, 1)
+      const radius = Math.max(55 + Math.min(t.capacity, 12) * 7, 85)
       const screenX = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - containerRect.left
       const screenY = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - containerRect.top
-      const screenRadius = radius * ctm.a // 假設均勻縮放
-      return { id: t.id, x: screenX, y: screenY, radius: screenRadius }
+      return { id: t.id, x: screenX, y: screenY, radius: radius * scale }
     })
+    setScreenTables(mappedTables)
 
-    setScreenTables(mapped)
-  }, [tables])
+    // 賓客座位 overlay
+    const guestSeats: ScreenGuestSeat[] = []
+    for (const t of tables) {
+      const tableGuests = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')
+      if (tableGuests.length === 0) continue
+
+      const tableRadius = Math.max(55 + Math.min(t.capacity, 12) * 7, 85)
+      const seatRadius = tableRadius - 28
+      const tableCenterX = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - containerRect.left
+      const tableCenterY = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - containerRect.top
+
+      // 計算每個座位的位置（跟 TableNode 裡的 buildSeatLayout 一樣的邏輯）
+      let posIndex = 0
+      for (const guest of tableGuests) {
+        if (posIndex >= t.capacity) break
+        // 本人座位
+        const angle = ((2 * Math.PI) / t.capacity) * posIndex - Math.PI / 2
+        guestSeats.push({
+          guest,
+          x: tableCenterX + Math.cos(angle) * seatRadius * scale,
+          y: tableCenterY + Math.sin(angle) * seatRadius * scale,
+          radius: 20 * scale,
+        })
+        posIndex++
+        // 跳過眷屬位
+        for (let c = 1; c < guest.attendeeCount; c++) {
+          if (posIndex >= t.capacity) break
+          posIndex++
+        }
+      }
+    }
+    setScreenGuestSeats(guestSeats)
+  }, [tables, guests])
 
   // 桌次位置或大小改變時更新 overlay
   useEffect(() => {
-    updateScreenTables()
-    window.addEventListener('resize', updateScreenTables)
-    return () => window.removeEventListener('resize', updateScreenTables)
-  }, [updateScreenTables])
+    updateScreenPositions()
+    window.addEventListener('resize', updateScreenPositions)
+    return () => window.removeEventListener('resize', updateScreenPositions)
+  }, [updateScreenPositions])
 
   const handleMouseDown = useCallback(
     (tableId: string, e: React.MouseEvent) => {
@@ -96,9 +142,9 @@ export function FloorPlan() {
         Math.max(50, Math.min(CANVAS_WIDTH - 50, point.x - offset.x)),
         Math.max(50, Math.min(CANVAS_HEIGHT - 50, point.y - offset.y)),
       )
-      updateScreenTables()
+      updateScreenPositions()
     },
-    [draggingTableId, getSvgPoint, updateTablePosition, updateScreenTables],
+    [draggingTableId, getSvgPoint, updateTablePosition, updateScreenPositions],
   )
 
   const handleMouseUp = useCallback(() => {
@@ -161,6 +207,17 @@ export function FloorPlan() {
           x={st.x}
           y={st.y}
           radius={st.radius}
+        />
+      ))}
+
+      {/* 賓客座位 draggable overlay（透明，用於從桌內拖曳賓客） */}
+      {screenGuestSeats.map((gs) => (
+        <GuestSeatOverlay
+          key={gs.guest.id}
+          guest={gs.guest}
+          x={gs.x}
+          y={gs.y}
+          radius={gs.radius}
         />
       ))}
     </div>
