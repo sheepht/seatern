@@ -896,3 +896,9 @@ interface SeatingSnapshot {
 | 1.0 | 2026-02-05 | 初版建立 |
 | 1.1 | 2026-02-05 | Phase 0 schema 更新：side→category、移除 plusOneName 改用 attendeeCount+infantCount、新增 needsMet、Table 改用 positionX/Y+color+note、Tag 新增 category、Event 新增 categories、SeatingSnapshot data 含桌次位置 |
 | 1.2 | 2026-02-05 | Schema 精簡：Contact 移除 dietaryNeeds/specialNeeds/tags、Guest 移除 dietaryNeeds[]/specialNeeds[]/needsMet 改用 dietaryNote/specialNote (String?)、Table 移除 tags、需求分固定 +5 |
+
+## Design System
+Always read DESIGN.md before making any visual or UI decisions.
+All font choices, colors, spacing, and aesthetic direction are defined there.
+Do not deviate without explicit user approval.
+In QA mode, flag any code that doesn't match DESIGN.md.
