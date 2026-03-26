@@ -1,5 +1,5 @@
 import { useDraggable } from '@dnd-kit/core'
-import type { Guest } from '@/stores/seating'
+import { useSeatingStore, type Guest } from '@/stores/seating'
 
 interface Props {
   guest: Guest
@@ -17,6 +17,7 @@ export function GuestSeatOverlay({ guest, x, y, radius }: Props) {
     id: `seat-${guest.id}`,
     data: { type: 'guest', guest },
   })
+  const setHoveredGuest = useSeatingStore((s) => s.setHoveredGuest)
 
   const size = radius * 2
   return (
@@ -24,26 +25,27 @@ export function GuestSeatOverlay({ guest, x, y, radius }: Props) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className="absolute rounded-full cursor-grab transition-all duration-150"
+      className="absolute rounded-full cursor-grab"
       style={{
-        left: x - radius,
-        top: y - radius,
-        width: size,
-        height: size,
+        left: x - radius - 4,
+        top: y - radius - 4,
+        width: size + 8,
+        height: size + 8,
         opacity: isDragging ? 0.3 : undefined,
         zIndex: 10,
-        border: '2px solid transparent',
+        border: '1.5px dashed transparent',
         boxSizing: 'border-box',
+        transition: 'border-color 150ms ease-out',
       }}
       onMouseEnter={(e) => {
         if (!isDragging) {
-          e.currentTarget.style.border = '2px solid #B08D57'
-          e.currentTarget.style.boxShadow = '0 0 8px rgba(176,141,87,0.4)'
+          e.currentTarget.style.borderColor = '#B08D57'
+          setHoveredGuest(guest.id)
         }
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.border = '2px solid transparent'
-        e.currentTarget.style.boxShadow = 'none'
+        e.currentTarget.style.borderColor = 'transparent'
+        setHoveredGuest(null)
       }}
     />
   )

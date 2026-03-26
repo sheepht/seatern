@@ -60,6 +60,7 @@ interface SeatingState {
 
   // UI state
   selectedTableId: string | null
+  hoveredGuestId: string | null
   loading: boolean
 
   // Undo stack
@@ -68,6 +69,7 @@ interface SeatingState {
   // Actions
   loadEvent: (eventId: string) => Promise<void>
   setSelectedTable: (tableId: string | null) => void
+  setHoveredGuest: (guestId: string | null) => void
   moveGuest: (guestId: string, toTableId: string | null) => void
   undo: () => void
   addTable: (name: string, positionX: number, positionY: number) => Promise<void>
@@ -95,6 +97,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   avoidPairs: [],
   snapshots: [],
   selectedTableId: null,
+  hoveredGuestId: null,
   loading: false,
   undoStack: [],
 
@@ -153,6 +156,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   },
 
   setSelectedTable: (tableId) => set({ selectedTableId: tableId }),
+  setHoveredGuest: (guestId) => set({ hoveredGuestId: guestId }),
 
   moveGuest: (guestId, toTableId) => {
     const { guests, tables, undoStack } = get()

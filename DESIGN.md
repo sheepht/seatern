@@ -58,10 +58,10 @@
 ### Satisfaction Scale
 | Range | Hex | Label |
 |-------|-----|-------|
-| 85-100 | `#16A34A` (green) | 被照顧得很好 |
-| 70-84 | `#CA8A04` (yellow) | 安排合理 |
-| 55-69 | `#EA580C` (orange) | 有優化空間 |
-| < 55 | `#DC2626` (red) | 需要關注 |
+| 75-100 | `#16A34A` (green) | 被照顧得很好 |
+| 50-74 | `#CA8A04` (yellow) | 安排合理 |
+| 26-49 | `#EA580C` (orange) | 有優化空間 |
+| 0-25 | `#DC2626` (red) | 需要關注 |
 
 ### Category Colors（賓客分類）
 | Category | Background | Border | Text |

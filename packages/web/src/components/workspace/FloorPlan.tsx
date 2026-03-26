@@ -81,8 +81,8 @@ export function FloorPlan() {
       const tableGuests = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')
       if (tableGuests.length === 0) continue
 
-      const tableRadius = Math.max(55 + Math.min(t.capacity, 12) * 7, 85)
-      const seatRadius = tableRadius - 28
+      const tableRadius = Math.max(58 + Math.min(t.capacity, 12) * 7, 88)
+      const seatRadius = tableRadius - 34
       const tableCenterX = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - containerRect.left
       const tableCenterY = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - containerRect.top
 
