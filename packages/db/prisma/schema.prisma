@@ -83,6 +83,7 @@ model Guest {
   satisfactionScore Float   @default(0)
   assignedTableId   String?
   assignedTable     Table?  @relation(fields: [assignedTableId], references: [id], onDelete: SetNull)
+  seatIndex         Int?    // 圓桌座位索引（0 ~ capacity-1）
   isOverflow        Boolean @default(false)
   isIsolated        Boolean @default(false)
 

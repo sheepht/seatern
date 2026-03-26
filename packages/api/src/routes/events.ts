@@ -138,11 +138,14 @@ events.patch('/:eventId/guests/:guestId/table', async (c) => {
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
-  const body = await c.req.json<{ tableId: string | null }>()
+  const body = await c.req.json<{ tableId: string | null; seatIndex?: number | null }>()
 
   const guest = await prisma.guest.update({
     where: { id: guestId },
-    data: { assignedTableId: body.tableId },
+    data: {
+      assignedTableId: body.tableId,
+      seatIndex: body.tableId === null ? null : (body.seatIndex ?? null),
+    },
   })
 
   return c.json(guest)

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { recalculateAll } from '@/lib/satisfaction'
+import { buildSlotArray, placeGuest, extractSeatIndices, type Slot } from '@/lib/seat-shift'
 
 // ─── Types ──────────────────────────────────────────
 
@@ -15,6 +16,7 @@ export interface Guest {
   specialNote: string
   satisfactionScore: number
   assignedTableId: string | null
+  seatIndex: number | null
   isOverflow: boolean
   isIsolated: boolean
   seatPreferences: Array<{ preferredGuestId: string; rank: number }>
@@ -63,14 +65,30 @@ interface SeatingState {
   hoveredGuestId: string | null
   loading: boolean
 
+  // 拖曳狀態
+  activeDragGuestId: string | null // 從 dragStart 到 dragEnd 持續存在
+  dragPreview: {
+    tableId: string
+    previewSlots: Slot[]
+    draggedGuestId: string
+  } | null
+
   // Undo stack
-  undoStack: Array<{ guestId: string; fromTableId: string | null; toTableId: string | null }>
+  undoStack: Array<{
+    guestId: string
+    fromTableId: string | null
+    toTableId: string | null
+    prevSeatIndices: Map<string, number | null>
+  }>
 
   // Actions
   loadEvent: (eventId: string) => Promise<void>
   setSelectedTable: (tableId: string | null) => void
   setHoveredGuest: (guestId: string | null) => void
+  setActiveDragGuest: (guestId: string | null) => void
   moveGuest: (guestId: string, toTableId: string | null) => void
+  moveGuestToSeat: (guestId: string, tableId: string, seatIndex: number, cursorBias?: 'left' | 'right') => void
+  setDragPreview: (tableId: string | null, seatIndex?: number, draggedGuestId?: string, cursorBias?: 'left' | 'right') => void
   undo: () => void
   addTable: (name: string, positionX: number, positionY: number) => Promise<void>
   updateTablePosition: (tableId: string, x: number, y: number) => void
@@ -99,6 +117,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   selectedTableId: null,
   hoveredGuestId: null,
   loading: false,
+  activeDragGuestId: null,
+  dragPreview: null,
   undoStack: [],
 
   loadEvent: async (eventId: string) => {
@@ -120,6 +140,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         specialNote: g.specialNote || '',
         satisfactionScore: 0,
         assignedTableId: g.assignedTableId,
+        seatIndex: g.seatIndex ?? null,
         isOverflow: g.isOverflow,
         isIsolated: g.isIsolated,
         seatPreferences: g.seatPreferences || [],
@@ -138,6 +159,38 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         if (t) t.averageSatisfaction = ts.averageSatisfaction
       }
 
+      // 為沒有 seatIndex 的賓客自動分配座位索引
+      for (const t of tables) {
+        const tableGuests = guests.filter(
+          (g: Guest) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed',
+        )
+        const needsIndex = tableGuests.filter((g: Guest) => g.seatIndex === null)
+        if (needsIndex.length > 0) {
+          // 找出已使用的座位索引
+          const usedIndices = new Set(
+            tableGuests.filter((g: Guest) => g.seatIndex !== null).map((g: Guest) => g.seatIndex!),
+          )
+          // 也要考慮眷屬佔的位子
+          for (const g of tableGuests) {
+            if (g.seatIndex !== null) {
+              for (let c = 1; c < g.attendeeCount; c++) {
+                usedIndices.add((g.seatIndex + c) % t.capacity)
+              }
+            }
+          }
+          let nextFree = 0
+          for (const g of needsIndex) {
+            while (usedIndices.has(nextFree)) nextFree++
+            g.seatIndex = nextFree
+            usedIndices.add(nextFree)
+            for (let c = 1; c < g.attendeeCount; c++) {
+              usedIndices.add(nextFree + c)
+            }
+            nextFree++
+          }
+        }
+      }
+
       set({
         eventId: data.id,
         eventName: data.name,
@@ -147,6 +200,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         snapshots: data.snapshots || [],
         loading: false,
         selectedTableId: null,
+        dragPreview: null,
         undoStack: [],
       })
     } catch (err) {
@@ -157,6 +211,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
   setSelectedTable: (tableId) => set({ selectedTableId: tableId }),
   setHoveredGuest: (guestId) => set({ hoveredGuestId: guestId }),
+  setActiveDragGuest: (guestId) => set({ activeDragGuestId: guestId, dragPreview: guestId ? undefined : null }),
 
   moveGuest: (guestId, toTableId) => {
     const { guests, tables, undoStack } = get()
@@ -165,9 +220,13 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     const fromTableId = guest.assignedTableId
 
-    // 更新賓客位置
+    // 記錄原始 seatIndex（用於 undo）
+    const prevSeatIndices = new Map<string, number | null>()
+    prevSeatIndices.set(guestId, guest.seatIndex)
+
+    // 更新賓客位置（移除桌時清 seatIndex）
     const updatedGuests = guests.map((g) =>
-      g.id === guestId ? { ...g, assignedTableId: toTableId } : g,
+      g.id === guestId ? { ...g, assignedTableId: toTableId, seatIndex: toTableId === null ? null : g.seatIndex } : g,
     )
 
     // 全量重算滿意度
@@ -184,7 +243,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     set({
       guests: finalGuests,
       tables: finalTables,
-      undoStack: [...undoStack, { guestId, fromTableId, toTableId }],
+      dragPreview: null,
+      undoStack: [...undoStack, { guestId, fromTableId, toTableId, prevSeatIndices }],
     })
 
     // 非同步存到後端（不 block UI）
@@ -194,9 +254,145 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ tableId: toTableId }),
+        body: JSON.stringify({ tableId: toTableId, seatIndex: toTableId === null ? null : guest.seatIndex }),
       }).catch(console.error)
     }
+  },
+
+  moveGuestToSeat: (guestId, tableId, seatIndex, cursorBias) => {
+    const { guests, tables, undoStack } = get()
+    const guest = guests.find((g) => g.id === guestId)
+    if (!guest) return
+
+    const fromTableId = guest.assignedTableId
+    const table = tables.find((t) => t.id === tableId)
+    if (!table) return
+
+    // 記錄所有可能受影響的 seatIndex（用於 undo）
+    const prevSeatIndices = new Map<string, number | null>()
+    prevSeatIndices.set(guestId, guest.seatIndex)
+
+    // 建立目標桌的 slot 陣列（排除正在拖的賓客）
+    const tableGuests = guests.filter(
+      (g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed' && g.id !== guestId,
+    )
+    for (const g of tableGuests) {
+      prevSeatIndices.set(g.id, g.seatIndex)
+    }
+
+    const seatGuests = tableGuests
+      .filter((g) => g.seatIndex !== null)
+      .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, attendeeCount: g.attendeeCount }))
+
+    const slots = buildSlotArray(seatGuests, table.capacity)
+    const newSlots = placeGuest(slots, seatIndex, guestId, guest.attendeeCount, cursorBias)
+
+    if (!newSlots) return // 無法放置
+
+    // 提取新的 seatIndex mapping
+    const newIndices = extractSeatIndices(newSlots)
+
+    // 更新所有賓客
+    const updatedGuests = guests.map((g) => {
+      if (g.id === guestId) {
+        return { ...g, assignedTableId: tableId, seatIndex: newIndices.get(guestId) ?? seatIndex }
+      }
+      if (newIndices.has(g.id)) {
+        return { ...g, seatIndex: newIndices.get(g.id)! }
+      }
+      return g
+    })
+
+    // 全量重算滿意度
+    const result = recalculateAll(updatedGuests, tables)
+    const finalGuests = updatedGuests.map((g) => {
+      const score = result.guests.find((gs) => gs.id === g.id)
+      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
+    })
+    const finalTables = tables.map((t) => {
+      const score = result.tables.find((ts) => ts.id === t.id)
+      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
+    })
+
+    set({
+      guests: finalGuests,
+      tables: finalTables,
+      dragPreview: null,
+      undoStack: [...undoStack, { guestId, fromTableId, toTableId: tableId, prevSeatIndices }],
+    })
+
+    // 非同步存到後端 — 所有受影響的賓客
+    const { eventId } = get()
+    if (eventId) {
+      // 被拖的賓客
+      fetch(`/api/events/${eventId}/guests/${guestId}/table`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ tableId, seatIndex: newIndices.get(guestId) ?? seatIndex }),
+      }).catch(console.error)
+
+      // 被位移的同桌賓客
+      for (const [id, newIdx] of newIndices) {
+        if (id !== guestId) {
+          const prev = prevSeatIndices.get(id)
+          if (prev !== newIdx) {
+            fetch(`/api/events/${eventId}/guests/${id}/table`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ tableId, seatIndex: newIdx }),
+            }).catch(console.error)
+          }
+        }
+      }
+    }
+  },
+
+  setDragPreview: (tableId, seatIndex, draggedGuestId, cursorBias) => {
+    if (!tableId || seatIndex === undefined || !draggedGuestId) {
+      set({ dragPreview: null })
+      return
+    }
+
+    const { guests, tables } = get()
+    const table = tables.find((t) => t.id === tableId)
+    const draggedGuest = guests.find((g) => g.id === draggedGuestId)
+    if (!table || !draggedGuest) {
+      set({ dragPreview: null })
+      return
+    }
+
+    // 建立 slot 陣列（排除被拖的賓客）
+    const tableGuests = guests.filter(
+      (g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed' && g.id !== draggedGuestId,
+    )
+    const seatGuests = tableGuests
+      .filter((g) => g.seatIndex !== null)
+      .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, attendeeCount: g.attendeeCount }))
+
+    const slots = buildSlotArray(seatGuests, table.capacity)
+    const newSlots = placeGuest(slots, seatIndex, draggedGuestId, draggedGuest.attendeeCount, cursorBias)
+
+    if (!newSlots) {
+      set({ dragPreview: null })
+      return
+    }
+
+    // 目標位留空 — 被拖的賓客跟著游標（DragOverlay），不顯示在桌上
+    for (let i = 0; i < newSlots.length; i++) {
+      if (newSlots[i]?.guestId === draggedGuestId) {
+        newSlots[i] = null
+      }
+    }
+
+    set({
+      dragPreview: {
+        tableId,
+        previewSlots: newSlots,
+        draggedGuestId,
+      },
+    })
   },
 
   undo: () => {
@@ -204,9 +400,18 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     if (undoStack.length === 0) return
 
     const last = undoStack[undoStack.length - 1]
-    const updatedGuests = guests.map((g) =>
-      g.id === last.guestId ? { ...g, assignedTableId: last.fromTableId } : g,
-    )
+
+    // 還原所有受影響賓客的 seatIndex + tableId
+    const updatedGuests = guests.map((g) => {
+      if (g.id === last.guestId) {
+        const prevIdx = last.prevSeatIndices.get(g.id) ?? null
+        return { ...g, assignedTableId: last.fromTableId, seatIndex: prevIdx }
+      }
+      if (last.prevSeatIndices.has(g.id)) {
+        return { ...g, seatIndex: last.prevSeatIndices.get(g.id) ?? null }
+      }
+      return g
+    })
 
     // 全量重算
     const result = recalculateAll(updatedGuests, tables)
@@ -225,14 +430,31 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       undoStack: undoStack.slice(0, -1),
     })
 
-    // 後端同步
+    // 後端同步：還原所有受影響的賓客
     if (eventId) {
+      // 被拖的賓客
+      const prevIdx = last.prevSeatIndices.get(last.guestId) ?? null
       fetch(`/api/events/${eventId}/guests/${last.guestId}/table`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ tableId: last.fromTableId }),
+        body: JSON.stringify({ tableId: last.fromTableId, seatIndex: prevIdx }),
       }).catch(console.error)
+
+      // 其他被位移的賓客
+      for (const [id, idx] of last.prevSeatIndices) {
+        if (id !== last.guestId) {
+          const currentGuest = guests.find((g) => g.id === id)
+          if (currentGuest && currentGuest.seatIndex !== idx) {
+            fetch(`/api/events/${eventId}/guests/${id}/table`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ tableId: currentGuest.assignedTableId, seatIndex: idx }),
+            }).catch(console.error)
+          }
+        }
+      }
     }
   },
 
@@ -290,6 +512,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       guests: confirmed.map((g) => ({
         guestId: g.id,
         tableId: g.assignedTableId,
+        seatIndex: g.seatIndex,
         satisfactionScore: g.satisfactionScore,
         isOverflow: g.isOverflow,
       })),
@@ -317,7 +540,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     if (!snapshot) return
 
     const snapData = snapshot.data as {
-      guests: Array<{ guestId: string; tableId: string | null; satisfactionScore: number }>
+      guests: Array<{ guestId: string; tableId: string | null; seatIndex?: number | null; satisfactionScore: number }>
       tables: Array<{ tableId: string; positionX: number; positionY: number }>
     }
 
@@ -325,7 +548,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const restoredGuests = guests.map((g) => {
       const sg = snapData.guests.find((sg) => sg.guestId === g.id)
       if (sg) {
-        return { ...g, assignedTableId: sg.tableId, satisfactionScore: sg.satisfactionScore }
+        return { ...g, assignedTableId: sg.tableId, seatIndex: sg.seatIndex ?? null, satisfactionScore: sg.satisfactionScore }
       }
       return g
     })
@@ -352,7 +575,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     set({ guests: finalGuests, tables: finalTables, undoStack: [] })
 
-    // 後端同步：逐一更新賓客的 tableId
+    // 後端同步：逐一更新賓客的 tableId + seatIndex
     const { eventId } = get()
     if (eventId) {
       for (const sg of snapData.guests) {
@@ -360,7 +583,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ tableId: sg.tableId }),
+          body: JSON.stringify({ tableId: sg.tableId, seatIndex: sg.seatIndex ?? null }),
         }).catch(console.error)
       }
     }

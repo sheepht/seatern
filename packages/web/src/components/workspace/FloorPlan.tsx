@@ -1,21 +1,16 @@
 import { useCallback, useState, useRef, useEffect } from 'react'
 import { useSeatingStore, type Guest } from '@/stores/seating'
 import { TableNode } from './TableNode'
-import { TableDropZone } from './TableDropZone'
+import { SeatDropZone } from './SeatDropZone'
 import { GuestSeatOverlay } from './GuestSeatOverlay'
 
 const CANVAS_WIDTH = 1200
 const CANVAS_HEIGHT = 800
 
-interface ScreenTable {
-  id: string
-  x: number
-  y: number
-  radius: number
-}
-
-interface ScreenGuestSeat {
-  guest: Guest
+interface ScreenSeat {
+  tableId: string
+  seatIndex: number
+  guest: Guest | null // null = empty seat
   x: number
   y: number
   radius: number
@@ -36,9 +31,8 @@ export function FloorPlan() {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // 螢幕座標的桌次位置（給 HTML drop zone 用）
-  const [screenTables, setScreenTables] = useState<ScreenTable[]>([])
-  const [screenGuestSeats, setScreenGuestSeats] = useState<ScreenGuestSeat[]>([])
+  // 螢幕座標的座位位置（給 HTML drop zone + draggable overlay 用）
+  const [screenSeats, setScreenSeats] = useState<ScreenSeat[]>([])
 
   const getSvgPoint = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current
@@ -64,56 +58,63 @@ export function FloorPlan() {
 
     const scale = ctm.a // 均勻縮放係數
 
-    // 桌次 drop zone
-    const mappedTables = tables.map((t) => {
-      const tableGuests = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')
-      const guestCount = Math.max(tableGuests.length, 1)
-      const radius = Math.max(55 + Math.min(t.capacity, 12) * 7, 85)
-      const screenX = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - containerRect.left
-      const screenY = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - containerRect.top
-      return { id: t.id, x: screenX, y: screenY, radius: radius * scale }
-    })
-    setScreenTables(mappedTables)
+    const allScreenSeats: ScreenSeat[] = []
 
-    // 賓客座位 overlay
-    const guestSeats: ScreenGuestSeat[] = []
     for (const t of tables) {
       const tableGuests = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')
-      if (tableGuests.length === 0) continue
-
       const tableRadius = Math.max(58 + Math.min(t.capacity, 12) * 7, 88)
       const seatRadius = tableRadius - 34
       const tableCenterX = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - containerRect.left
       const tableCenterY = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - containerRect.top
+      const totalSlots = t.capacity
 
-      // 計算 totalSlots — 跟 TableNode buildSeatLayout 完全一致
-      let totalOccupied = 0
+      // 建立 slot map（哪個 seatIndex 有誰）
+      const slotMap = new Map<number, Guest>()
       for (const g of tableGuests) {
-        totalOccupied += g.attendeeCount
+        if (g.seatIndex !== null) {
+          slotMap.set(g.seatIndex, g)
+        }
       }
-      const totalSlots = Math.max(t.capacity, totalOccupied)
 
-      // 計算每個座位的位置
-      let posIndex = 0
-      for (const guest of tableGuests) {
-        if (posIndex >= totalSlots) break
-        // 本人座位
-        const angle = ((2 * Math.PI) / totalSlots) * posIndex - Math.PI / 2
-        guestSeats.push({
-          guest,
+      // 為每個座位建立螢幕座標
+      for (let i = 0; i < totalSlots; i++) {
+        const angle = ((2 * Math.PI) / totalSlots) * i - Math.PI / 2
+        const guest = slotMap.get(i) || null
+        // 只顯示主人座位和空位的 overlay（眷屬位不需要獨立的 drag/drop）
+        const isCompanion = guest && tableGuests.some(
+          (g) => g.seatIndex !== null && g.id !== guest.id &&
+            i > g.seatIndex && i < g.seatIndex + g.attendeeCount,
+        )
+        // 檢查是否為眷屬座位
+        const occupant = guest // 這個 slot 的主人
+        let isCompanionSlot = false
+        for (const g of tableGuests) {
+          if (g.seatIndex !== null && g.attendeeCount > 1) {
+            for (let c = 1; c < g.attendeeCount; c++) {
+              if ((g.seatIndex + c) % totalSlots === i) {
+                isCompanionSlot = true
+                break
+              }
+            }
+          }
+          if (isCompanionSlot) break
+        }
+
+        // 眷屬座位不需要 drop zone（拖到主人即可）
+        if (isCompanionSlot) continue
+
+        allScreenSeats.push({
+          tableId: t.id,
+          seatIndex: i,
+          guest: slotMap.get(i) || null,
           x: tableCenterX + Math.cos(angle) * seatRadius * scale,
           y: tableCenterY + Math.sin(angle) * seatRadius * scale,
           radius: 20 * scale,
         })
-        posIndex++
-        // 跳過眷屬位
-        for (let c = 1; c < guest.attendeeCount; c++) {
-          if (posIndex >= totalSlots) break
-          posIndex++
-        }
       }
     }
-    setScreenGuestSeats(guestSeats)
+
+    setScreenSeats(allScreenSeats)
   }, [tables, guests])
 
   // 桌次位置或大小改變時更新 overlay
@@ -217,29 +218,33 @@ export function FloorPlan() {
         )}
       </svg>
 
-      {/* HTML drop zone overlay（透明，用於 @dnd-kit 偵測） */}
-      {/* 拖桌子時禁用所有 HTML overlay 的滑鼠事件 */}
+      {/* HTML overlay 層（拖桌子時禁用） */}
       <div style={{ pointerEvents: draggingTableId ? 'none' : undefined }}>
-        {screenTables.map((st) => (
-          <TableDropZone
-            key={st.id}
-            tableId={st.id}
-            x={st.x}
-            y={st.y}
-            radius={st.radius}
+        {/* 每個座位的 drop zone（含空位） */}
+        {screenSeats.map((ss) => (
+          <SeatDropZone
+            key={`drop-${ss.tableId}-${ss.seatIndex}`}
+            tableId={ss.tableId}
+            seatIndex={ss.seatIndex}
+            x={ss.x}
+            y={ss.y}
+            radius={ss.radius}
+            isEmpty={ss.guest === null}
           />
         ))}
 
-        {/* 賓客座位 draggable overlay（透明，用於從桌內拖曳賓客） */}
-        {screenGuestSeats.map((gs) => (
-          <GuestSeatOverlay
-            key={gs.guest.id}
-            guest={gs.guest}
-          x={gs.x}
-          y={gs.y}
-          radius={gs.radius}
-        />
-      ))}
+        {/* 賓客座位 draggable overlay（只有有人的位子） */}
+        {screenSeats
+          .filter((ss) => ss.guest !== null)
+          .map((ss) => (
+            <GuestSeatOverlay
+              key={`drag-${ss.guest!.id}`}
+              guest={ss.guest!}
+              x={ss.x}
+              y={ss.y}
+              radius={ss.radius}
+            />
+          ))}
       </div>
     </div>
   )

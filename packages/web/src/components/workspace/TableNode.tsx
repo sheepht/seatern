@@ -1,4 +1,6 @@
+import { useRef, useLayoutEffect } from 'react'
 import { useSeatingStore, type Table, type Guest } from '@/stores/seating'
+import type { Slot } from '@/lib/seat-shift'
 
 const CATEGORY_COLORS: Record<string, string> = {
   '男方': '#DBEAFE',
@@ -32,6 +34,9 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
   const getTableSeatCount = useSeatingStore((s) => s.getTableSeatCount)
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
   const hoveredGuestId = useSeatingStore((s) => s.hoveredGuestId)
+  const dragPreview = useSeatingStore((s) => s.dragPreview)
+  const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
+  const allGuests = useSeatingStore((s) => s.guests)
 
   const guests = getTableGuests(table.id)
   const seatCount = getTableSeatCount(table.id)
@@ -50,11 +55,65 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
   // 滿意度色環
   const satisfactionColor = getSatisfactionColor(table.averageSatisfaction)
 
+  // 是否有此桌的拖曳預覽
+  const isPreviewTable = dragPreview?.tableId === table.id
+  const previewSlots = isPreviewTable ? dragPreview.previewSlots : null
+
+  // 拖曳中的賓客一律不顯示在任何桌上（他跟著游標走）
+  const filteredGuests = activeDragGuestId
+    ? guests.filter((g) => g.id !== activeDragGuestId)
+    : guests
+
+  // 預覽時需要所有賓客資料（被位移的人可能需要查找）
+  const guestPool = isPreviewTable ? allGuests.filter((g) => g.rsvpStatus === 'confirmed') : filteredGuests
+
   // 所有座位（含空位），依 capacity 固定數量
-  const allSeats = buildSeatLayout(guests, table.capacity, radius)
+  const allSeats = buildSeatLayout(guestPool, table.capacity, radius, previewSlots)
+
+  // FLIP 動畫：追蹤座位元素的前一次位置
+  const seatRefsMap = useRef<Map<string, SVGGElement>>(new Map())
+  const prevPositions = useRef<Map<string, { x: number; y: number }>>(new Map())
+
+  // 在 DOM 更新前捕捉當前位置（FLIP: First）
+  // 因為 React 在 render 後才更新 DOM，我們在這裡先記錄 "即將被替換" 的位置
+  const currentPositions = new Map<string, { x: number; y: number }>()
+  for (const seat of allSeats) {
+    if (seat.guest) {
+      const key = seat.type === 'companion' ? `guest-${seat.guest.id}-c${seat.companionIndex}` : `guest-${seat.guest.id}-main`
+      currentPositions.set(key, { x: seat.x, y: seat.y })
+    }
+  }
+
+  useLayoutEffect(() => {
+    // FLIP: Last → Invert → Play
+    const prev = prevPositions.current
+    for (const [key, newPos] of currentPositions) {
+      const oldPos = prev.get(key)
+      if (!oldPos) continue
+
+      const dx = oldPos.x - newPos.x
+      const dy = oldPos.y - newPos.y
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue
+
+      const el = seatRefsMap.current.get(key)
+      if (!el) continue
+
+      // Invert + Play：從舊位置動畫到新位置
+      el.animate(
+        [
+          { transform: `translate(${newPos.x + dx}px, ${newPos.y + dy}px)` },
+          { transform: `translate(${newPos.x}px, ${newPos.y}px)` },
+        ],
+        { duration: 200, easing: 'ease-out' },
+      )
+    }
+
+    // 更新記錄
+    prevPositions.current = currentPositions
+  })
 
   // 眷屬群組弧線
-  const groupArcs = buildGroupArcs(guests, table.capacity, radius)
+  const groupArcs = buildGroupArcsFromSeats(allSeats, table.capacity, radius)
 
   return (
     <g
@@ -183,22 +242,26 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
         />
       ))}
 
-      {/* 所有座位（含空位） */}
-      {allSeats.map((seat, i) => {
-        if (seat.type === 'empty') {
-          // 空位：灰色虛線圈
-          return (
-            <circle
-              key={`empty-${i}`}
-              cx={seat.x}
-              cy={seat.y}
-              r={20}
-              fill="none"
-              stroke="#D6D3D1"
-              strokeWidth="1.5"
-              strokeDasharray="4 3"
-            />
-          )
+      {/* 空位（靜態，不需動畫，獨立一組避免干擾賓客的 DOM 順序） */}
+      {allSeats.filter((s) => s.type === 'empty').map((seat) => (
+        <circle
+          key={`empty-${seat.seatIndex}`}
+          cx={seat.x}
+          cy={seat.y}
+          r={20}
+          fill="none"
+          stroke="#D6D3D1"
+          strokeWidth="1.5"
+          strokeDasharray="4 3"
+        />
+      ))}
+
+      {/* 有人的座位（賓客 + 眷屬），用 guest ID 作為穩定 key + FLIP 動畫 */}
+      {allSeats.filter((s) => s.type !== 'empty').map((seat) => {
+        const key = `guest-${seat.guest!.id}-${seat.type === 'companion' ? `c${seat.companionIndex}` : 'main'}`
+        const setRef = (el: SVGGElement | null) => {
+          if (el) seatRefsMap.current.set(key, el)
+          else seatRefsMap.current.delete(key)
         }
 
         if (seat.type === 'companion' || seat.type === 'overflow-companion') {
@@ -207,10 +270,8 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
           const totalCompanions = seat.guest!.attendeeCount - 1
           const isLast = seat.companionIndex === totalCompanions
           return (
-            <g key={`companion-${i}`}>
+            <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)` }}>
               <circle
-                cx={seat.x}
-                cy={seat.y}
                 r={20}
                 fill={bgColor}
                 stroke="white"
@@ -219,8 +280,7 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
               />
               {isLast && (
                 <text
-                  x={seat.x}
-                  y={seat.y + 6}
+                  y={6}
                   textAnchor="middle"
                   fill={textColor}
                   fontSize="14"
@@ -235,7 +295,7 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
           )
         }
 
-        // 賓客本人（不區分 overflow，所有人一視同仁）
+        // 賓客本人
         const bgColor = CATEGORY_COLORS[seat.guest!.category] || '#F3F4F6'
         const textColor = CATEGORY_TEXT[seat.guest!.category] || '#374151'
         const displayName = getDisplayName(seat.guest!.name)
@@ -248,13 +308,11 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
         const isHovered = hoveredGuestId === seat.guest!.id
 
         return (
-          <g key={`${seat.guest!.id}-${i}`}>
-            {/* 滿意度進度圈（hover 時隱藏，由 HTML overlay 的虛線取代） */}
+          <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)` }}>
+            {/* 滿意度進度圈 */}
             {!isHovered && (
               <>
                 <circle
-                  cx={seat.x}
-                  cy={seat.y}
                   r={guestRingR}
                   fill="none"
                   stroke="#E7E5E4"
@@ -262,8 +320,6 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
                 />
                 {guestScore > 0 && (
                   <circle
-                    cx={seat.x}
-                    cy={seat.y}
                     r={guestRingR}
                     fill="none"
                     stroke={guestSatColor}
@@ -271,23 +327,20 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
                     strokeLinecap="round"
                     strokeDasharray={`${guestCircum * guestProgress} ${guestCircum * (1 - guestProgress)}`}
                     strokeDashoffset={guestCircum * 0.25}
-                    transform={`rotate(-90 ${seat.x} ${seat.y})`}
+                    transform="rotate(-90)"
                   />
                 )}
               </>
             )}
             {/* 賓客圓形 */}
             <circle
-              cx={seat.x}
-              cy={seat.y}
               r={guestR}
               fill={bgColor}
               stroke="white"
-              strokeWidth="1.5"
+              strokeWidth={1.5}
             />
             <text
-              x={seat.x}
-              y={seat.y + 6}
+              y={6}
               textAnchor="middle"
               fill={textColor}
               fontSize="16"
@@ -308,80 +361,78 @@ interface Seat {
   type: 'guest' | 'companion' | 'empty' | 'overflow' | 'overflow-companion'
   guest: Guest | null
   companionIndex?: number // 第幾個眷屬（從 1 開始）
+  seatIndex: number // 圓桌上的座位索引
   x: number
   y: number
 }
 
 /**
- * 建立座位佈局：
- * - 依 capacity 固定基本座位數
- * - 超出容量的賓客也顯示（用 overflow 標記）
- * - 剩餘空位用 empty 標記
+ * 計算座位角度位置
+ */
+function seatPosition(seatIndex: number, totalSlots: number, seatRadius: number) {
+  const angle = ((2 * Math.PI) / totalSlots) * seatIndex - Math.PI / 2
+  return {
+    x: Math.cos(angle) * seatRadius,
+    y: Math.sin(angle) * seatRadius,
+  }
+}
+
+/**
+ * 建立座位佈局（使用 seatIndex）：
+ * - 統一走 Slot[] → Seat[] 的 code path（不管有沒有 preview）
+ * - 確保 React 元素結構穩定，CSS transition 能正常運作
  */
 function buildSeatLayout(
   guests: Guest[],
   capacity: number,
   tableRadius: number,
+  previewSlots?: Slot[] | null,
 ): Seat[] {
-  // 計算實際需要的座位數（含超出的）
-  let totalOccupied = 0
-  for (const g of guests) {
-    totalOccupied += g.attendeeCount
-  }
-  const totalSlots = Math.max(capacity, totalOccupied)
-
+  const totalSlots = capacity
   const seatRadius = tableRadius - 34
 
-  // 建立所有座位的角度位置
-  const positions = Array.from({ length: totalSlots }, (_, i) => {
-    const angle = ((2 * Math.PI) / totalSlots) * i - Math.PI / 2
-    return {
-      x: Math.cos(angle) * seatRadius,
-      y: Math.sin(angle) * seatRadius,
-    }
-  })
-
-  const seats: Seat[] = []
-  let posIndex = 0
-  let seatsFilled = 0
-
-  for (const guest of guests) {
-    if (posIndex >= totalSlots) break
-
-    const isOverflow = seatsFilled >= capacity
-
-    // 賓客本人
-    seats.push({
-      type: isOverflow ? 'overflow' : 'guest',
-      guest,
-      ...positions[posIndex],
-    })
-    posIndex++
-    seatsFilled++
-
-    // 眷屬佔位
-    for (let c = 1; c < guest.attendeeCount; c++) {
-      if (posIndex >= totalSlots) break
-      const companionOverflow = seatsFilled >= capacity
-      seats.push({
-        type: companionOverflow ? 'overflow-companion' : 'companion',
-        guest,
-        companionIndex: c,
-        ...positions[posIndex],
-      })
-      posIndex++
-      seatsFilled++
+  // Step 1: 建立 Slot[] — preview 時直接用，正常時從 guests 建立
+  let slots: Slot[]
+  if (previewSlots) {
+    slots = previewSlots
+  } else {
+    slots = new Array(totalSlots).fill(null)
+    for (const guest of guests) {
+      const startIdx = guest.seatIndex ?? 0
+      if (startIdx < totalSlots) {
+        slots[startIdx] = { guestId: guest.id, isCompanion: false }
+      }
+      for (let c = 1; c < guest.attendeeCount; c++) {
+        const idx = (startIdx + c) % totalSlots
+        slots[idx] = { guestId: guest.id, isCompanion: true }
+      }
     }
   }
 
-  // 剩餘空位（只在沒超出時才有）
-  while (posIndex < totalSlots) {
-    seats.push({
-      type: 'empty',
-      guest: null,
-      ...positions[posIndex],
-    })
-    posIndex++
+  // Step 2: 統一 code path — 從 Slot[] 轉成 Seat[]
+  const guestMap = new Map<string, Guest>()
+  for (const g of guests) guestMap.set(g.id, g)
+
+  const seats: Seat[] = []
+  for (let i = 0; i < totalSlots; i++) {
+    const slot = slots[i]
+    const pos = seatPosition(i, totalSlots, seatRadius)
+
+    if (!slot) {
+      seats.push({ type: 'empty', guest: null, seatIndex: i, ...pos })
+    } else if (slot.isCompanion) {
+      const guest = guestMap.get(slot.guestId) || null
+      // 計算 companionIndex（往前數同 guestId 的連續 slot）
+      let companionIdx = 0
+      for (let j = i - 1; j >= 0; j--) {
+        if (slots[j]?.guestId === slot.guestId) companionIdx++
+        else break
+      }
+      seats.push({ type: 'companion', guest, companionIndex: companionIdx, seatIndex: i, ...pos })
+    } else {
+      const guest = guestMap.get(slot.guestId) || null
+      seats.push({ type: 'guest', guest, seatIndex: i, ...pos })
+    }
   }
 
   return seats
@@ -393,38 +444,37 @@ interface GroupArc {
 }
 
 /**
- * 為帶眷屬的賓客建立弧線路徑
- * 像用圓頭筆刷畫一道弧形，標記同一組的座位
+ * 從 allSeats 建立眷屬群組弧線
  */
-function buildGroupArcs(
-  guests: Guest[],
+function buildGroupArcsFromSeats(
+  allSeats: Seat[],
   capacity: number,
   tableRadius: number,
 ): GroupArc[] {
-  let totalOccupied = 0
-  for (const g of guests) {
-    totalOccupied += g.attendeeCount
-  }
-  const totalSlots = Math.max(capacity, totalOccupied)
-
-  const seatRadius = tableRadius - 34 // 跟座位同一圈
+  const seatRadius = tableRadius - 34
+  const totalSlots = capacity
   const arcs: GroupArc[] = []
 
-  let posIndex = 0
-  for (const guest of guests) {
-    if (posIndex >= totalSlots) break
+  // 找出帶眷屬的賓客，取得他們的起始 seatIndex 和佔位數
+  const processed = new Set<string>()
 
-    const seatCount = Math.min(guest.attendeeCount, totalSlots - posIndex)
-    const startIndex = posIndex
-    posIndex += seatCount
+  for (const seat of allSeats) {
+    if (!seat.guest || seat.type !== 'guest') continue
+    if (processed.has(seat.guest.id)) continue
+    processed.add(seat.guest.id)
 
-    if (seatCount < 2) continue
+    if (seat.guest.attendeeCount < 2) continue
+
+    const startIndex = seat.seatIndex
+    const seatCount = seat.guest.attendeeCount
 
     const angleStep = (2 * Math.PI) / totalSlots
     const startAngle = angleStep * startIndex - Math.PI / 2
-    const endAngle = angleStep * (startIndex + seatCount - 1) - Math.PI / 2
+    const endAngle = angleStep * ((startIndex + seatCount - 1) % totalSlots) - Math.PI / 2
 
-    const sweepAngle = endAngle - startAngle
+    // 處理環形情況
+    let sweepAngle = endAngle - startAngle
+    if (sweepAngle < 0) sweepAngle += 2 * Math.PI
     const largeArc = sweepAngle > Math.PI ? 1 : 0
 
     const x1 = Math.cos(startAngle) * seatRadius
@@ -434,7 +484,7 @@ function buildGroupArcs(
 
     arcs.push({
       path: `M ${x1} ${y1} A ${seatRadius} ${seatRadius} 0 ${largeArc} 1 ${x2} ${y2}`,
-      category: guest.category,
+      category: seat.guest.category,
     })
   }
 
