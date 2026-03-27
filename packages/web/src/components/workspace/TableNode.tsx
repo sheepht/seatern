@@ -143,11 +143,26 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
   const seatCount = getTableSeatCount(table.id)
   const isOverCapacity = seatCount > table.capacity
 
-  // 檢查此桌是否有避免同桌違規
+  // 檢查此桌是否有避免同桌違規，並記錄哪些賓客涉及
   const guestIds = guests.map((g) => g.id)
-  const hasViolation = avoidPairs.some(
-    (ap) => guestIds.includes(ap.guestAId) && guestIds.includes(ap.guestBId),
-  )
+  const violatingGuestIds = new Set<string>()
+  const hasViolation = avoidPairs.some((ap) => {
+    if (guestIds.includes(ap.guestAId) && guestIds.includes(ap.guestBId)) {
+      violatingGuestIds.add(ap.guestAId)
+      violatingGuestIds.add(ap.guestBId)
+      return true
+    }
+    return false
+  })
+  // some 只找到第一組就停了，補掃全部
+  if (hasViolation) {
+    for (const ap of avoidPairs) {
+      if (guestIds.includes(ap.guestAId) && guestIds.includes(ap.guestBId)) {
+        violatingGuestIds.add(ap.guestAId)
+        violatingGuestIds.add(ap.guestBId)
+      }
+    }
+  }
 
   // 桌次大小依容量固定（要放得下所有座位圈圈）
   const baseRadius = 58 + Math.min(table.capacity, 12) * 7
@@ -227,17 +242,8 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
       opacity={isDragging ? 0.6 : 1}
     >
       {/* 對話框 badge — 畫在桌子圓形之前，讓圓形蓋住尖角底部 */}
-      {hasViolation && (
-        <g transform={`translate(${radius * 0.8}, ${-radius - 8})`}>
-          <rect x={0} y={0} width={88} height={32} rx={6} fill="#DC2626" />
-          <polygon points="10,32 0,46 20,32" fill="#DC2626" />
-          <text x={44} y={22} textAnchor="middle" fill="white" fontSize="16" fontWeight="600" fontFamily="'Noto Sans TC', sans-serif">
-            避免同桌
-          </text>
-        </g>
-      )}
       {isOverCapacity && (
-        <g transform={`translate(${radius * 0.8}, ${hasViolation ? -radius - 44 : -radius - 8})`}>
+        <g transform={`translate(${radius * 0.8}, ${-radius - 8})`}>
           <rect x={0} y={0} width={88} height={32} rx={6} fill="#EA580C" />
           <polygon points="10,32 0,46 20,32" fill="#EA580C" />
           <text x={44} y={22} textAnchor="middle" fill="white" fontSize="16" fontWeight="600" fontFamily="'Noto Sans TC', sans-serif">
@@ -422,6 +428,29 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
             >
               {displayName}
             </text>
+            {/* 避免同桌違規：漫畫風怒氣對話框 */}
+            {violatingGuestIds.has(seat.guest!.id) && (
+              <g transform={`translate(${guestR + 4}, ${-guestR - 4})`}>
+                {/* 漫畫對話框：圓形 + 右下尖角 */}
+                <path
+                  d="M-9,7 A12,12 0 1,1 -5,10 L-14,16 Z"
+                  fill="white"
+                  stroke="#DC2626"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+                {/* 十字青筋（紅色，置中於圓形） */}
+                <g transform="translate(1,-1)">
+                  <path
+                    d="M-1.5,-6 Q-1.5,-1.5 -6,-1.5 M1.5,-6 Q1.5,-1.5 6,-1.5 M-1.5,6 Q-1.5,1.5 -6,1.5 M1.5,6 Q1.5,1.5 6,1.5"
+                    fill="none"
+                    stroke="#DC2626"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </g>
+              </g>
+            )}
           </g>
         )
       })}

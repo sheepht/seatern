@@ -143,8 +143,10 @@ export default function WorkspacePage() {
       const seatIndex = (dropSeatIndex - offset + capacity) % capacity
       const cursorBias = getCursorBias(event)
 
-      // 檢查避免同桌違規
-      const violation = checkAvoidViolation(guestId, tableId)
+      // 檢查避免同桌違規（同桌內換位不需要再提醒）
+      const draggedGuest = guests.find((g) => g.id === guestId)
+      const alreadyAtSameTable = draggedGuest?.assignedTableId === tableId
+      const violation = alreadyAtSameTable ? null : checkAvoidViolation(guestId, tableId)
       if (violation) {
         const guest = guests.find((g) => g.id === guestId)
         setPendingMove({
