@@ -52,7 +52,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string
 
 const CATEGORY_ORDER = ['男方', '女方', '共同']
 
-export function SidePanel() {
+export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
   const guests = useSeatingStore((s) => s.guests)
   const getUnassignedGuests = useSeatingStore((s) => s.getUnassignedGuests)
 
@@ -113,7 +113,6 @@ export function SidePanel() {
         ref={setNodeRef}
         className="flex-1 flex flex-col overflow-hidden"
         style={{
-          borderTop: '1px solid var(--border)',
           background: isOver ? 'var(--accent-light)' : 'transparent',
           transition: 'background 150ms ease',
         }}
@@ -134,9 +133,23 @@ export function SidePanel() {
                 </span>
               )}
             </div>
-            {isOver && (
-              <span className="text-xs" style={{ color: 'var(--accent-dark)' }}>放開以取消安排</span>
-            )}
+            <div className="flex items-center gap-1">
+              {isOver && (
+                <span className="text-xs" style={{ color: 'var(--accent-dark)' }}>放開以取消安排</span>
+              )}
+              {onCollapse && (
+                <button
+                  onClick={onCollapse}
+                  className="flex items-center justify-center w-6 h-6 rounded cursor-pointer hover:bg-[var(--accent-light)]"
+                  style={{ color: 'var(--text-muted)', flexShrink: 0 }}
+                  title="收合側邊欄"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 3L5 7l4 4" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
           <input
             type="text"

@@ -415,7 +415,7 @@ export function Toolbar() {
           </span>
           <button
             onClick={() => { setRenameEventValue(eventName); setShowRenameEvent(true) }}
-            className="flex items-center justify-center w-5 h-5 rounded hover:bg-[var(--accent-light)]"
+            className="flex items-center justify-center w-5 h-5 rounded cursor-pointer hover:bg-[var(--accent-light)]"
             style={{ color: 'var(--text-muted)', flexShrink: 0 }}
             title="修改活動名稱"
           >

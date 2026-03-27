@@ -29,6 +29,7 @@ export default function WorkspacePage() {
   const checkAvoidViolation = useSeatingStore((s) => s.checkAvoidViolation)
 
   const [activeGuest, setActiveGuest] = useState<Guest | null>(null)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   // 違規確認 modal 狀態
   const [pendingMove, setPendingMove] = useState<{
@@ -183,8 +184,39 @@ export default function WorkspacePage() {
         <Toolbar />
 
         <div className="flex-1 flex overflow-hidden">
-          <div className="w-72 border-r border-gray-200 bg-gray-50 shrink-0">
-            <SidePanel />
+          {/* 折疊時的展開條（永遠渲染，寬度跟側邊欄同步動畫） */}
+          <div
+            className="shrink-0 flex items-center justify-center cursor-pointer bg-[var(--bg-primary)] hover:bg-[var(--accent-light)] overflow-hidden"
+            style={{
+              width: sidebarCollapsed ? 28 : 0,
+              borderRight: sidebarCollapsed ? '1px solid var(--border)' : 'none',
+              transition: 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+            onClick={() => setSidebarCollapsed(false)}
+            title="展開側邊欄"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M5 3l4 4-4 4" />
+            </svg>
+          </div>
+          {/* 側邊欄 */}
+          <div
+            className="shrink-0 overflow-hidden"
+            style={{
+              width: sidebarCollapsed ? 0 : 288,
+              borderRight: sidebarCollapsed ? 'none' : '1px solid var(--border)',
+              background: 'var(--bg-primary)',
+              transition: 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          >
+            <div style={{
+              width: 288,
+              height: '100%',
+              transform: sidebarCollapsed ? 'translateX(-288px)' : 'translateX(0)',
+              transition: 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+            }}>
+              <SidePanel onCollapse={() => setSidebarCollapsed(true)} />
+            </div>
           </div>
           <div className="flex-1 min-w-0">
             <FloorPlan />
