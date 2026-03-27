@@ -1,4 +1,5 @@
 import { useSeatingStore, type Guest } from '@/stores/seating'
+import { getSatisfactionColor } from '@/lib/satisfaction'
 
 const CATEGORY_STYLES: Record<string, { background: string; borderColor: string; color: string }> = {
   '男方': { background: '#DBEAFE', borderColor: '#BFDBFE', color: '#1E40AF' },
@@ -12,12 +13,6 @@ function getDisplayName(name: string): string {
   return name.slice(-2)
 }
 
-function getSatisfactionColor(score: number): string {
-  if (score >= 75) return '#16A34A'
-  if (score >= 50) return '#CA8A04'
-  if (score >= 26) return '#EA580C'
-  return '#DC2626'
-}
 
 interface Props {
   guest: Guest

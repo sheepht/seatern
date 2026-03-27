@@ -1,5 +1,7 @@
 import { useRef, useLayoutEffect, useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useSeatingStore, type Table, type Guest } from '@/stores/seating'
+import { getSatisfactionColor } from '@/lib/satisfaction'
 import type { Slot } from '@/lib/seat-shift'
 
 /**
@@ -142,6 +144,18 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
   const recommendationGuestScore = useSeatingStore((s) => s.recommendationGuestScore)
   const guestsWithRecommendations = useSeatingStore((s) => s.guestsWithRecommendations)
   const allGuests = useSeatingStore((s) => s.guests)
+  const moveGuest = useSeatingStore((s) => s.moveGuest)
+  const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
+  const removeTable = useSeatingStore((s) => s.removeTable)
+  const updateTableName = useSeatingStore((s) => s.updateTableName)
+
+  const [isHovered, setIsHovered] = useState(false)
+  const [showRenameModal, setShowRenameModal] = useState(false)
+  const [showActionConfirm, setShowActionConfirm] = useState(false)
+  const [renameValue, setRenameValue] = useState(table.name)
+  // 量測桌名文字長度，用來精確定位圖示
+  const namePathRef = useRef<SVGTextPathElement>(null)
+  const [nameTextLength, setNameTextLength] = useState(table.name.length * 20)
 
   const guests = getTableGuests(table.id)
   const seatCount = getTableSeatCount(table.id)
@@ -237,17 +251,98 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
     prevPositions.current = currentPositions
   })
 
+  // 量測桌名文字長度（用於圖示定位）
+  useLayoutEffect(() => {
+    if (namePathRef.current) {
+      const len = namePathRef.current.getComputedTextLength()
+      if (len > 0) setNameTextLength(len)
+    }
+  }, [table.name, radius])
+
   // 眷屬群組弧線
   const groupArcs = buildGroupArcsFromSeats(allSeats, table.capacity, radius)
 
+  const handleRename = () => {
+    const trimmed = renameValue.trim()
+    if (trimmed && trimmed !== table.name) updateTableName(table.id, trimmed)
+    setShowRenameModal(false)
+  }
+
+  const handleActionConfirm = () => {
+    if (guests.length > 0) {
+      for (const g of guests) moveGuest(g.id, null)
+      setSelectedTable(null)
+    } else {
+      removeTable(table.id)
+    }
+    setShowActionConfirm(false)
+  }
+
+  const showIcons = isSelected && !isDragging
+  const iconR = 14
+  // 弧線參數化：t ∈ [0,1]，x(t) = -R·cos(t·π)，y(t) = -R·sin(t·π)
+  // textArcR = 文字 baseline 所在弧線（與 textPath 一致）
+  // iconArcR = 圖示中心所在弧線，需往外偏移約半個字高，使圖示視覺中心對齊文字中心
+  const textArcR = radius + 12
+  const fontSize = 20
+  const iconArcR = textArcR + fontSize * 0.55  // baseline → 文字視覺中心
+  const arcLength = Math.PI * textArcR
+  const iconPad = 20  // 文字邊緣到圖示中心的間距（px）
+  const tEdit = Math.max(0.04, 0.5 - (nameTextLength / 2 + iconPad) / arcLength)
+  const tDelete = Math.min(0.96, 0.5 + (nameTextLength / 2 + iconPad) / arcLength)
+  const editX = -iconArcR * Math.cos(tEdit * Math.PI)
+  const editY = -iconArcR * Math.sin(tEdit * Math.PI)
+  const deleteX = -iconArcR * Math.cos(tDelete * Math.PI)
+  const deleteY = -iconArcR * Math.sin(tDelete * Math.PI)
+  // 動畫起點：桌子中心（從外層 <g> 反推 = 負的終點座標）
+  // 圖示畫在桌子圓形之前，所以在桌面內的路程被桌子蓋住，穿越邊緣後彈出
+  const editFromX = -editX
+  const editFromY = -editY
+  const deleteFromX = -deleteX
+  const deleteFromY = -deleteY
+
   return (
+    <>
     <g
       transform={`translate(${table.positionX}, ${table.positionY})`}
       onMouseDown={onMouseDown}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}
       opacity={isDimmed ? 0.2 : isDragging ? 0.6 : 1}
       style={{ transition: 'opacity 200ms ease-out' }}
     >
+      {/* 操作圖示 — 畫在桌子圓形之前，讓桌面蓋住圖示（從背後彈出效果） */}
+      {showIcons && (
+        <>
+          <g
+            transform={`translate(${editX}, ${editY})`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); setRenameValue(table.name); setShowRenameModal(true) }}
+            style={{ cursor: 'pointer' }}
+          >
+            <g className="table-icon-pop" style={{ '--icon-from-x': `${editFromX}px`, '--icon-from-y': `${editFromY}px` } as React.CSSProperties}>
+              <circle r={iconR} fill="white" stroke="#D6D3D1" strokeWidth="1.5" />
+              <g fill="none" stroke="#78716C" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" transform="translate(-5,-5)">
+                <path d="M7.5 1.5 9.5 3.5 3 10 1 10 1 8 Z" />
+                <path d="M7.5 1.5 8.5 0.5 10 2 9.5 3.5 Z" />
+              </g>
+            </g>
+          </g>
+          <g
+            transform={`translate(${deleteX}, ${deleteY})`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); setShowActionConfirm(true) }}
+            style={{ cursor: 'pointer' }}
+          >
+            <g className="table-icon-pop" style={{ '--icon-from-x': `${deleteFromX}px`, '--icon-from-y': `${deleteFromY}px` } as React.CSSProperties}>
+              <circle r={iconR} fill="white" stroke="#FECACA" strokeWidth="1.5" />
+              <path d="M-5-5L5 5M5-5L-5 5" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" />
+            </g>
+          </g>
+        </>
+      )}
+
       {/* 對話框 badge — 畫在桌子圓形之前，讓圓形蓋住尖角底部 */}
       {isOverCapacity && (
         <g transform={`translate(${radius * 0.8}, ${-radius - 8})`}>
@@ -302,6 +397,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
         fontFamily="'Noto Sans TC', 'Plus Jakarta Sans', sans-serif"
       >
         <textPath
+          ref={namePathRef}
           href={`#table-name-path-${table.id}`}
           startOffset="50%"
           textAnchor="middle"
@@ -492,6 +588,53 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
       })}
 
     </g>
+
+    {/* 改名 modal */}
+    {showRenameModal && createPortal(
+      <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowRenameModal(false)} />
+        <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '24px', width: '300px', border: '1px solid var(--border)' }}>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>修改桌名</p>
+          <input
+            autoFocus
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setShowRenameModal(false) }}
+            style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--accent)', borderRadius: '6px', fontSize: '13px', outline: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', boxSizing: 'border-box', fontFamily: 'inherit' }}
+          />
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+            <button onClick={() => setShowRenameModal(false)} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>取消</button>
+            <button onClick={handleRename} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', border: 'none', background: 'var(--accent)', color: 'white', cursor: 'pointer', fontWeight: 600 }}>確認</button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+
+    {/* 清空/刪除 modal */}
+    {showActionConfirm && createPortal(
+      <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowActionConfirm(false)} />
+        <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '24px', width: '300px', border: '1px solid var(--border)' }}>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+            {guests.length > 0 ? `清空「${table.name}」？` : `刪除「${table.name}」？`}
+          </p>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+            {guests.length > 0
+              ? `此桌的 ${guests.length} 位賓客將移回未安排。`
+              : '此桌為空桌，將直接刪除。'}
+          </p>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <button onClick={() => setShowActionConfirm(false)} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>取消</button>
+            <button onClick={handleActionConfirm} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', border: 'none', background: '#DC2626', color: 'white', cursor: 'pointer', fontWeight: 600 }}>
+              {guests.length > 0 ? '清空' : '刪除'}
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   )
 }
 
@@ -630,9 +773,3 @@ function buildGroupArcsFromSeats(
   return arcs
 }
 
-function getSatisfactionColor(score: number): string {
-  if (score >= 75) return '#16A34A'
-  if (score >= 50) return '#CA8A04'
-  if (score >= 26) return '#EA580C'
-  return '#DC2626'
-}

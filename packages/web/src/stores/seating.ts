@@ -84,6 +84,8 @@ interface SeatingState {
   recommendationGuestScore: { guestId: string; score: number } | null
   /** 智慧推薦：最佳推薦的全場平均滿意度 */
   recommendationOverallScore: number | null
+  /** 智慧推薦：最佳推薦的每位賓客預覽滿意度 */
+  recommendationPreviewScores: Map<string, number>
   /** 有更好位置的賓客 ID 集合（顯示💡圖示） */
   guestsWithRecommendations: Set<string>
 
@@ -105,6 +107,8 @@ interface SeatingState {
   setDragPreview: (tableId: string | null, seatIndex?: number, draggedGuestId?: string, cursorBias?: 'left' | 'right') => void
   undo: () => void
   addTable: (name: string, positionX: number, positionY: number) => Promise<void>
+  removeTable: (tableId: string) => Promise<void>
+  updateTableName: (tableId: string, name: string) => void
   updateTablePosition: (tableId: string, x: number, y: number) => void
   saveTablePosition: (tableId: string) => void
   saveSnapshot: (name: string) => Promise<void>
@@ -138,6 +142,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   recommendationTableScores: new Map(),
   recommendationGuestScore: null,
   recommendationOverallScore: null,
+  recommendationPreviewScores: new Map(),
   guestsWithRecommendations: new Set(),
   undoStack: [],
 
@@ -169,7 +174,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       const tables = data.tables as Table[]
 
       // 初始滿意度計算
-      const result = recalculateAll(guests, tables)
+      const result = recalculateAll(guests, tables, data.avoidPairs || [])
       for (const gs of result.guests) {
         const g = guests.find((gg: Guest) => gg.id === gs.id)
         if (g) g.satisfactionScore = gs.satisfactionScore
@@ -240,7 +245,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   }),
 
   moveGuest: (guestId, toTableId) => {
-    const { guests, tables, undoStack } = get()
+    const { guests, tables, undoStack, avoidPairs } = get()
     const guest = guests.find((g) => g.id === guestId)
     if (!guest) return
 
@@ -256,7 +261,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     )
 
     // 全量重算滿意度
-    const result = recalculateAll(updatedGuests, tables)
+    const result = recalculateAll(updatedGuests, tables, avoidPairs)
     const finalGuests = updatedGuests.map((g) => {
       const score = result.guests.find((gs) => gs.id === g.id)
       return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
@@ -286,7 +291,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   },
 
   moveGuestToSeat: (guestId, tableId, seatIndex, cursorBias) => {
-    const { guests, tables, undoStack } = get()
+    const { guests, tables, undoStack, avoidPairs } = get()
     const guest = guests.find((g) => g.id === guestId)
     if (!guest) return
 
@@ -330,7 +335,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     })
 
     // 全量重算滿意度
-    const result = recalculateAll(updatedGuests, tables)
+    const result = recalculateAll(updatedGuests, tables, avoidPairs)
     const finalGuests = updatedGuests.map((g) => {
       const score = result.guests.find((gs) => gs.id === g.id)
       return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
@@ -381,7 +386,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       return
     }
 
-    const { guests, tables } = get()
+    const { guests, tables, avoidPairs } = get()
     const table = tables.find((t) => t.id === tableId)
     const draggedGuest = guests.find((g) => g.id === draggedGuestId)
     if (!table || !draggedGuest) {
@@ -419,7 +424,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       }
       return g
     })
-    const previewResult = recalculateAll(previewGuests, tables)
+    const previewResult = recalculateAll(previewGuests, tables, avoidPairs)
 
     const previewScores = new Map<string, number>()
     for (const gs of previewResult.guests) previewScores.set(gs.id, gs.satisfactionScore)
@@ -446,7 +451,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   },
 
   undo: () => {
-    const { undoStack, guests, tables, eventId } = get()
+    const { undoStack, guests, tables, eventId, avoidPairs } = get()
     if (undoStack.length === 0) return
 
     const last = undoStack[undoStack.length - 1]
@@ -464,7 +469,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     })
 
     // 全量重算
-    const result = recalculateAll(updatedGuests, tables)
+    const result = recalculateAll(updatedGuests, tables, avoidPairs)
     const finalGuests = updatedGuests.map((g) => {
       const score = result.guests.find((gs) => gs.id === g.id)
       return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
@@ -508,6 +513,38 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     }
   },
 
+  removeTable: async (tableId) => {
+    const { eventId, tables, guests, selectedTableId } = get()
+    if (!eventId) return
+
+    // 先把所有桌上的賓客移回未安排
+    const tableGuests = guests.filter((g) => g.assignedTableId === tableId)
+    const updatedGuests = guests.map((g) =>
+      g.assignedTableId === tableId ? { ...g, assignedTableId: undefined } : g,
+    )
+
+    set({
+      tables: tables.filter((t) => t.id !== tableId),
+      guests: updatedGuests,
+      selectedTableId: selectedTableId === tableId ? null : selectedTableId,
+    })
+
+    // 回寫 API：移除桌上賓客
+    await Promise.all(
+      tableGuests.map((g) =>
+        fetch(`/api/events/${eventId}/guests/${g.id}/seat`, {
+          method: 'DELETE',
+          credentials: 'include',
+        }).catch(console.error),
+      ),
+    )
+
+    await fetch(`/api/events/${eventId}/tables/${tableId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    }).catch(console.error)
+  },
+
   addTable: async (name, positionX, positionY) => {
     const { eventId, tables } = get()
     if (!eventId) return
@@ -522,6 +559,18 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     const table = await res.json()
     set({ tables: [...tables, table] })
+  },
+
+  updateTableName: (tableId, name) => {
+    const { eventId, tables } = get()
+    set({ tables: tables.map((t) => t.id === tableId ? { ...t, name } : t) })
+    if (!eventId) return
+    fetch(`/api/events/${eventId}/tables/${tableId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ name }),
+    }).catch(console.error)
   },
 
   updateTablePosition: (tableId, x, y) => {
@@ -568,6 +617,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       })),
       tables: tables.map((t) => ({
         tableId: t.id,
+        name: t.name,
         positionX: t.positionX,
         positionY: t.positionY,
       })),
@@ -585,13 +635,13 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   },
 
   restoreSnapshot: (snapshotId) => {
-    const { snapshots, guests, tables } = get()
+    const { snapshots, guests, tables, avoidPairs } = get()
     const snapshot = snapshots.find((s) => s.id === snapshotId)
     if (!snapshot) return
 
     const snapData = snapshot.data as {
       guests: Array<{ guestId: string; tableId: string | null; seatIndex?: number | null; satisfactionScore: number }>
-      tables: Array<{ tableId: string; positionX: number; positionY: number }>
+      tables: Array<{ tableId: string; name?: string; positionX: number; positionY: number }>
     }
 
     // 還原賓客分配
@@ -607,13 +657,13 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const restoredTables = tables.map((t) => {
       const st = snapData.tables.find((st) => st.tableId === t.id)
       if (st) {
-        return { ...t, positionX: st.positionX, positionY: st.positionY }
+        return { ...t, positionX: st.positionX, positionY: st.positionY, ...(st.name ? { name: st.name } : {}) }
       }
       return t
     })
 
     // 重算滿意度（確保一致）
-    const result = recalculateAll(restoredGuests, restoredTables)
+    const result = recalculateAll(restoredGuests, restoredTables, avoidPairs)
     const finalGuests = restoredGuests.map((g) => {
       const score = result.guests.find((gs) => gs.id === g.id)
       return score ? { ...g, satisfactionScore: score.satisfactionScore } : g

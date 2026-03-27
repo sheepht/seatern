@@ -124,7 +124,7 @@ export function Toolbar() {
             style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
             title="Ctrl+Z"
           >
-            撤銷
+            還原
           </button>
 
           <button
@@ -156,7 +156,7 @@ export function Toolbar() {
               當時全場平均滿意度：<span className="font-data font-bold">{snapshots[0].averageSatisfaction}</span>
             </p>
             <p className="text-sm mb-5" style={{ color: 'var(--warning)' }}>
-              目前的排位將被覆蓋，撤銷記錄會清空。
+              目前的排位將被覆蓋，還原記錄會清空。
             </p>
             <div className="flex gap-3">
               <button

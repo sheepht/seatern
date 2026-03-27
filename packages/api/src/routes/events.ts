@@ -196,6 +196,26 @@ events.patch('/:eventId/tables/:tableId', async (c) => {
   return c.json(table)
 })
 
+// DELETE /events/:eventId/tables/:tableId — 刪除桌次（同時清除賓客分配）
+events.delete('/:eventId/tables/:tableId', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const { eventId, tableId } = c.req.param()
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  // 清除該桌所有賓客的分配
+  await prisma.guest.updateMany({
+    where: { eventId, assignedTableId: tableId },
+    data: { assignedTableId: null, seatIndex: null },
+  })
+
+  await prisma.table.delete({ where: { id: tableId } })
+
+  return c.json({ ok: true })
+})
+
 // ─── 座位偏好 ────────────────────────────────────────
 
 // POST /events/:id/preferences/batch — 批次建立座位偏好

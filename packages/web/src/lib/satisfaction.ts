@@ -5,7 +5,7 @@
  * 權威來源：PRD（CLAUDE.md）§3.4
  */
 
-import type { Guest, Table } from '@/stores/seating'
+import type { Guest, Table, AvoidPair } from '@/stores/seating'
 
 // ─── 群組分（0-20）──────────────────────────────────
 // 同桌有同群組的人佔比
@@ -87,12 +87,31 @@ export function isNeighborTable(a: Table, b: Table): boolean {
   return distance <= NEIGHBOR_THRESHOLD
 }
 
+// ─── 避免同桌懲罰（每個衝突 -20，最低 0）───────────────
+
+const AVOID_PENALTY = 60
+
+export function calculateAvoidPenalty(
+  guest: Guest,
+  tableGuests: Guest[],
+  avoidPairs: AvoidPair[],
+): number {
+  const tableGuestIds = new Set(tableGuests.filter((g) => g.id !== guest.id).map((g) => g.id))
+  const violations = avoidPairs.filter(
+    (ap) =>
+      (ap.guestAId === guest.id && tableGuestIds.has(ap.guestBId)) ||
+      (ap.guestBId === guest.id && tableGuestIds.has(ap.guestAId)),
+  )
+  return violations.length * AVOID_PENALTY
+}
+
 // ─── 個人滿意度 ─────────────────────────────────────
 
 export function calculateSatisfaction(
   guest: Guest,
   allGuests: Guest[],
   tables: Table[],
+  avoidPairs: AvoidPair[] = [],
 ): number {
   // 婉拒的不計算
   if (guest.rsvpStatus === 'declined') return 0
@@ -108,8 +127,9 @@ export function calculateSatisfaction(
   const groupScore = calculateGroupScore(guest, tableGuests)
   const prefScore = calculatePreferenceScore(guest, tableGuests, allGuests, tables)
   const needsScore = 5 // 固定 +5
+  const avoidPenalty = calculateAvoidPenalty(guest, tableGuests, avoidPairs)
 
-  return base + groupScore + prefScore + needsScore
+  return Math.max(0, base + groupScore + prefScore + needsScore - avoidPenalty)
 }
 
 // ─── 桌次平均滿意度 ─────────────────────────────────
@@ -143,12 +163,13 @@ export interface RecalcResult {
 export function recalculateAll(
   guests: Guest[],
   tables: Table[],
+  avoidPairs: AvoidPair[] = [],
 ): RecalcResult {
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
 
   const guestScores = confirmed.map((g) => ({
     id: g.id,
-    satisfactionScore: calculateSatisfaction(g, guests, tables),
+    satisfactionScore: calculateSatisfaction(g, guests, tables, avoidPairs),
   }))
 
   const tableScores = tables.map((t) => ({
@@ -169,4 +190,14 @@ export function recalculateAll(
       : 0
 
   return { guests: guestScores, tables: tableScores, overallAverage }
+}
+
+// ─── 滿意度顏色 ──────────────────────────────────────
+// >= 75 綠、>= 50 黃、>= 25 橘、< 25 紅
+
+export function getSatisfactionColor(score: number): string {
+  if (score >= 75) return '#16A34A'
+  if (score >= 50) return '#CA8A04'
+  if (score >= 25) return '#EA580C'
+  return '#DC2626'
 }

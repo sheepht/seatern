@@ -14,7 +14,6 @@ import { useSeatingStore, type Guest, type AvoidPair } from '@/stores/seating'
 import { Toolbar } from '@/components/workspace/Toolbar'
 import { FloorPlan } from '@/components/workspace/FloorPlan'
 import { SidePanel } from '@/components/workspace/SidePanel'
-import { UnassignedBar } from '@/components/workspace/UnassignedBar'
 import { DragOverlayContent } from '@/components/workspace/DragOverlayContent'
 import { ViolationModal } from '@/components/workspace/ViolationModal'
 
@@ -196,15 +195,14 @@ export default function WorkspacePage() {
         <Toolbar />
 
         <div className="flex-1 flex overflow-hidden">
+          <div className="w-72 border-r border-gray-200 bg-gray-50 shrink-0">
+            <SidePanel />
+          </div>
           <div className="flex-1 min-w-0">
             <FloorPlan />
           </div>
-          <div className="w-72 border-l border-gray-200 bg-gray-50 shrink-0">
-            <SidePanel />
-          </div>
         </div>
 
-        <UnassignedBar />
       </div>
 
       <DragOverlay dropAnimation={null}>

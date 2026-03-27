@@ -16,6 +16,8 @@ interface Recommendation {
   newGuestScore: number
   /** 模擬後的全場平均滿意度 */
   newOverallAvg: number
+  /** 模擬後每位賓客的滿意度 */
+  newGuestScores: Map<string, number>
 }
 
 const CANVAS_WIDTH = 1200
@@ -34,6 +36,7 @@ interface ScreenSeat {
 export function FloorPlan() {
   const tables = useSeatingStore((s) => s.tables)
   const guests = useSeatingStore((s) => s.guests)
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs)
   const hoveredGuestId = useSeatingStore((s) => s.hoveredGuestId)
   const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
   const selectedTableId = useSeatingStore((s) => s.selectedTableId)
@@ -84,7 +87,7 @@ export function FloorPlan() {
 
         // 簡化計算：只檢查是否存在任何雙贏桌（找到一個就停）
         let found = false
-        const currentResult = recalculateAll(guests, tables)
+        const currentResult = recalculateAll(guests, tables, avoidPairs)
         const currentOverall = currentResult.overallAverage
 
         for (const t of tables) {
@@ -94,7 +97,7 @@ export function FloorPlan() {
           if (seatCount + guest.attendeeCount > t.capacity) continue
 
           const simGuests = guests.map((g) => g.id === guest.id ? { ...g, assignedTableId: t.id } : g)
-          const simResult = recalculateAll(simGuests, tables)
+          const simResult = recalculateAll(simGuests, tables, avoidPairs)
           const newGuestScore = simResult.guests.find((g) => g.id === guest.id)?.satisfactionScore ?? 0
           const guestDelta = newGuestScore - guest.satisfactionScore
           const rawTableDelta = (simResult.tables.find((ts) => ts.id === t.id)?.averageSatisfaction ?? 0) - t.averageSatisfaction
@@ -128,10 +131,12 @@ export function FloorPlan() {
       for (const rec of recs) scores.set(rec.tableId, rec.newTableAvg)
       const bestGuest = recs.length > 0 ? { guestId, score: recs[0].newGuestScore } : null
       const bestOverall = recs.length > 0 ? recs[0].newOverallAvg : null
+      const bestPreviewScores = recs.length > 0 ? recs[0].newGuestScores : new Map<string, number>()
       useSeatingStore.setState({
         recommendationTableScores: scores,
         recommendationGuestScore: bestGuest,
         recommendationOverallScore: bestOverall,
+        recommendationPreviewScores: bestPreviewScores,
       })
     }
 
@@ -167,7 +172,7 @@ export function FloorPlan() {
 
       const currentGuestScore = guest.satisfactionScore
       // 當前全場平均
-      const currentResult = recalculateAll(guests, tables)
+      const currentResult = recalculateAll(guests, tables, avoidPairs)
       const currentOverall = currentResult.overallAverage
       const results: Recommendation[] = []
 
@@ -183,7 +188,7 @@ export function FloorPlan() {
         const simGuests = guests.map((g) =>
           g.id === hoveredGuestId ? { ...g, assignedTableId: t.id } : g,
         )
-        const simResult = recalculateAll(simGuests, tables)
+        const simResult = recalculateAll(simGuests, tables, avoidPairs)
 
         const newGuestScore = simResult.guests.find((g) => g.id === hoveredGuestId)?.satisfactionScore ?? 0
         const newTableAvg = simResult.tables.find((ts) => ts.id === t.id)?.averageSatisfaction ?? 0
@@ -194,6 +199,8 @@ export function FloorPlan() {
 
         // 賓客滿意度上升 AND（桌滿意度也上升 OR 全場平均上升）
         if (guestDelta > 0 && (rawTableDelta > 0.1 || rawOverallDelta > 0.1)) {
+          const newGuestScores = new Map<string, number>()
+          for (const gs of simResult.guests) newGuestScores.set(gs.id, gs.satisfactionScore)
           results.push({
             tableId: t.id,
             guestDelta,
@@ -202,6 +209,7 @@ export function FloorPlan() {
             newTableAvg,
             newGuestScore,
             newOverallAvg: simResult.overallAverage,
+            newGuestScores,
           })
         }
       }
@@ -391,23 +399,19 @@ export function FloorPlan() {
           }
           const shouldDim = highlightedIds.size > 0
 
+          // 選中的桌子排到陣列最後，確保 SVG DOM 順序最後 = 圖層最上面
+          const orderedTables = [
+            ...tables.filter((t) => t.id !== selectedTableId),
+            ...tables.filter((t) => t.id === selectedTableId),
+          ]
+
           return (
             <>
-              {tables.filter((t) => t.id !== selectedTableId).map((table) => (
+              {orderedTables.map((table) => (
                 <TableNode
                   key={table.id}
                   table={table}
-                  isSelected={false}
-                  isDragging={draggingTableId === table.id}
-                  isDimmed={shouldDim && !highlightedIds.has(table.id)}
-                  onMouseDown={(e) => handleMouseDown(table.id, e)}
-                />
-              ))}
-              {selectedTableId && tables.filter((t) => t.id === selectedTableId).map((table) => (
-                <TableNode
-                  key={table.id}
-                  table={table}
-                  isSelected={true}
+                  isSelected={table.id === selectedTableId}
                   isDragging={draggingTableId === table.id}
                   isDimmed={shouldDim && !highlightedIds.has(table.id)}
                   onMouseDown={(e) => handleMouseDown(table.id, e)}
