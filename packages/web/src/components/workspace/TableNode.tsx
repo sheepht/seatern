@@ -45,6 +45,7 @@ interface Props {
   table: Table
   isSelected: boolean
   isDragging: boolean
+  isDimmed?: boolean
   onMouseDown: (e: React.MouseEvent) => void
 }
 
@@ -105,20 +106,20 @@ function TableScoreRing({ score, originalScore, hasGuests }: { score: number; or
       </g>
       {/* ±N badge（在縮放 group 外面，不受影響） */}
       {delta !== 0 && (
-        <g transform={`translate(0, ${ringRadius + 14})`}>
+        <g transform={`translate(0, ${ringRadius + 16})`}>
           <rect
-            x={-18}
-            y={-10}
-            width={36}
-            height={20}
-            rx={10}
+            x={-22}
+            y={-13}
+            width={44}
+            height={26}
+            rx={13}
             fill={delta > 0 ? '#16A34A' : '#DC2626'}
           />
           <text
-            y={4}
+            y={5}
             textAnchor="middle"
             fill="white"
-            fontSize="11"
+            fontSize="14"
             fontWeight="700"
             fontFamily="'Plus Jakarta Sans', sans-serif"
           >
@@ -130,7 +131,7 @@ function TableScoreRing({ score, originalScore, hasGuests }: { score: number; or
   )
 }
 
-export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props) {
+export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown }: Props) {
   const getTableGuests = useSeatingStore((s) => s.getTableGuests)
   const getTableSeatCount = useSeatingStore((s) => s.getTableSeatCount)
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
@@ -244,7 +245,8 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
       transform={`translate(${table.positionX}, ${table.positionY})`}
       onMouseDown={onMouseDown}
       className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}
-      opacity={isDragging ? 0.6 : 1}
+      opacity={isDimmed ? 0.2 : isDragging ? 0.6 : 1}
+      style={{ transition: 'opacity 200ms ease-out' }}
     >
       {/* 對話框 badge — 畫在桌子圓形之前，讓圓形蓋住尖角底部 */}
       {isOverCapacity && (
@@ -434,8 +436,21 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
             >
               {displayName}
             </text>
-            {/* 避免同桌違規：漫畫風怒氣對話框（右上） */}
-            {violatingGuestIds.has(seat.guest!.id) && (
+          </g>
+        )
+      })}
+
+      {/* 圖示層：怒氣 + 推薦（在所有賓客之上，不會被其他賓客蓋住） */}
+      {allSeats.filter((s) => s.type === 'guest' && s.guest).map((seat) => {
+        const guestR = 20
+        const hasViolation = violatingGuestIds.has(seat.guest!.id)
+        const hasRecommendation = guestsWithRecommendations.has(seat.guest!.id) && !hasViolation
+
+        if (!hasViolation && !hasRecommendation) return null
+
+        return (
+          <g key={`icon-${seat.guest!.id}`} style={{ transform: `translate(${seat.x}px, ${seat.y}px)` }}>
+            {hasViolation && (
               <g transform={`translate(${guestR + 4}, ${-guestR - 4})`}>
                 <path
                   d="M-9,7 A12,12 0 1,1 -5,10 L-14,16 Z"
@@ -455,10 +470,8 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
                 </g>
               </g>
             )}
-            {/* 💡 有更好位置提示（左上） */}
-            {guestsWithRecommendations.has(seat.guest!.id) && !violatingGuestIds.has(seat.guest!.id) && (
+            {hasRecommendation && (
               <g transform={`translate(${-guestR - 4}, ${-guestR - 4})`}>
-                {/* 對話框：圓形 + 右下尖角 */}
                 <path
                   d="M9,7 A12,12 0 1,0 5,10 L14,16 Z"
                   fill="white"
@@ -466,12 +479,9 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
                   strokeWidth="1.5"
                   strokeLinejoin="round"
                 />
-                {/* 雙箭頭循環圖示 */}
                 <g transform="translate(0, 0)">
-                  {/* 上弧 + 箭頭 */}
                   <path d="M6,0 A6.5,6.5 0 0,0 -4,-5" fill="none" stroke="#B08D57" strokeWidth="2.2" strokeLinecap="round" />
                   <polygon points="-2,-9 -7,-3.5 -1,-3" fill="#B08D57" />
-                  {/* 下弧 + 箭頭 */}
                   <path d="M-6,0 A6.5,6.5 0 0,0 4,5" fill="none" stroke="#B08D57" strokeWidth="2.2" strokeLinecap="round" />
                   <polygon points="2,9 7,3.5 1,3" fill="#B08D57" />
                 </g>

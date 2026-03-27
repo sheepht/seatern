@@ -14,6 +14,8 @@ interface Recommendation {
   newTableAvg: number
   /** 模擬後的賓客滿意度 */
   newGuestScore: number
+  /** 模擬後的全場平均滿意度 */
+  newOverallAvg: number
 }
 
 const CANVAS_WIDTH = 1200
@@ -125,7 +127,12 @@ export function FloorPlan() {
       const scores = new Map<string, number>()
       for (const rec of recs) scores.set(rec.tableId, rec.newTableAvg)
       const bestGuest = recs.length > 0 ? { guestId, score: recs[0].newGuestScore } : null
-      useSeatingStore.setState({ recommendationTableScores: scores, recommendationGuestScore: bestGuest })
+      const bestOverall = recs.length > 0 ? recs[0].newOverallAvg : null
+      useSeatingStore.setState({
+        recommendationTableScores: scores,
+        recommendationGuestScore: bestGuest,
+        recommendationOverallScore: bestOverall,
+      })
     }
 
     if (activeDragGuestId) {
@@ -194,6 +201,7 @@ export function FloorPlan() {
             overallDelta: Math.round(rawOverallDelta),
             newTableAvg,
             newGuestScore,
+            newOverallAvg: simResult.overallAverage,
           })
         }
       }
@@ -372,25 +380,42 @@ export function FloorPlan() {
         </defs>
         <rect width={CANVAS_WIDTH} height={CANVAS_HEIGHT} fill="url(#grid)" />
 
-        {/* 選中的桌子最後畫（最上層） */}
-        {tables.filter((t) => t.id !== selectedTableId).map((table) => (
-          <TableNode
-            key={table.id}
-            table={table}
-            isSelected={false}
-            isDragging={draggingTableId === table.id}
-            onMouseDown={(e) => handleMouseDown(table.id, e)}
-          />
-        ))}
-        {selectedTableId && tables.filter((t) => t.id === selectedTableId).map((table) => (
-          <TableNode
-            key={table.id}
-            table={table}
-            isSelected={true}
-            isDragging={draggingTableId === table.id}
-            onMouseDown={(e) => handleMouseDown(table.id, e)}
-          />
-        ))}
+        {/* 推薦虛線時需要 dim 的桌子 */}
+        {(() => {
+          // 計算哪些桌不需要 dim（來源桌 + 推薦目標桌）
+          const highlightedIds = new Set<string>()
+          if (recommendations.length > 0 && hoveredGuestId) {
+            const g = guests.find((gg) => gg.id === hoveredGuestId)
+            if (g?.assignedTableId) highlightedIds.add(g.assignedTableId)
+            for (const rec of recommendations) highlightedIds.add(rec.tableId)
+          }
+          const shouldDim = highlightedIds.size > 0
+
+          return (
+            <>
+              {tables.filter((t) => t.id !== selectedTableId).map((table) => (
+                <TableNode
+                  key={table.id}
+                  table={table}
+                  isSelected={false}
+                  isDragging={draggingTableId === table.id}
+                  isDimmed={shouldDim && !highlightedIds.has(table.id)}
+                  onMouseDown={(e) => handleMouseDown(table.id, e)}
+                />
+              ))}
+              {selectedTableId && tables.filter((t) => t.id === selectedTableId).map((table) => (
+                <TableNode
+                  key={table.id}
+                  table={table}
+                  isSelected={true}
+                  isDragging={draggingTableId === table.id}
+                  isDimmed={shouldDim && !highlightedIds.has(table.id)}
+                  onMouseDown={(e) => handleMouseDown(table.id, e)}
+                />
+              ))}
+            </>
+          )
+        })()}
 
         {/* 智慧推薦虛線 */}
         {recommendations.length > 0 && hoveredGuestId && (() => {
@@ -407,36 +432,69 @@ export function FloorPlan() {
           const guestX = srcTable.positionX + Math.cos(angle) * seatRadius
           const guestY = srcTable.positionY + Math.sin(angle) * seatRadius
 
-          return recommendations.map((rec, i) => {
-            const targetTable = tables.find((t) => t.id === rec.tableId)
-            if (!targetTable) return null
+          return (
+            <>
+              {/* 虛線 + 箭頭 */}
+              {recommendations.map((rec, i) => {
+                const targetTable = tables.find((t) => t.id === rec.tableId)
+                if (!targetTable) return null
 
-            const tx = targetTable.positionX
-            const ty = targetTable.positionY
-            // 線的中點（放 badge）
-            const mx = (guestX + tx) / 2
-            const my = (guestY + ty) / 2
+                const tx = targetTable.positionX
+                const ty = targetTable.positionY
+                const targetRadius = Math.max(58 + Math.min(targetTable.capacity, 12) * 7, 88)
+                const guestCircleR = 23
 
-            return (
-              <g key={`rec-${i}`} opacity={0.9 - i * 0.15}>
-                {/* 虛線 */}
-                <line
-                  x1={guestX} y1={guestY} x2={tx} y2={ty}
-                  stroke="#B08D57"
-                  strokeWidth="2"
-                  strokeDasharray="8 5"
-                />
-                {/* 賓客 +N（線的中點） */}
-                <g transform={`translate(${mx}, ${my - 10})`}>
-                  <rect x={-16} y={-10} width={32} height={20} rx={10} fill="#16A34A" />
-                  <text y={4} textAnchor="middle" fill="white" fontSize="11" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
-                    +{rec.guestDelta}
-                  </text>
-                </g>
-                {/* 桌 ±N 由 TableScoreRing 透過 recommendationTableScores 顯示 */}
-              </g>
-            )
-          })
+                const dx = tx - guestX
+                const dy = ty - guestY
+                const dist = Math.sqrt(dx * dx + dy * dy)
+                const ux = dx / dist
+                const uy = dy / dist
+
+                const startX = guestX + ux * (guestCircleR + 4)
+                const startY = guestY + uy * (guestCircleR + 4)
+                const endX = tx - ux * (targetRadius + 4)
+                const endY = ty - uy * (targetRadius + 4)
+                const mx = (startX + endX) / 2
+                const my = (startY + endY) / 2
+
+                const arrowSize = 16
+                const ax1 = endX - ux * arrowSize - uy * arrowSize * 0.5
+                const ay1 = endY - uy * arrowSize + ux * arrowSize * 0.5
+                const ax2 = endX - ux * arrowSize + uy * arrowSize * 0.5
+                const ay2 = endY - uy * arrowSize - ux * arrowSize * 0.5
+
+                return (
+                  <g key={`rec-${i}`} opacity={0.9 - i * 0.15}>
+                    {/* 流動虛線動畫 */}
+                    <style>{`
+                      @keyframes rec-flow-${i} {
+                        from { stroke-dashoffset: 0; }
+                        to { stroke-dashoffset: -16; }
+                      }
+                    `}</style>
+                    <line
+                      x1={startX} y1={startY} x2={endX} y2={endY}
+                      stroke="#B08D57"
+                      strokeWidth="2.5"
+                      strokeDasharray="10 6"
+                      style={{ animation: `rec-flow-${i} 0.6s linear infinite` }}
+                    />
+                    <polygon
+                      points={`${endX},${endY} ${ax1},${ay1} ${ax2},${ay2}`}
+                      fill="#B08D57"
+                    />
+                    {/* 賓客 +N（線的中點，放大版） */}
+                    <g transform={`translate(${mx}, ${my - 12})`}>
+                      <rect x={-20} y={-12} width={40} height={24} rx={12} fill="#16A34A" />
+                      <text y={5} textAnchor="middle" fill="white" fontSize="14" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
+                        +{rec.guestDelta}
+                      </text>
+                    </g>
+                  </g>
+                )
+              })}
+            </>
+          )
         })()}
 
         {tables.length === 0 && (

@@ -82,6 +82,8 @@ interface SeatingState {
   recommendationTableScores: Map<string, number>
   /** 智慧推薦：hover 的賓客在最佳推薦桌的預覽分數 */
   recommendationGuestScore: { guestId: string; score: number } | null
+  /** 智慧推薦：最佳推薦的全場平均滿意度 */
+  recommendationOverallScore: number | null
   /** 有更好位置的賓客 ID 集合（顯示💡圖示） */
   guestsWithRecommendations: Set<string>
 
@@ -135,6 +137,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   dragRejectTableId: null,
   recommendationTableScores: new Map(),
   recommendationGuestScore: null,
+  recommendationOverallScore: null,
   guestsWithRecommendations: new Set(),
   undoStack: [],
 

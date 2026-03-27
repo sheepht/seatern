@@ -35,6 +35,8 @@ export function SidePanel() {
   const getTotalAssignedSeats = useSeatingStore((s) => s.getTotalAssignedSeats)
   const getTotalConfirmedSeats = useSeatingStore((s) => s.getTotalConfirmedSeats)
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
+  const dragPreview = useSeatingStore((s) => s.dragPreview)
+  const recommendationOverallScore = useSeatingStore((s) => s.recommendationOverallScore)
 
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
   const assigned = getTotalAssignedSeats()
@@ -58,15 +60,52 @@ export function SidePanel() {
       {/* 全場滿意度 */}
       <div className="p-3" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
         <h3 className="text-xs font-medium uppercase tracking-wide mb-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}>全場統計</h3>
-        <div className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-          <span className="font-data">
-          {confirmed.length > 0
+        {(() => {
+          const currentAvg = confirmed.length > 0
             ? Math.round((confirmed.reduce((s, g) => s + g.satisfactionScore, 0) / confirmed.length) * 10) / 10
-            : '—'
-          }
-          </span>
-          <span className="text-sm font-normal ml-1" style={{ color: 'var(--text-muted)' }}>/ 100</span>
-        </div>
+            : 0
+          // 拖曳預覽或推薦的全場平均
+          const previewOverall = dragPreview?.previewTableScores
+            ? (() => {
+                // 拖曳時用 previewScores 計算全場平均
+                const scores = confirmed.map((g) => dragPreview.previewScores.get(g.id) ?? g.satisfactionScore)
+                return scores.length > 0 ? Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10 : 0
+              })()
+            : recommendationOverallScore !== null
+              ? Math.round(recommendationOverallScore * 10) / 10
+              : null
+          const displayScore = previewOverall ?? currentAvg
+          const rawDelta = previewOverall !== null ? previewOverall - currentAvg : 0
+          const delta = rawDelta > 0.05 ? Math.max(1, Math.round(rawDelta * 10) / 10) : rawDelta < -0.05 ? Math.min(-1, Math.round(rawDelta * 10) / 10) : 0
+
+          return (
+            <div className="flex items-center gap-2">
+              <div className="text-2xl font-bold" style={{
+                color: 'var(--text-primary)',
+                transform: rawDelta > 0.05 ? 'scale(1.08)' : rawDelta < -0.05 ? 'scale(0.95)' : 'scale(1)',
+                transition: 'transform 200ms ease-out',
+                transformOrigin: 'left center',
+              }}>
+                <span className="font-data">
+                  {confirmed.length > 0 ? displayScore : '—'}
+                </span>
+                <span className="text-sm font-normal ml-1" style={{ color: 'var(--text-muted)' }}>/ 100</span>
+              </div>
+              {delta !== 0 && (
+                <span
+                  className="text-xs font-bold font-data px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: delta > 0 ? '#16A34A' : '#DC2626',
+                    color: 'white',
+                    fontSize: '11px',
+                  }}
+                >
+                  {delta > 0 ? '+' : ''}{delta}
+                </span>
+              )}
+            </div>
+          )
+        })()}
         <div className="mt-2 grid grid-cols-2 gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
           <div>已安排 <span className="font-medium font-data" style={{ color: 'var(--text-primary)' }}>{assigned}</span> 席</div>
           <div>未安排 <span className="font-medium font-data" style={{ color: '#EA580C' }}>{unassigned}</span> 席</div>
