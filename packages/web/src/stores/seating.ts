@@ -72,6 +72,7 @@ interface SeatingState {
     previewSlots: Slot[]
     draggedGuestId: string
   } | null
+  dragRejectTableId: string | null // 拖曳 hover 時無法放置的桌 ID（滿桌提示）
 
   // Undo stack
   undoStack: Array<{
@@ -119,6 +120,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   loading: false,
   activeDragGuestId: null,
   dragPreview: null,
+  dragRejectTableId: null,
   undoStack: [],
 
   loadEvent: async (eventId: string) => {
@@ -211,7 +213,11 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
   setSelectedTable: (tableId) => set({ selectedTableId: tableId }),
   setHoveredGuest: (guestId) => set({ hoveredGuestId: guestId }),
-  setActiveDragGuest: (guestId) => set({ activeDragGuestId: guestId, dragPreview: guestId ? undefined : null }),
+  setActiveDragGuest: (guestId) => set({
+    activeDragGuestId: guestId,
+    dragPreview: guestId ? undefined : null,
+    dragRejectTableId: guestId ? undefined : null,
+  }),
 
   moveGuest: (guestId, toTableId) => {
     const { guests, tables, undoStack } = get()
@@ -351,7 +357,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
   setDragPreview: (tableId, seatIndex, draggedGuestId, cursorBias) => {
     if (!tableId || seatIndex === undefined || !draggedGuestId) {
-      set({ dragPreview: null })
+      set({ dragPreview: null, dragRejectTableId: null })
       return
     }
 
@@ -359,7 +365,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const table = tables.find((t) => t.id === tableId)
     const draggedGuest = guests.find((g) => g.id === draggedGuestId)
     if (!table || !draggedGuest) {
-      set({ dragPreview: null })
+      set({ dragPreview: null, dragRejectTableId: null })
       return
     }
 
@@ -375,7 +381,10 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const newSlots = placeGuest(slots, seatIndex, draggedGuestId, draggedGuest.attendeeCount, cursorBias)
 
     if (!newSlots) {
-      set({ dragPreview: null })
+      // 無法放置 — 區分原因：真的滿桌 vs 不可移動的位子
+      const emptySlots = slots.filter((s) => s === null).length
+      const isTrulyFull = emptySlots < draggedGuest.attendeeCount
+      set({ dragPreview: null, dragRejectTableId: isTrulyFull ? tableId : null })
       return
     }
 
@@ -392,6 +401,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         previewSlots: newSlots,
         draggedGuestId,
       },
+      dragRejectTableId: null,
     })
   },
 

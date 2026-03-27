@@ -19,7 +19,6 @@ interface Props {
 export function DragOverlayContent({ guest }: Props) {
   const catStyle = CATEGORY_STYLES[guest.category] || DEFAULT_STYLE
   const displayName = getDisplayName(guest.name)
-
   return (
     <div className="relative cursor-grabbing">
       <div

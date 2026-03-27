@@ -63,14 +63,23 @@ export default function WorkspacePage() {
     return () => window.removeEventListener('keydown', handler)
   }, [undo])
 
+  /** 從 drag event 取得賓客 ID */
+  const getGuestId = (event: DragStartEvent | DragOverEvent | DragEndEvent): string => {
+    const data = event.active.data.current
+    if (data?.type === 'guest' && data.guest) return data.guest.id
+    return event.active.id as string
+  }
+
+  /** 取得眷屬偏移量（拖眷屬時回推主人的目標座位） */
+  const getCompanionOffset = (event: DragOverEvent | DragEndEvent): number => {
+    return event.active.data.current?.companionOffset ?? 0
+  }
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
     if (active.data.current?.type === 'guest') {
       setActiveGuest(active.data.current.guest)
-      // 從 seat-{guestId} 或直接 guestId 取得 ID
-      const rawId = active.id as string
-      const guestId = rawId.startsWith('seat-') ? rawId.slice(5) : rawId
-      setActiveDragGuest(guestId)
+      setActiveDragGuest(active.data.current.guest.id)
     }
   }
 
@@ -91,21 +100,25 @@ export default function WorkspacePage() {
   }
 
   const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event
-    if (!over || !active.data.current) {
+    const { over } = event
+    if (!over || !event.active.data.current) {
       setDragPreview(null)
       return
     }
 
-    const rawId = active.id as string
-    const guestId = rawId.startsWith('seat-') ? rawId.slice(5) : rawId
+    const guestId = getGuestId(event)
     const overData = over.data.current
 
     if (overData?.type === 'seat') {
       const tableId = overData.tableId as string
-      const seatIndex = overData.seatIndex as number
+      const dropSeatIndex = overData.seatIndex as number
+      const offset = getCompanionOffset(event)
+      const table = useSeatingStore.getState().tables.find((t) => t.id === tableId)
+      const capacity = table?.capacity ?? 10
+      // 回推主人的目標座位：眷屬座位 - 偏移量
+      const mainSeatIndex = (dropSeatIndex - offset + capacity) % capacity
       const cursorBias = getCursorBias(event)
-      setDragPreview(tableId, seatIndex, guestId, cursorBias)
+      setDragPreview(tableId, mainSeatIndex, guestId, cursorBias)
     } else {
       setDragPreview(null)
     }
@@ -115,16 +128,19 @@ export default function WorkspacePage() {
     setActiveGuest(null)
     setActiveDragGuest(null)
 
-    const { active, over } = event
-    if (!over || !active.data.current) return
+    const { over } = event
+    if (!over || !event.active.data.current) return
 
-    const rawId = active.id as string
-    const guestId = rawId.startsWith('seat-') ? rawId.slice(5) : rawId
+    const guestId = getGuestId(event)
     const overData = over.data.current
 
     if (overData?.type === 'seat') {
       const tableId = overData.tableId as string
-      const seatIndex = overData.seatIndex as number
+      const dropSeatIndex = overData.seatIndex as number
+      const offset = getCompanionOffset(event)
+      const table = useSeatingStore.getState().tables.find((t) => t.id === tableId)
+      const capacity = table?.capacity ?? 10
+      const seatIndex = (dropSeatIndex - offset + capacity) % capacity
       const cursorBias = getCursorBias(event)
 
       // 檢查避免同桌違規

@@ -231,13 +231,15 @@ export function FloorPlan() {
           />
         ))}
 
-        {/* 賓客座位 draggable overlay（主人座位，不含眷屬位） */}
+        {/* 賓客座位 draggable overlay（主人 + 眷屬都可拖，拖眷屬 = 拖整組） */}
         {screenSeats
-          .filter((ss) => ss.guest !== null && !ss.isCompanion)
+          .filter((ss) => ss.guest !== null)
           .map((ss) => (
             <GuestSeatOverlay
-              key={`drag-${ss.guest!.id}`}
+              key={`drag-${ss.guest!.id}-${ss.seatIndex}`}
               guest={ss.guest!}
+              seatIndex={ss.seatIndex}
+              isCompanion={ss.isCompanion}
               x={ss.x}
               y={ss.y}
               radius={ss.radius}

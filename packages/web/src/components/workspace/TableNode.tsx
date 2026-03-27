@@ -36,6 +36,7 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
   const hoveredGuestId = useSeatingStore((s) => s.hoveredGuestId)
   const dragPreview = useSeatingStore((s) => s.dragPreview)
   const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
+  const dragRejectTableId = useSeatingStore((s) => s.dragRejectTableId)
   const allGuests = useSeatingStore((s) => s.guests)
 
   const guests = getTableGuests(table.id)
@@ -54,6 +55,9 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
 
   // 滿意度色環
   const satisfactionColor = getSatisfactionColor(table.averageSatisfaction)
+
+  // 拖曳 hover 但無法放置（滿桌）
+  const isRejectTable = dragRejectTableId === table.id
 
   // 是否有此桌的拖曳預覽
   const isPreviewTable = dragPreview?.tableId === table.id
@@ -141,13 +145,22 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
           </text>
         </g>
       )}
+      {isRejectTable && (
+        <g transform={`translate(${radius * 0.8}, ${-radius - 8 - (hasViolation ? 36 : 0) - (isOverCapacity ? 36 : 0)})`}>
+          <rect x={0} y={0} width={64} height={32} rx={6} fill="#991B1B" />
+          <polygon points="10,32 0,46 20,32" fill="#991B1B" />
+          <text x={32} y={22} textAnchor="middle" fill="white" fontSize="16" fontWeight="600" fontFamily="'Noto Sans TC', sans-serif">
+            滿桌
+          </text>
+        </g>
+      )}
 
       {/* 桌次圓形 — 畫在 badge 之後，蓋住尖角底部 */}
       <circle
         r={radius}
-        fill="white"
-        stroke="#D6D3D1"
-        strokeWidth="1.5"
+        fill={isRejectTable ? '#FEF2F2' : 'white'}
+        stroke={isRejectTable ? '#DC2626' : '#D6D3D1'}
+        strokeWidth={isRejectTable ? 2 : 1.5}
       />
 
       {/* 選中時外圈虛線 */}
