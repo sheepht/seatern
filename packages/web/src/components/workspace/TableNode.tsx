@@ -62,42 +62,70 @@ function TableScoreRing({ score, originalScore, hasGuests }: { score: number; or
   const strokeW = 5
   const circumference = 2 * Math.PI * ringRadius
 
-  const animatedScore = useAnimatedNumber(score)
+  const roundedScore = Math.round(score)
+  const animatedScore = useAnimatedNumber(roundedScore)
   const progress = Math.min(animatedScore / 100, 1)
   const color = getSatisfactionColor(animatedScore)
 
-  // 分數變化 → 微調大小（有變就縮放，不設門檻）
-  const delta = score - originalScore
-  const scale = delta > 0 ? 1.1 : delta < 0 ? 0.9 : 1
+  // 用未四捨五入的值算差異，顯示時才 round
+  const rawDelta = score - originalScore
+  const delta = Math.round(rawDelta)
+  const scale = rawDelta > 0.1 ? 1.25 : rawDelta < -0.1 ? 0.8 : 1
 
   return (
-    <g style={{ transform: `scale(${scale})`, transition: 'transform 200ms ease-out', transformOrigin: '0 0' }}>
-      <circle r={ringRadius} fill="none" stroke="#E7E5E4" strokeWidth={strokeW} />
-      {hasGuests && (
-        <circle
-          r={ringRadius}
-          fill="none"
-          strokeWidth={strokeW}
-          strokeLinecap="round"
-          strokeDashoffset={circumference * 0.25}
-          transform="rotate(-90)"
-          style={{
-            stroke: color,
-            strokeDasharray: `${circumference * progress} ${circumference * (1 - progress)}`,
-            transition: 'stroke 400ms ease-out',
-          }}
-        />
+    <g>
+      {/* 圓環 + 數字（帶縮放） */}
+      <g style={{ transform: `scale(${scale})`, transition: 'transform 200ms ease-out', transformOrigin: '0 0' }}>
+        <circle r={ringRadius} fill="none" stroke="#E7E5E4" strokeWidth={strokeW} />
+        {hasGuests && (
+          <circle
+            r={ringRadius}
+            fill="none"
+            strokeWidth={strokeW}
+            strokeLinecap="round"
+            strokeDashoffset={circumference * 0.25}
+            transform="rotate(-90)"
+            style={{
+              stroke: color,
+              strokeDasharray: `${circumference * progress} ${circumference * (1 - progress)}`,
+              transition: 'stroke 400ms ease-out',
+            }}
+          />
+        )}
+        <text
+          y={hasGuests ? 8 : 6}
+          textAnchor="middle"
+          fontSize={hasGuests ? '26' : '14'}
+          fontWeight="800"
+          fontFamily="'Plus Jakarta Sans', sans-serif"
+          style={{ fill: hasGuests ? color : '#A8A29E', transition: 'fill 400ms ease-out' }}
+        >
+          {hasGuests ? animatedScore : '空桌'}
+        </text>
+      </g>
+      {/* ±N badge（在縮放 group 外面，不受影響） */}
+      {delta !== 0 && (
+        <g transform={`translate(0, ${ringRadius + 14})`}>
+          <rect
+            x={-18}
+            y={-10}
+            width={36}
+            height={20}
+            rx={10}
+            fill={delta > 0 ? '#16A34A' : '#DC2626'}
+          />
+          <text
+            y={4}
+            textAnchor="middle"
+            fill="white"
+            fontSize="11"
+            fontWeight="700"
+            fontFamily="'Plus Jakarta Sans', sans-serif"
+          >
+            {delta > 0 ? '+' : ''}{delta}
+          </text>
+        </g>
       )}
-      <text
-        y={hasGuests ? 8 : 6}
-        textAnchor="middle"
-        fontSize={hasGuests ? '26' : '14'}
-        fontWeight="800"
-        fontFamily="'Plus Jakarta Sans', sans-serif"
-        style={{ fill: hasGuests ? color : '#A8A29E', transition: 'fill 400ms ease-out' }}
-      >
-        {hasGuests ? animatedScore : '空桌'}
-      </text>
     </g>
   )
 }
@@ -271,8 +299,8 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
 
       {/* 滿意度圓環進度條 + 中央數字（帶動畫） */}
       <TableScoreRing
-        score={guests.length > 0 ? Math.round(previewTableScore ?? table.averageSatisfaction) : 0}
-        originalScore={guests.length > 0 ? Math.round(table.averageSatisfaction) : 0}
+        score={guests.length > 0 ? (previewTableScore ?? table.averageSatisfaction) : 0}
+        originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
         hasGuests={guests.length > 0}
       />
 

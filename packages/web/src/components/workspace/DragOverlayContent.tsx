@@ -35,7 +35,7 @@ export function DragOverlayContent({ guest }: Props) {
 
   // 分數變化 → 微調大小
   const delta = previewScore !== undefined ? previewScore - guest.satisfactionScore : 0
-  const scale = delta > 0 ? 1.1 : delta < 0 ? 0.9 : 1
+  const scale = delta > 0 ? 1.25 : delta < 0 ? 0.8 : 1
 
   const size = 48
   const ringR = size / 2 + 3
@@ -103,6 +103,31 @@ export function DragOverlayContent({ guest }: Props) {
       >
         {displayName}
       </div>
+
+      {/* 滿意度變化 badge（不受父層 scale 影響） */}
+      {delta !== 0 && (
+        <div
+          className="absolute flex items-center justify-center"
+          style={{
+            bottom: -8,
+            left: '50%',
+            transform: `translateX(-50%) scale(${1 / scale})`,
+            minWidth: 28,
+            height: 20,
+            borderRadius: 10,
+            padding: '0 6px',
+            background: delta > 0 ? '#16A34A' : '#DC2626',
+            color: 'white',
+            fontSize: '11px',
+            fontWeight: 700,
+            fontFamily: 'var(--font-data)',
+            border: '2px solid white',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {delta > 0 ? '+' : ''}{Math.round(delta)}
+        </div>
+      )}
 
       {/* 眷屬 badge */}
       {guest.attendeeCount > 1 && (
