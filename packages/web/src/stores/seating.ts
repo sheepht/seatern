@@ -88,6 +88,10 @@ interface SeatingState {
   recommendationPreviewScores: Map<string, number>
   /** 有更好位置的賓客 ID 集合（顯示💡圖示） */
   guestsWithRecommendations: Set<string>
+  /** 上次重排的時間戳，用於觸發入場動畫 */
+  lastResetAt: number
+  /** 重排動畫進行中（桌上賓客淡出） */
+  isResetting: boolean
 
   // Undo stack
   undoStack: Array<{
@@ -95,6 +99,7 @@ interface SeatingState {
     fromTableId: string | null
     toTableId: string | null
     prevSeatIndices: Map<string, number | null>
+    batchId?: string
   }>
 
   // Actions
@@ -106,6 +111,7 @@ interface SeatingState {
   moveGuestToSeat: (guestId: string, tableId: string, seatIndex: number, cursorBias?: 'left' | 'right') => void
   setDragPreview: (tableId: string | null, seatIndex?: number, draggedGuestId?: string, cursorBias?: 'left' | 'right') => void
   undo: () => void
+  resetAllSeats: () => void
   updateEventName: (name: string) => void
   addTable: (name: string, positionX: number, positionY: number) => Promise<void>
   removeTable: (tableId: string) => Promise<void>
@@ -146,6 +152,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   recommendationPreviewScores: new Map(),
   guestsWithRecommendations: new Set(),
   undoStack: [],
+  lastResetAt: 0,
+  isResetting: false,
 
   loadEvent: async (eventId: string) => {
     set({ loading: true })
@@ -457,17 +465,28 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     const last = undoStack[undoStack.length - 1]
 
+    // 批次還原：如果最後一筆有 batchId，找出所有同 batch 的 entry 一起還原
+    const entriesToUndo = last.batchId
+      ? undoStack.filter((e) => e.batchId === last.batchId)
+      : [last]
+    const remainingStack = last.batchId
+      ? undoStack.filter((e) => e.batchId !== last.batchId)
+      : undoStack.slice(0, -1)
+
     // 還原所有受影響賓客的 seatIndex + tableId
-    const updatedGuests = guests.map((g) => {
-      if (g.id === last.guestId) {
-        const prevIdx = last.prevSeatIndices.get(g.id) ?? null
-        return { ...g, assignedTableId: last.fromTableId, seatIndex: prevIdx }
-      }
-      if (last.prevSeatIndices.has(g.id)) {
-        return { ...g, seatIndex: last.prevSeatIndices.get(g.id) ?? null }
-      }
-      return g
-    })
+    let updatedGuests = [...guests]
+    for (const entry of entriesToUndo) {
+      updatedGuests = updatedGuests.map((g) => {
+        if (g.id === entry.guestId) {
+          const prevIdx = entry.prevSeatIndices.get(g.id) ?? null
+          return { ...g, assignedTableId: entry.fromTableId, seatIndex: prevIdx }
+        }
+        if (entry.prevSeatIndices.has(g.id)) {
+          return { ...g, seatIndex: entry.prevSeatIndices.get(g.id) ?? null }
+        }
+        return g
+      })
+    }
 
     // 全量重算
     const result = recalculateAll(updatedGuests, tables, avoidPairs)
@@ -483,7 +502,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     set({
       guests: finalGuests,
       tables: finalTables,
-      undoStack: undoStack.slice(0, -1),
+      undoStack: remainingStack,
     })
 
     // 後端同步：還原所有受影響的賓客
@@ -560,6 +579,46 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     const table = await res.json()
     set({ tables: [...tables, table] })
+  },
+
+  resetAllSeats: () => {
+    const { guests, tables, avoidPairs, eventId, undoStack } = get()
+    const assigned = guests.filter((g) => g.assignedTableId)
+    if (assigned.length === 0) return
+
+    // 把每位已安排賓客的狀態推入 undoStack，共享 batchId 讓「還原」一次全部回來
+    const batchId = `reset-${Date.now()}`
+    const undoEntries = assigned.map((g) => ({
+      guestId: g.id,
+      fromTableId: g.assignedTableId ?? null,
+      toTableId: null as string | null,
+      prevSeatIndices: new Map<string, number | null>([[g.id, g.seatIndex ?? null]]),
+      batchId,
+    }))
+
+    const updatedGuests = guests.map((g) => ({
+      ...g,
+      assignedTableId: null as string | undefined | null,
+      seatIndex: null,
+      satisfactionScore: g.rsvpStatus === 'confirmed' ? 55 : 0,
+    }))
+    const updatedTables = tables.map((t) => ({ ...t, averageSatisfaction: 0 }))
+
+    set({ guests: updatedGuests, tables: updatedTables, selectedTableId: null, undoStack: [...undoStack, ...undoEntries], lastResetAt: Date.now(), isResetting: false })
+
+    // 批次清除後端座位分配
+    if (eventId) {
+      Promise.all(
+        assigned.map((g) =>
+          fetch(`/api/events/${eventId}/guests/${g.id}/table`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ tableId: null, seatIndex: null }),
+          }).catch(console.error),
+        ),
+      )
+    }
   },
 
   updateEventName: (name) => {

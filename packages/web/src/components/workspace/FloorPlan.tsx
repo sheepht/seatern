@@ -372,6 +372,7 @@ export function FloorPlan() {
     <div ref={containerRef} className="relative w-full h-full">
       {/* SVG 平面圖 */}
       <svg
+        id="floorplan-svg"
         ref={svgRef}
         viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
         className="w-full h-full bg-[#FAFAFA]"

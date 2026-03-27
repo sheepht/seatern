@@ -144,6 +144,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
   const recommendationGuestScore = useSeatingStore((s) => s.recommendationGuestScore)
   const guestsWithRecommendations = useSeatingStore((s) => s.guestsWithRecommendations)
   const allGuests = useSeatingStore((s) => s.guests)
+  const isResetting = useSeatingStore((s) => s.isResetting)
   const moveGuest = useSeatingStore((s) => s.moveGuest)
   const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
   const removeTable = useSeatingStore((s) => s.removeTable)
@@ -440,6 +441,11 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
         />
       ))}
 
+      {/* 賓客圖層 — 重排時立刻隱藏（浮動圓圈取代） */}
+      <g style={{
+        opacity: isResetting ? 0 : 1,
+      }}>
+
       {/* 有人的座位（賓客 + 眷屬），用 guest ID 作為穩定 key + FLIP 動畫 */}
       {allSeats.filter((s) => s.type !== 'empty').map((seat) => {
         const key = `guest-${seat.guest!.id}-${seat.type === 'companion' ? `c${seat.companionIndex}` : 'main'}`
@@ -586,6 +592,8 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
           </g>
         )
       })}
+
+      </g>{/* 結束賓客圖層 */}
 
     </g>
 

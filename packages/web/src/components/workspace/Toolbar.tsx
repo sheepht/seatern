@@ -24,10 +24,13 @@ export function Toolbar() {
 
   const updateEventName = useSeatingStore((s) => s.updateEventName)
 
+  const resetAllSeats = useSeatingStore((s) => s.resetAllSeats)
+
   const [adding, setAdding] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showAvoidModal, setShowAvoidModal] = useState(false)
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showRenameEvent, setShowRenameEvent] = useState(false)
   const [renameEventValue, setRenameEventValue] = useState('')
 
@@ -62,6 +65,116 @@ export function Toolbar() {
   const confirmRestore = () => {
     restoreSnapshot(snapshots[0].id)
     setShowRestoreConfirm(false)
+  }
+
+  const CATEGORY_BG: Record<string, string> = { '男方': '#DBEAFE', '女方': '#FEE2E2', '共同': '#F3F4F6' }
+  const CATEGORY_CLR: Record<string, string> = { '男方': '#1E40AF', '女方': '#991B1B', '共同': '#374151' }
+  const CATEGORY_BD: Record<string, string> = { '男方': '#BFDBFE', '女方': '#FECACA', '共同': '#D1D5DB' }
+
+  const animateResetToSidebar = () => {
+    const svgEl = document.getElementById('floorplan-svg') as SVGSVGElement | null
+    if (!svgEl) { resetAllSeats(); return }
+
+    const ctm = svgEl.getScreenCTM()
+    if (!ctm) { resetAllSeats(); return }
+
+    const assignedGuests = guests.filter((g) => g.assignedTableId && g.rsvpStatus === 'confirmed')
+    if (assignedGuests.length === 0) { resetAllSeats(); return }
+
+    // 計算 SVG 單位到螢幕 px 的縮放比（用於圓圈大小）
+    const vb = svgEl.viewBox.baseVal
+    const svgRect = svgEl.getBoundingClientRect()
+    const svgScale = svgRect.width / vb.width
+    const circleSize = 40 * svgScale  // r=20 → 直徑 40 SVG 單位
+
+    // 立刻隱藏桌上的 SVG 賓客，讓浮動圓圈「取代」它們
+    useSeatingStore.setState({ isResetting: true })
+
+    // sidebar 目標位置（左側面板中央偏上）
+    const sidebarEl = document.querySelector('[data-droppable-id="unassigned"]') || document.querySelector('.overflow-y-auto')
+    const targetX = 144  // w-72 / 2
+    const targetY = sidebarEl ? sidebarEl.getBoundingClientRect().top + 40 : 200
+
+    // 建立浮動 overlay
+    const overlay = document.createElement('div')
+    overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999'
+    document.body.appendChild(overlay)
+
+    const chips: HTMLDivElement[] = []
+    assignedGuests.forEach((guest) => {
+      const table = tables.find((t) => t.id === guest.assignedTableId)
+      if (!table) return
+
+      // 計算座位在 SVG 中的位置
+      const radius = Math.max(58 + Math.min(table.capacity, 12) * 7, 88)
+      const seatRadius = radius - 34
+      const seatIndex = guest.seatIndex ?? 0
+      const angle = ((2 * Math.PI) / table.capacity) * seatIndex - Math.PI / 2
+      const seatSvgX = table.positionX + Math.cos(angle) * seatRadius
+      const seatSvgY = table.positionY + Math.sin(angle) * seatRadius
+
+      // SVG 座標 → 螢幕座標（用 CTM 正確處理 viewBox + preserveAspectRatio）
+      const pt = svgEl.createSVGPoint()
+      pt.x = seatSvgX
+      pt.y = seatSvgY
+      const screenPt = pt.matrixTransform(ctm)
+      const screenX = screenPt.x
+      const screenY = screenPt.y
+
+      const displayName = guest.name.length <= 2 ? guest.name : guest.name.slice(-2)
+      const fontSize = Math.max(10, Math.round(16 * svgScale))
+      const chip = document.createElement('div')
+      chip.textContent = displayName
+      chip.style.cssText = `
+        position:fixed;
+        left:${screenX}px;
+        top:${screenY}px;
+        transform:translate(-50%,-50%);
+        width:${circleSize}px;
+        height:${circleSize}px;
+        border-radius:50%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:${fontSize}px;
+        font-weight:500;
+        font-family:'Noto Sans TC',sans-serif;
+        background:${CATEGORY_BG[guest.category] || '#F3F4F6'};
+        color:${CATEGORY_CLR[guest.category] || '#374151'};
+        border:1.5px solid white;
+        box-shadow:0 2px 8px rgba(0,0,0,0.15);
+        pointer-events:none;
+        transition:all 500ms cubic-bezier(0.4, 0, 0.2, 1);
+        z-index:9999;
+      `
+      overlay.appendChild(chip)
+      chips.push(chip)
+    })
+
+    // sidebar 的可見範圍高度
+    const sidebarRect = sidebarEl?.getBoundingClientRect()
+    const sidebarTop = sidebarRect ? sidebarRect.top + 20 : 100
+    const sidebarHeight = sidebarRect ? sidebarRect.height - 40 : 400
+
+    // 下一幀觸發飛行動畫
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        chips.forEach((chip, i) => {
+          const randomY = sidebarTop + Math.random() * sidebarHeight
+          chip.style.left = `${targetX}px`
+          chip.style.top = `${randomY}px`
+          chip.style.opacity = '0'
+          chip.style.transform = 'translate(-50%,-50%)'
+          chip.style.transitionDelay = `${i * 20}ms`
+        })
+      })
+    })
+
+    // 動畫快結束時執行真正的 reset
+    setTimeout(() => {
+      resetAllSeats()
+      setTimeout(() => overlay.remove(), 200)
+    }, 450)
   }
 
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
@@ -198,6 +311,14 @@ export function Toolbar() {
           </button>
 
           <button
+            onClick={() => setShowResetConfirm(true)}
+            className="px-3 py-1.5 text-sm font-medium rounded border cursor-pointer hover:bg-red-50"
+            style={{ fontFamily: 'var(--font-display)', color: '#EA580C', borderColor: '#FECACA', borderRadius: 'var(--radius-sm)' }}
+          >
+            重排
+          </button>
+
+          <button
             onClick={undo}
             disabled={undoStack.length === 0}
             className="px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
@@ -218,6 +339,24 @@ export function Toolbar() {
       </div>
 
       {showAvoidModal && <AvoidPairModal onClose={() => setShowAvoidModal(false)} />}
+
+      {showResetConfirm && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowResetConfirm(false)} />
+          <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '24px', width: '320px', border: '1px solid var(--border)' }}>
+            <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>確定重排？</p>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>所有已安排的賓客將移回待排區。可按「還原」回復。</p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowResetConfirm(false)} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '13px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>取消</button>
+              <button onClick={() => {
+                setShowResetConfirm(false)
+                animateResetToSidebar()
+              }} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '13px', border: 'none', background: '#DC2626', color: 'white', cursor: 'pointer', fontWeight: 600 }}>重排</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {showRenameEvent && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
