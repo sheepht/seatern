@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { useSeatingStore, type Guest } from '@/stores/seating'
 
@@ -26,6 +27,8 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
     data: { type: 'guest', guest, companionOffset },
   })
   const setHoveredGuest = useSeatingStore((s) => s.setHoveredGuest)
+  const hoverSuppressedUntil = useSeatingStore((s) => s.hoverSuppressedUntil)
+  const delayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const size = radius * 2
   return (
@@ -35,10 +38,10 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
       {...attributes}
       className="absolute rounded-full cursor-grab"
       style={{
-        left: x - radius - 4,
-        top: y - radius - 4,
-        width: size + 8,
-        height: size + 8,
+        left: x - radius - 6,
+        top: y - radius - 6,
+        width: size + 12,
+        height: size + 12,
         opacity: isDragging ? 0.3 : undefined,
         zIndex: 10,
         border: '1.5px dashed transparent',
@@ -46,12 +49,22 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         transition: 'border-color 150ms ease-out',
       }}
       onMouseEnter={(e) => {
-        if (!isDragging) {
-          e.currentTarget.style.borderColor = '#B08D57'
+        if (isDragging) return
+        const el = e.currentTarget
+        const remaining = hoverSuppressedUntil - Date.now()
+        if (remaining > 0) {
+          // 動畫播放中 — 延遲到動畫結束才顯示 hover
+          delayRef.current = setTimeout(() => {
+            el.style.borderColor = '#B08D57'
+            setHoveredGuest(guest.id)
+          }, remaining)
+        } else {
+          el.style.borderColor = '#B08D57'
           setHoveredGuest(guest.id)
         }
       }}
       onMouseLeave={(e) => {
+        if (delayRef.current) { clearTimeout(delayRef.current); delayRef.current = null }
         e.currentTarget.style.borderColor = 'transparent'
         setHoveredGuest(null)
       }}

@@ -1,6 +1,33 @@
-import { useRef, useLayoutEffect } from 'react'
+import { useRef, useLayoutEffect, useState, useEffect } from 'react'
 import { useSeatingStore, type Table, type Guest } from '@/stores/seating'
 import type { Slot } from '@/lib/seat-shift'
+
+/**
+ * 數字漸變動畫 hook — 值改變時平滑過渡
+ */
+function useAnimatedNumber(target: number, duration = 400): number {
+  const [current, setCurrent] = useState(target)
+  const prevRef = useRef(target)
+  const rafRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const from = prevRef.current
+    if (from === target) return
+    prevRef.current = target
+
+    const start = performance.now()
+    const animate = (now: number) => {
+      const t = Math.min((now - start) / duration, 1)
+      const eased = 1 - Math.pow(1 - t, 3) // ease-out cubic
+      setCurrent(Math.round(from + (target - from) * eased))
+      if (t < 1) rafRef.current = requestAnimationFrame(animate)
+    }
+    rafRef.current = requestAnimationFrame(animate)
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+  }, [target, duration])
+
+  return current
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
   '男方': '#DBEAFE',
@@ -29,11 +56,56 @@ function getDisplayName(name: string): string {
   return name.slice(-2)
 }
 
+/** 桌次中央滿意度圓環（數字 + 進度弧線帶動畫） */
+function TableScoreRing({ score, originalScore, hasGuests }: { score: number; originalScore: number; hasGuests: boolean }) {
+  const ringRadius = 28
+  const strokeW = 5
+  const circumference = 2 * Math.PI * ringRadius
+
+  const animatedScore = useAnimatedNumber(score)
+  const progress = Math.min(animatedScore / 100, 1)
+  const color = getSatisfactionColor(animatedScore)
+
+  // 分數變化 → 微調大小（有變就縮放，不設門檻）
+  const delta = score - originalScore
+  const scale = delta > 0 ? 1.1 : delta < 0 ? 0.9 : 1
+
+  return (
+    <g style={{ transform: `scale(${scale})`, transition: 'transform 200ms ease-out', transformOrigin: '0 0' }}>
+      <circle r={ringRadius} fill="none" stroke="#E7E5E4" strokeWidth={strokeW} />
+      {hasGuests && (
+        <circle
+          r={ringRadius}
+          fill="none"
+          strokeWidth={strokeW}
+          strokeLinecap="round"
+          strokeDashoffset={circumference * 0.25}
+          transform="rotate(-90)"
+          style={{
+            stroke: color,
+            strokeDasharray: `${circumference * progress} ${circumference * (1 - progress)}`,
+            transition: 'stroke 400ms ease-out',
+          }}
+        />
+      )}
+      <text
+        y={hasGuests ? 8 : 6}
+        textAnchor="middle"
+        fontSize={hasGuests ? '26' : '14'}
+        fontWeight="800"
+        fontFamily="'Plus Jakarta Sans', sans-serif"
+        style={{ fill: hasGuests ? color : '#A8A29E', transition: 'fill 400ms ease-out' }}
+      >
+        {hasGuests ? animatedScore : '空桌'}
+      </text>
+    </g>
+  )
+}
+
 export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props) {
   const getTableGuests = useSeatingStore((s) => s.getTableGuests)
   const getTableSeatCount = useSeatingStore((s) => s.getTableSeatCount)
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
-  const hoveredGuestId = useSeatingStore((s) => s.hoveredGuestId)
   const dragPreview = useSeatingStore((s) => s.dragPreview)
   const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
   const dragRejectTableId = useSeatingStore((s) => s.dragRejectTableId)
@@ -53,15 +125,15 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
   const baseRadius = 58 + Math.min(table.capacity, 12) * 7
   const radius = Math.max(baseRadius, 88)
 
-  // 滿意度色環
-  const satisfactionColor = getSatisfactionColor(table.averageSatisfaction)
-
   // 拖曳 hover 但無法放置（滿桌）
   const isRejectTable = dragRejectTableId === table.id
 
   // 是否有此桌的拖曳預覽
   const isPreviewTable = dragPreview?.tableId === table.id
   const previewSlots = isPreviewTable ? dragPreview.previewSlots : null
+  // 預覽滿意度分數（拖曳中即時計算 — 適用於所有桌，不只目標桌）
+  const previewScores = dragPreview ? dragPreview.previewScores : null
+  const previewTableScore = dragPreview?.previewTableScores?.get(table.id)
 
   // 拖曳中的賓客一律不顯示在任何桌上（他跟著游標走）
   const filteredGuests = activeDragGuestId
@@ -197,50 +269,12 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
         </textPath>
       </text>
 
-      {/* 滿意度圓環進度條 + 中央數字 */}
-      {(() => {
-        const ringRadius = 28
-        const strokeW = 5
-        const circumference = 2 * Math.PI * ringRadius
-        const score = guests.length > 0 ? Math.round(table.averageSatisfaction) : 0
-        const progress = Math.min(score / 100, 1)
-
-        return (
-          <g>
-            {/* 底圈（灰色軌道） */}
-            <circle
-              r={ringRadius}
-              fill="none"
-              stroke="#E7E5E4"
-              strokeWidth={strokeW}
-            />
-            {/* 進度圈 */}
-            {guests.length > 0 && (
-              <circle
-                r={ringRadius}
-                fill="none"
-                stroke={satisfactionColor}
-                strokeWidth={strokeW}
-                strokeLinecap="round"
-                strokeDasharray={`${circumference * progress} ${circumference * (1 - progress)}`}
-                strokeDashoffset={circumference * 0.25}
-                transform="rotate(-90)"
-              />
-            )}
-            {/* 中央數字 */}
-            <text
-              y={guests.length > 0 ? 8 : 6}
-              textAnchor="middle"
-              fill={guests.length > 0 ? satisfactionColor : '#A8A29E'}
-              fontSize={guests.length > 0 ? '26' : '14'}
-              fontWeight="800"
-              fontFamily="'Plus Jakarta Sans', sans-serif"
-            >
-              {guests.length > 0 ? score : '空桌'}
-            </text>
-          </g>
-        )
-      })()}
+      {/* 滿意度圓環進度條 + 中央數字（帶動畫） */}
+      <TableScoreRing
+        score={guests.length > 0 ? Math.round(previewTableScore ?? table.averageSatisfaction) : 0}
+        originalScore={guests.length > 0 ? Math.round(table.averageSatisfaction) : 0}
+        hasGuests={guests.length > 0}
+      />
 
       {/* 眷屬群組：圓頭筆刷弧線 */}
       {groupArcs.map((arc, i) => (
@@ -312,38 +346,36 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
         const bgColor = CATEGORY_COLORS[seat.guest!.category] || '#F3F4F6'
         const textColor = CATEGORY_TEXT[seat.guest!.category] || '#374151'
         const displayName = getDisplayName(seat.guest!.name)
-        const guestScore = seat.guest!.satisfactionScore
+        const guestScore = previewScores?.get(seat.guest!.id) ?? seat.guest!.satisfactionScore
         const guestSatColor = getSatisfactionColor(guestScore)
         const guestR = 20
         const guestRingR = guestR + 3
         const guestCircum = 2 * Math.PI * guestRingR
         const guestProgress = Math.min(guestScore / 100, 1)
-        const isHovered = hoveredGuestId === seat.guest!.id
 
         return (
           <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)` }}>
-            {/* 滿意度進度圈 */}
-            {!isHovered && (
-              <>
-                <circle
-                  r={guestRingR}
-                  fill="none"
-                  stroke="#E7E5E4"
-                  strokeWidth="2"
-                />
-                {guestScore > 0 && (
-                  <circle
-                    r={guestRingR}
-                    fill="none"
-                    stroke={guestSatColor}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeDasharray={`${guestCircum * guestProgress} ${guestCircum * (1 - guestProgress)}`}
-                    strokeDashoffset={guestCircum * 0.25}
-                    transform="rotate(-90)"
-                  />
-                )}
-              </>
+            {/* 滿意度進度圈（帶動畫，永遠顯示） */}
+            <circle
+              r={guestRingR}
+              fill="none"
+              stroke="#E7E5E4"
+              strokeWidth="2"
+            />
+            {guestScore > 0 && (
+              <circle
+                r={guestRingR}
+                fill="none"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeDashoffset={guestCircum * 0.25}
+                transform="rotate(-90)"
+                style={{
+                  stroke: guestSatColor,
+                  strokeDasharray: `${guestCircum * guestProgress} ${guestCircum * (1 - guestProgress)}`,
+                  transition: 'stroke-dasharray 400ms ease-out, stroke 400ms ease-out',
+                }}
+              />
             )}
             {/* 賓客圓形 */}
             <circle

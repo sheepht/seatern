@@ -67,10 +67,15 @@ interface SeatingState {
 
   // 拖曳狀態
   activeDragGuestId: string | null // 從 dragStart 到 dragEnd 持續存在
+  hoverSuppressedUntil: number // drop 後暫時抑制 hover，讓滿意度動畫播完
   dragPreview: {
     tableId: string
     previewSlots: Slot[]
     draggedGuestId: string
+    /** 預覽滿意度：被拖的賓客和受影響賓客的即時分數 */
+    previewScores: Map<string, number>
+    /** 預覽桌次平均滿意度 */
+    previewTableScores: Map<string, number>
   } | null
   dragRejectTableId: string | null // 拖曳 hover 時無法放置的桌 ID（滿桌提示）
 
@@ -119,6 +124,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   hoveredGuestId: null,
   loading: false,
   activeDragGuestId: null,
+  hoverSuppressedUntil: 0,
   dragPreview: null,
   dragRejectTableId: null,
   undoStack: [],
@@ -217,6 +223,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     activeDragGuestId: guestId,
     dragPreview: guestId ? undefined : null,
     dragRejectTableId: guestId ? undefined : null,
+    // drop 時抑制 hover 400ms，讓滿意度動畫播完
+    hoverSuppressedUntil: guestId ? 0 : Date.now() + 400,
   }),
 
   moveGuest: (guestId, toTableId) => {
@@ -388,6 +396,24 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       return
     }
 
+    // 計算預覽滿意度：模擬被拖賓客放到目標位後的分數
+    const newIndices = extractSeatIndices(newSlots)
+    const previewGuests = guests.map((g) => {
+      if (g.id === draggedGuestId) {
+        return { ...g, assignedTableId: tableId, seatIndex: newIndices.get(g.id) ?? seatIndex }
+      }
+      if (newIndices.has(g.id)) {
+        return { ...g, seatIndex: newIndices.get(g.id)! }
+      }
+      return g
+    })
+    const previewResult = recalculateAll(previewGuests, tables)
+
+    const previewScores = new Map<string, number>()
+    for (const gs of previewResult.guests) previewScores.set(gs.id, gs.satisfactionScore)
+    const previewTableScores = new Map<string, number>()
+    for (const ts of previewResult.tables) previewTableScores.set(ts.id, ts.averageSatisfaction)
+
     // 目標位留空 — 被拖的賓客跟著游標（DragOverlay），不顯示在桌上
     for (let i = 0; i < newSlots.length; i++) {
       if (newSlots[i]?.guestId === draggedGuestId) {
@@ -400,6 +426,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         tableId,
         previewSlots: newSlots,
         draggedGuestId,
+        previewScores,
+        previewTableScores,
       },
       dragRejectTableId: null,
     })
