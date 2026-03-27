@@ -54,19 +54,11 @@ const CATEGORY_ORDER = ['男方', '女方', '共同']
 
 export function SidePanel() {
   const guests = useSeatingStore((s) => s.guests)
-  const tables = useSeatingStore((s) => s.tables)
-  const getTotalAssignedSeats = useSeatingStore((s) => s.getTotalAssignedSeats)
-  const getTotalConfirmedSeats = useSeatingStore((s) => s.getTotalConfirmedSeats)
-  const dragPreview = useSeatingStore((s) => s.dragPreview)
-  const recommendationPreviewScores = useSeatingStore((s) => s.recommendationPreviewScores)
   const getUnassignedGuests = useSeatingStore((s) => s.getUnassignedGuests)
 
   const [search, setSearch] = useState('')
 
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
-  const assigned = getTotalAssignedSeats()
-  const total = getTotalConfirmedSeats()
-  const unassigned = total - assigned
 
   const unassignedGuests = getUnassignedGuests()
   const totalUnassignedSeats = unassignedGuests.reduce((s, g) => s + g.attendeeCount, 0)
@@ -114,90 +106,6 @@ export function SidePanel() {
   return (
     <div className="h-full flex flex-col" style={{ background: 'var(--bg-primary)' }}>
 
-      {/* 全場統計 */}
-      <div className="p-4 shrink-0">
-        <div className="p-3" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-          {/* 安排進度 */}
-          <div className="mt-1 space-y-1.5">
-            <div className="flex items-center justify-between text-sm">
-              <span style={{ color: 'var(--text-secondary)' }}>安排進度</span>
-              <span className="font-data" style={{ color: 'var(--text-muted)' }}>{assigned}/{total} 席</span>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(128,128,128,0.15)' }}>
-              <div
-                className="h-full rounded-full transition-all duration-300"
-                style={{
-                  width: total > 0 ? `${Math.round((assigned / total) * 100)}%` : '0%',
-                  background: total > 0 && assigned >= total ? '#16A34A' : assigned / total >= 0.5 ? '#CA8A04' : '#EA580C',
-                }}
-              />
-            </div>
-          </div>
-          {/* 滿意度分佈 */}
-          {confirmed.length > 0 && (() => {
-            const seated = confirmed.filter((g) => g.assignedTableId)
-            if (seated.length === 0) return null
-            const baseGreen = seated.filter((g) => g.satisfactionScore >= 75).length
-            const baseYellow = seated.filter((g) => g.satisfactionScore >= 50 && g.satisfactionScore < 75).length
-            const baseOrange = seated.filter((g) => g.satisfactionScore >= 25 && g.satisfactionScore < 50).length
-            const baseRed = seated.filter((g) => g.satisfactionScore < 25).length
-            const previewScores = dragPreview?.previewScores ?? (recommendationPreviewScores.size > 0 ? recommendationPreviewScores : null)
-            const getScore = (g: typeof confirmed[0]) => previewScores?.get(g.id) ?? g.satisfactionScore
-            const green = seated.filter((g) => getScore(g) >= 75).length
-            const yellow = seated.filter((g) => getScore(g) >= 50 && getScore(g) < 75).length
-            const orange = seated.filter((g) => getScore(g) >= 25 && getScore(g) < 50).length
-            const red = seated.filter((g) => getScore(g) < 25).length
-            const t = seated.length
-            const hasPreview = previewScores !== null
-            const dGreen = green - baseGreen
-            const dYellow = yellow - baseYellow
-            const dOrange = orange - baseOrange
-            const dRed = red - baseRed
-
-            const deltaBadge = (d: number) => d !== 0 && hasPreview ? (
-              <span className="font-data font-bold ml-0.5 px-1 py-px rounded-full" style={{
-                background: d > 0 ? '#16A34A' : '#DC2626',
-                color: 'white',
-                fontSize: '11px',
-                lineHeight: '16px',
-              }}>{d > 0 ? '+' : ''}{d}</span>
-            ) : null
-
-            return (
-              <div className="mt-3 space-y-1.5">
-                <div className="flex items-center justify-between text-sm">
-                  <span style={{ color: 'var(--text-secondary)' }}>滿意度分佈</span>
-                  <span className="font-data" style={{ color: 'var(--text-muted)' }}>{seated.length} 人</span>
-                </div>
-                <div className="h-2 rounded-full overflow-hidden flex" style={{ background: 'rgba(128,128,128,0.15)', gap: '1px' }}>
-                  {green > 0 && <div className="h-full transition-all duration-300" style={{ width: `${(green / t) * 100}%`, background: '#16A34A' }} />}
-                  {yellow > 0 && <div className="h-full transition-all duration-300" style={{ width: `${(yellow / t) * 100}%`, background: '#CA8A04' }} />}
-                  {orange > 0 && <div className="h-full transition-all duration-300" style={{ width: `${(orange / t) * 100}%`, background: '#EA580C' }} />}
-                  {red > 0 && <div className="h-full transition-all duration-300" style={{ width: `${(red / t) * 100}%`, background: '#DC2626' }} />}
-                </div>
-                <div className="flex gap-3 text-xs items-center" style={{ color: 'var(--text-muted)' }}>
-                  {[
-                    { color: '#16A34A', label: '讚', count: green, delta: dGreen },
-                    { color: '#CA8A04', label: '可', count: yellow, delta: dYellow },
-                    { color: '#EA580C', label: '爛', count: orange, delta: dOrange },
-                    { color: '#DC2626', label: '慘', count: red, delta: dRed },
-                  ].map(({ color, label, count, delta }) => (
-                    <span key={color} className="flex items-center gap-0.5">
-                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0, display: 'inline-block', marginRight: 3 }} />
-                      <span className="font-data" style={{ color: 'var(--text-muted)' }}>{count}人</span>
-                      {deltaBadge(delta)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )
-          })()}
-          {/* 桌次統計 */}
-          <div className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-            桌次 <span className="font-medium font-data" style={{ color: 'var(--text-primary)' }}>{tables.length}</span> 桌
-          </div>
-        </div>
-      </div>
 
 
       {/* 未安排賓客 — 佔滿剩餘高度 */}
@@ -217,7 +125,7 @@ export function SidePanel() {
               <span className="text-xs font-medium uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}>
                 未安排
               </span>
-              <span className="text-xs font-data font-medium" style={{ color: unassigned > 0 ? '#EA580C' : 'var(--text-muted)' }}>
+              <span className="text-xs font-data font-medium" style={{ color: unassignedGuests.length > 0 ? '#EA580C' : 'var(--text-muted)' }}>
                 {unassignedGuests.length} 人
               </span>
               {totalUnassignedSeats !== unassignedGuests.length && (

@@ -106,6 +106,7 @@ interface SeatingState {
   moveGuestToSeat: (guestId: string, tableId: string, seatIndex: number, cursorBias?: 'left' | 'right') => void
   setDragPreview: (tableId: string | null, seatIndex?: number, draggedGuestId?: string, cursorBias?: 'left' | 'right') => void
   undo: () => void
+  updateEventName: (name: string) => void
   addTable: (name: string, positionX: number, positionY: number) => Promise<void>
   removeTable: (tableId: string) => Promise<void>
   updateTableName: (tableId: string, name: string) => void
@@ -559,6 +560,18 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     const table = await res.json()
     set({ tables: [...tables, table] })
+  },
+
+  updateEventName: (name) => {
+    const { eventId } = get()
+    set({ eventName: name })
+    if (!eventId) return
+    fetch(`/api/events/${eventId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ name }),
+    }).catch(console.error)
   },
 
   updateTableName: (tableId, name) => {
