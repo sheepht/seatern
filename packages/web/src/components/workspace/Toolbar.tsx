@@ -128,6 +128,25 @@ export function Toolbar() {
   const animateUndo = () => {
     if (undoStack.length === 0) return
 
+    // 非賓客移動（新增桌、移動桌）直接 undo，不需飛行動畫
+    const last = undoStack[undoStack.length - 1]
+    if (last.type === 'add-table' || last.type === 'rename-table') { undo(); return }
+
+    // 移動桌子：用 SVG 動畫滑回原位
+    if (last.type === 'move-table') {
+      const tableEl = document.querySelector(`[data-table-id="${last.tableId}"]`) as SVGGElement | null
+      if (!tableEl) { undo(); return }
+      const { fromX, fromY, toX, toY } = last
+      tableEl.animate(
+        [
+          { transform: `translate(${toX}px, ${toY}px)` },
+          { transform: `translate(${fromX}px, ${fromY}px)` },
+        ],
+        { duration: 400, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
+      ).onfinish = () => undo()
+      return
+    }
+
     const svgEl = document.getElementById('floorplan-svg') as SVGSVGElement | null
     if (!svgEl) { undo(); return }
     const ctm = svgEl.getScreenCTM()
@@ -139,9 +158,8 @@ export function Toolbar() {
     const circleSize = 40 * svgScale
     const fontSize = Math.max(10, Math.round(16 * svgScale))
 
-    // 找出即將被 undo 的 entries
-    const last = undoStack[undoStack.length - 1]
-    const entriesToUndo = last.batchId
+    // 找出即將被 undo 的 entries（last 已在上方宣告，且 add-table 已 early return）
+    const entriesToUndo = 'batchId' in last && last.batchId
       ? undoStack.filter((e) => e.batchId === last.batchId)
       : [last]
 
@@ -414,7 +432,7 @@ export function Toolbar() {
                 className="h-full rounded-full transition-all duration-300"
                 style={{
                   width: total > 0 ? `${Math.round((assigned / total) * 100)}%` : '0%',
-                  background: total > 0 && assigned >= total ? '#16A34A' : assigned / total >= 0.5 ? '#CA8A04' : '#EA580C',
+                  background: getSatisfactionColor(total > 0 ? (assigned / total) * 100 : 0),
                 }}
               />
             </div>
@@ -500,7 +518,8 @@ export function Toolbar() {
 
           <button
             onClick={() => setShowResetConfirm(true)}
-            className="px-3 py-1.5 text-sm font-medium rounded border cursor-pointer hover:bg-red-50"
+            disabled={assigned === 0}
+            className="px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-red-50"
             style={{ fontFamily: 'var(--font-display)', color: '#EA580C', borderColor: '#FECACA', borderRadius: 'var(--radius-sm)' }}
           >
             重排

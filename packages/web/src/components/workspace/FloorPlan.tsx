@@ -227,6 +227,7 @@ export function FloorPlan() {
   // 桌次拖曳狀態
   const [draggingTableId, setDraggingTableId] = useState<string | null>(null)
   const dragOffsetRef = useRef({ x: 0, y: 0 })
+  const dragStartPosRef = useRef({ x: 0, y: 0 })
   const didDragRef = useRef(false)
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -330,6 +331,7 @@ export function FloorPlan() {
       const point = getSvgPoint(e.clientX, e.clientY)
       setDraggingTableId(tableId)
       dragOffsetRef.current = { x: point.x - table.positionX, y: point.y - table.positionY }
+      dragStartPosRef.current = { x: table.positionX, y: table.positionY }
       didDragRef.current = false
       setSelectedTable(tableId)
     },
@@ -354,7 +356,7 @@ export function FloorPlan() {
 
   const handleMouseUp = useCallback(() => {
     if (draggingTableId && didDragRef.current) {
-      saveTablePosition(draggingTableId)
+      saveTablePosition(draggingTableId, dragStartPosRef.current.x, dragStartPosRef.current.y)
     }
     setDraggingTableId(null)
   }, [draggingTableId, saveTablePosition])

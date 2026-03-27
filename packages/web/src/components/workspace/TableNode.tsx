@@ -147,6 +147,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
   const isResetting = useSeatingStore((s) => s.isResetting)
   const flyingGuestIds = useSeatingStore((s) => s.flyingGuestIds)
   const moveGuest = useSeatingStore((s) => s.moveGuest)
+  const clearTable = useSeatingStore((s) => s.clearTable)
   const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
   const removeTable = useSeatingStore((s) => s.removeTable)
   const updateTableName = useSeatingStore((s) => s.updateTableName)
@@ -276,7 +277,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
 
   const handleActionConfirm = () => {
     if (guests.length > 0) {
-      for (const g of guests) moveGuest(g.id, null)
+      clearTable(table.id)
       setSelectedTable(null)
     } else {
       removeTable(table.id)
@@ -310,6 +311,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
   return (
     <>
     <g
+      data-table-id={table.id}
       transform={`translate(${table.positionX}, ${table.positionY})`}
       onMouseDown={onMouseDown}
       onMouseEnter={() => setIsHovered(true)}

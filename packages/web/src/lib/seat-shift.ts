@@ -178,18 +178,18 @@ export function placeGuest(
   }
 
   // 位移所有佔用的目標格
+  // 'right'：從左往右處理，讓最左的賓客先推出右邊界，後面的依序跟上
+  // 'left'：從右往左處理，讓最右的賓客先推出左邊界，前面的依序跟上
   if (direction !== null) {
     if (direction === 'right') {
-      // 從右往左處理，讓每次位移空出的格子給下一個用
-      for (let i = attendeeCount - 1; i >= 0; i--) {
+      for (let i = 0; i < attendeeCount; i++) {
         const idx = (targetIndex + i) % len
         if (workingSlots[idx] !== null) {
           workingSlots = shiftSlot(workingSlots, idx, 'right')
         }
       }
     } else {
-      // 從左往右處理
-      for (let i = 0; i < attendeeCount; i++) {
+      for (let i = attendeeCount - 1; i >= 0; i--) {
         const idx = (targetIndex + i) % len
         if (workingSlots[idx] !== null) {
           workingSlots = shiftSlot(workingSlots, idx, 'left')
