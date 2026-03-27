@@ -96,6 +96,13 @@ button, a, input, select, textarea {
   animation: chip-enter 0.3s ease-out both;
 }
 
+.guest-chip {
+  position: relative;
+}
+.guest-chip:hover {
+  z-index: 10;
+}
+
 /* Table node icons — fly out from table center to final position */
 @keyframes table-icon-pop {
   0%   { transform: translate(var(--icon-from-x, 0px), var(--icon-from-y, 0px)) scale(0); opacity: 0; }

@@ -39,6 +39,7 @@ export function FloorPlan() {
   const guests = useSeatingStore((s) => s.guests)
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
   const hoveredGuestId = useSeatingStore((s) => s.hoveredGuestId)
+  const hoveredGuestScreenY = useSeatingStore((s) => s.hoveredGuestScreenY)
   const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
   const selectedTableId = useSeatingStore((s) => s.selectedTableId)
   const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
@@ -169,8 +170,9 @@ export function FloorPlan() {
 
     const compute = () => {
       const guest = guests.find((g) => g.id === hoveredGuestId)
-      if (!guest || !guest.assignedTableId || guest.rsvpStatus !== 'confirmed') return []
+      if (!guest || guest.rsvpStatus !== 'confirmed') return []
 
+      const isUnassigned = !guest.assignedTableId
       const currentGuestScore = guest.satisfactionScore
       // 當前全場平均
       const currentResult = recalculateAll(guests, tables, avoidPairs)
@@ -198,20 +200,38 @@ export function FloorPlan() {
         const rawTableDelta = newTableAvg - t.averageSatisfaction
         const rawOverallDelta = simResult.overallAverage - currentOverall
 
-        // 賓客滿意度上升 AND（桌滿意度也上升 OR 全場平均上升）
-        if (guestDelta > 0 && (rawTableDelta > 0.1 || rawOverallDelta > 0.1)) {
-          const newGuestScores = new Map<string, number>()
-          for (const gs of simResult.guests) newGuestScores.set(gs.id, gs.satisfactionScore)
-          results.push({
-            tableId: t.id,
-            guestDelta,
-            tableDelta: Math.round(rawTableDelta),
-            overallDelta: Math.round(rawOverallDelta),
-            newTableAvg,
-            newGuestScore,
-            newOverallAvg: simResult.overallAverage,
-            newGuestScores,
-          })
+        if (isUnassigned) {
+          // 待排賓客：只要該桌能讓賓客得分 > 基礎分就推薦
+          if (newGuestScore > 55) {
+            const newGuestScores = new Map<string, number>()
+            for (const gs of simResult.guests) newGuestScores.set(gs.id, gs.satisfactionScore)
+            results.push({
+              tableId: t.id,
+              guestDelta: Math.round(newGuestScore),
+              tableDelta: Math.round(rawTableDelta),
+              overallDelta: Math.round(rawOverallDelta),
+              newTableAvg,
+              newGuestScore,
+              newOverallAvg: simResult.overallAverage,
+              newGuestScores,
+            })
+          }
+        } else {
+          // 已入座賓客：滿意度上升 AND（桌滿意度也上升 OR 全場平均上升）
+          if (guestDelta > 0 && (rawTableDelta > 0.1 || rawOverallDelta > 0.1)) {
+            const newGuestScores = new Map<string, number>()
+            for (const gs of simResult.guests) newGuestScores.set(gs.id, gs.satisfactionScore)
+            results.push({
+              tableId: t.id,
+              guestDelta,
+              tableDelta: Math.round(rawTableDelta),
+              overallDelta: Math.round(rawOverallDelta),
+              newTableAvg,
+              newGuestScore,
+              newOverallAvg: simResult.overallAverage,
+              newGuestScores,
+            })
+          }
         }
       }
 
@@ -379,7 +399,7 @@ export function FloorPlan() {
         ref={svgRef}
         viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
         className="w-full h-full bg-[#FAFAFA]"
-        style={{ userSelect: 'none' }}
+        style={{ userSelect: 'none', overflow: 'visible' }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
@@ -412,17 +432,46 @@ export function FloorPlan() {
           /* 智慧推薦虛線放在桌子下層，讓桌子蓋住穿過的部分 */
           const recLines = recommendations.length > 0 && hoveredGuestId && (() => {
           const guest = guests.find((g) => g.id === hoveredGuestId)
-          if (!guest || guest.seatIndex === null || !guest.assignedTableId) return null
-          const srcTable = tables.find((t) => t.id === guest.assignedTableId)
-          if (!srcTable) return null
+          if (!guest) return null
 
-          // 計算賓客在 SVG 上的位置
-          const srcRadius = Math.max(58 + Math.min(srcTable.capacity, 12) * 7, 88)
-          const seatRadius = srcRadius - 34
-          const totalSlots = srcTable.capacity
-          const angle = ((2 * Math.PI) / totalSlots) * guest.seatIndex - Math.PI / 2
-          const guestX = srcTable.positionX + Math.cos(angle) * seatRadius
-          const guestY = srcTable.positionY + Math.sin(angle) * seatRadius
+          const isUnassigned = !guest.assignedTableId
+          let guestX: number, guestY: number
+          let srcTable: (typeof tables)[number] | undefined
+          let srcRadius = 0
+
+          if (isUnassigned) {
+            // 待排賓客：線從側欄賓客位置出發（SVG 左邊外面）
+            guestY = CANVAS_HEIGHT / 2 // fallback
+            const svgEl = svgRef.current
+            const chipEl = document.querySelector(`[data-guest-id="${guest.id}"]`)
+            if (svgEl && chipEl) {
+              const chipRect = chipEl.getBoundingClientRect()
+              const ctm = svgEl.getScreenCTM()
+              if (ctm) {
+                const pt = svgEl.createSVGPoint()
+                // 賓客 chip 的右邊緣 + 偏移（螢幕座標）→ SVG 座標，讓線從 chip 右邊出發不重疊
+                pt.x = chipRect.right + 6
+                pt.y = chipRect.top + chipRect.height / 2
+                const svgPt = pt.matrixTransform(ctm.inverse())
+                guestX = svgPt.x
+                guestY = svgPt.y
+              } else {
+                guestX = -80
+              }
+            } else {
+              guestX = -80
+            }
+          } else {
+            if (guest.seatIndex === null) return null
+            srcTable = tables.find((t) => t.id === guest.assignedTableId)
+            if (!srcTable) return null
+            srcRadius = Math.max(58 + Math.min(srcTable.capacity, 12) * 7, 88)
+            const seatRadius = srcRadius - 34
+            const totalSlots = srcTable.capacity
+            const angle = ((2 * Math.PI) / totalSlots) * guest.seatIndex - Math.PI / 2
+            guestX = srcTable.positionX + Math.cos(angle) * seatRadius
+            guestY = srcTable.positionY + Math.sin(angle) * seatRadius
+          }
 
           return (
             <>
@@ -434,17 +483,17 @@ export function FloorPlan() {
                 const tx = targetTable.positionX
                 const ty = targetTable.positionY
                 const targetRadius = Math.max(58 + Math.min(targetTable.capacity, 12) * 7, 88)
-                const guestCircleR = 23
+                const guestCircleR = isUnassigned ? 0 : 23
 
-                // 起終點：從賓客圓邊緣到桌子圓邊緣
+                // 起終點
                 const dx0 = tx - guestX
                 const dy0 = ty - guestY
                 const dist0 = Math.sqrt(dx0 * dx0 + dy0 * dy0) || 1
                 const ux0 = dx0 / dist0
                 const uy0 = dy0 / dist0
 
-                const startX = guestX + ux0 * (guestCircleR + 4)
-                const startY = guestY + uy0 * (guestCircleR + 4)
+                const startX = isUnassigned ? guestX : guestX + ux0 * (guestCircleR + 4)
+                const startY = isUnassigned ? guestY : guestY + uy0 * (guestCircleR + 4)
                 const endX = tx - ux0 * (targetRadius + 4)
                 const endY = ty - uy0 * (targetRadius + 4)
 
@@ -458,11 +507,10 @@ export function FloorPlan() {
                   }))
 
                 // 來源桌資訊（讓路徑先從桌外出發）
-                const srcObstacle = {
-                  cx: srcTable.positionX,
-                  cy: srcTable.positionY,
-                  r: srcRadius,
-                }
+                // 待排賓客：用虛擬障礙強制線先往右走
+                const srcObstacle = srcTable
+                  ? { cx: srcTable.positionX, cy: srcTable.positionY, r: srcRadius }
+                  : { cx: guestX - 20, cy: guestY, r: 30 }
 
                 // 計算避障路徑
                 const { d: pathD, midpoint } = computeAvoidancePath(
@@ -507,7 +555,7 @@ export function FloorPlan() {
                     <g transform={`translate(${midpoint.x}, ${midpoint.y - 12})`}>
                       <rect x={-20} y={-12} width={40} height={24} rx={12} fill="#16A34A" />
                       <text y={5} textAnchor="middle" fill="white" fontSize="14" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
-                        +{rec.guestDelta}
+                        {isUnassigned ? rec.guestDelta : `+${rec.guestDelta}`}
                       </text>
                     </g>
                   </g>

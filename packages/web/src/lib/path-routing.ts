@@ -92,7 +92,7 @@ export function computeAvoidancePath(
   const finder = new PF.AStarFinder({ allowDiagonal: true, dontCrossCorners: true })
   let path: number[][] = finder.findPath(sc, sr, tc, tr, grid)
 
-  // A* 找不到路 → fallback 弧線（source → target）
+  // A* 找不到路 → fallback 弧線
   if (path.length < 2) {
     return makeArc(source, target)
   }
@@ -113,9 +113,9 @@ export function computeAvoidancePath(
   // 在最前面插入賓客真實位置 → 出桌點成為第二個點
   pts.unshift(source)
 
-  // 如果只有 2 點（source + target，沒有中間轉折），加自然弧度
+  // 如果只有 2 點，加自然弧度
   if (pts.length === 2) {
-    return makeArc(source, target)
+    return makeArc(pts[0], pts[1])
   }
 
   // Catmull-Rom → cubic bezier 平滑

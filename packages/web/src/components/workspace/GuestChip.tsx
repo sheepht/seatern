@@ -19,6 +19,7 @@ export function GuestChip({ guest, animIndex }: Props) {
     data: { type: 'guest', guest },
   })
   const lastResetAt = useSeatingStore((s) => s.lastResetAt)
+  const setHoveredGuest = useSeatingStore((s) => s.setHoveredGuest)
 
   const categoryStyle = CATEGORY_STYLES[guest.category] || DEFAULT_CATEGORY_STYLE
 
@@ -33,7 +34,7 @@ export function GuestChip({ guest, animIndex }: Props) {
       {...listeners}
       {...attributes}
       data-guest-id={guest.id}
-      className={`px-2 py-0.5 text-sm cursor-grab select-none whitespace-nowrap ${
+      className={`guest-chip px-2 py-0.5 text-sm cursor-grab select-none whitespace-nowrap ${
         isDragging ? 'opacity-30' : ''
       } ${animClass}`}
       style={{
@@ -44,6 +45,11 @@ export function GuestChip({ guest, animIndex }: Props) {
         color: categoryStyle.color,
         animationDelay: animDelay,
       }}
+      onMouseEnter={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect()
+        setHoveredGuest(guest.id, rect.top + rect.height / 2)
+      }}
+      onMouseLeave={() => setHoveredGuest(null)}
       title={`${guest.name}${guest.attendeeCount > 1 ? ` (+${guest.attendeeCount - 1})` : ''}${guest.dietaryNote ? ` [${guest.dietaryNote}]` : ''}`}
     >
       {guest.name}

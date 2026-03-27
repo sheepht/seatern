@@ -211,7 +211,7 @@ export default function WorkspacePage() {
             <div style={{
               width: 288,
               height: '100%',
-              transform: sidebarCollapsed ? 'translateX(-288px)' : 'translateX(0)',
+              transform: sidebarCollapsed ? 'translateX(-288px)' : 'none',
               transition: 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
             }}>
               <SidePanel onCollapse={() => setSidebarCollapsed(true)} />

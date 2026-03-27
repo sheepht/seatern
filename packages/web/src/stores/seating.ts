@@ -63,6 +63,7 @@ interface SeatingState {
   // UI state
   selectedTableId: string | null
   hoveredGuestId: string | null
+  hoveredGuestScreenY: number | null
   loading: boolean
 
   // 拖曳狀態
@@ -128,7 +129,7 @@ interface SeatingState {
   // Actions
   loadEvent: (eventId: string) => Promise<void>
   setSelectedTable: (tableId: string | null) => void
-  setHoveredGuest: (guestId: string | null) => void
+  setHoveredGuest: (guestId: string | null, screenY?: number | null) => void
   setActiveDragGuest: (guestId: string | null) => void
   moveGuest: (guestId: string, toTableId: string | null) => void
   moveGuestToSeat: (guestId: string, tableId: string, seatIndex: number, cursorBias?: 'left' | 'right') => void
@@ -165,6 +166,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   snapshots: [],
   selectedTableId: null,
   hoveredGuestId: null,
+  hoveredGuestScreenY: null,
   loading: false,
   activeDragGuestId: null,
   hoverSuppressedUntil: 0,
@@ -269,7 +271,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   },
 
   setSelectedTable: (tableId) => set({ selectedTableId: tableId }),
-  setHoveredGuest: (guestId) => set({ hoveredGuestId: guestId }),
+  setHoveredGuest: (guestId, screenY) => set({ hoveredGuestId: guestId, hoveredGuestScreenY: screenY ?? null }),
   setActiveDragGuest: (guestId) => set({
     activeDragGuestId: guestId,
     dragPreview: guestId ? undefined : null,
