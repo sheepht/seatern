@@ -107,3 +107,9 @@ button, a, input, select, textarea {
   transform-origin: center;
   transform-box: fill-box;
 }
+
+/* Table edit/delete button hover */
+.table-btn-edit:hover circle { fill: #F5F5F4; stroke: #A8A29E; }
+.table-btn-edit:hover g[stroke] { stroke: #57534E; }
+.table-btn-delete:hover circle { fill: #FEF2F2; stroke: #FCA5A5; }
+.table-btn-delete:hover g[stroke] { stroke: #B91C1C; }

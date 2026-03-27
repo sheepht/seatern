@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
+import { ChevronLeft } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
 import { GuestChip } from './GuestChip'
@@ -144,9 +145,7 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
                   style={{ color: 'var(--text-muted)', flexShrink: 0 }}
                   title="收合側邊欄"
                 >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 3L5 7l4 4" />
-                  </svg>
+                  <ChevronLeft size={14} />
                 </button>
               )}
             </div>

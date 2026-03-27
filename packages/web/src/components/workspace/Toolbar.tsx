@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import { Pencil, Menu, History, Ban, Shuffle, Download, Lock } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
 import { AvoidPairModal } from './AvoidPairModal'
@@ -33,6 +34,7 @@ export function Toolbar() {
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showRenameEvent, setShowRenameEvent] = useState(false)
   const [renameEventValue, setRenameEventValue] = useState('')
+  const [showMenu, setShowMenu] = useState(false)
 
   const handleRenameEvent = () => {
     const trimmed = renameEventValue.trim()
@@ -419,10 +421,7 @@ export function Toolbar() {
             style={{ color: 'var(--text-muted)', flexShrink: 0 }}
             title="修改活動名稱"
           >
-            <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 1.5 8.5 3 3 8.5 1 9 1.5 7 7 1.5Z" />
-              <path d="M6 2.5 7.5 4" />
-            </svg>
+            <Pencil size={12} />
           </button>
           <span style={{ color: 'var(--border-strong)' }}>|</span>
           {/* 安排進度 */}
@@ -477,8 +476,6 @@ export function Toolbar() {
             + 新桌
           </button>
 
-          <div className="w-px h-5" style={{ background: 'var(--border)' }} />
-
           <button
             onClick={handleSave}
             disabled={saving}
@@ -486,43 +483,6 @@ export function Toolbar() {
             style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
           >
             {saving ? '儲存中...' : '儲存'}
-          </button>
-
-          <button
-            onClick={handleRestore}
-            disabled={snapshots.length === 0}
-            className="px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
-            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
-            title={snapshots.length > 0 ? `還原：${snapshots[0].name}` : '尚無快照'}
-          >
-            讀取
-          </button>
-
-          <div className="w-px h-5" style={{ background: 'var(--border)' }} />
-
-          <button
-            onClick={() => setShowAvoidModal(true)}
-            className="px-3 py-1.5 text-sm font-medium rounded border cursor-pointer relative hover:bg-[var(--accent-light)]"
-            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
-          >
-            避桌
-            {avoidPairs.length > 0 && (
-              <span
-                className="absolute -top-1.5 -right-1.5 w-4 h-4 text-white text-[10px] rounded-full flex items-center justify-center"
-                style={{ background: 'var(--error)' }}
-              >
-                {avoidPairs.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setShowResetConfirm(true)}
-            disabled={assigned === 0}
-            className="px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-red-50"
-            style={{ fontFamily: 'var(--font-display)', color: '#EA580C', borderColor: '#FECACA', borderRadius: 'var(--radius-sm)' }}
-          >
-            重排
           </button>
 
           <button
@@ -535,13 +495,102 @@ export function Toolbar() {
             還原
           </button>
 
-          <button
-            onClick={() => navigate('/import')}
-            className="px-3 py-1.5 text-sm font-medium rounded border cursor-pointer hover:bg-[var(--accent-light)]"
-            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
-          >
-            匯入
-          </button>
+          {/* ☰ 選單按鈕 */}
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="flex items-center justify-center w-8 h-8 rounded cursor-pointer hover:bg-[var(--accent-light)] relative"
+              style={{ color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)' }}
+              title="更多"
+            >
+              <Menu size={18} />
+              {avoidPairs.length > 0 && (
+                <span
+                  className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 text-white text-[9px] rounded-full flex items-center justify-center"
+                  style={{ background: 'var(--error)' }}
+                >
+                  {avoidPairs.length}
+                </span>
+              )}
+            </button>
+
+            {showMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                <div
+                  className="absolute right-0 top-full mt-1 z-50 py-1 min-w-[200px]"
+                  style={{
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md, 8px)',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+                  }}
+                >
+                  {/* 讀取 */}
+                  <button
+                    onClick={() => { setShowMenu(false); handleRestore() }}
+                    disabled={snapshots.length === 0}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]"
+                    style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-body)' }}
+                  >
+                    <History size={16} className="shrink-0" />
+                    <span>讀取</span>
+                    {snapshots.length > 0 && (
+                      <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>{snapshots[0].name}</span>
+                    )}
+                  </button>
+
+                  {/* 避桌 */}
+                  <button
+                    onClick={() => { setShowMenu(false); setShowAvoidModal(true) }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
+                    style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-body)' }}
+                  >
+                    <Ban size={16} className="shrink-0" />
+                    <span>避桌</span>
+                    {avoidPairs.length > 0 && (
+                      <span className="ml-auto text-xs font-data" style={{ color: 'var(--error)' }}>{avoidPairs.length} 組</span>
+                    )}
+                  </button>
+
+                  {/* 重排 */}
+                  <button
+                    onClick={() => { setShowMenu(false); setShowResetConfirm(true) }}
+                    disabled={assigned === 0}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]"
+                    style={{ color: '#EA580C', fontFamily: 'var(--font-body)' }}
+                  >
+                    <Shuffle size={16} className="shrink-0" />
+                    <span>重排</span>
+                  </button>
+
+                  {/* 匯入 */}
+                  <button
+                    onClick={() => { setShowMenu(false); navigate('/import') }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
+                    style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
+                  >
+                    <Download size={16} className="shrink-0" />
+                    <span>匯入</span>
+                  </button>
+
+                  {/* 分隔線 */}
+                  <div className="my-1" style={{ borderTop: '1px solid var(--border)' }} />
+
+                  {/* 登入（未來擴充） */}
+                  <button
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
+                    style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}
+                    disabled
+                  >
+                    <Lock size={16} className="shrink-0" />
+                    <span>登入</span>
+                    <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>即將推出</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -551,14 +600,14 @@ export function Toolbar() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowResetConfirm(false)} />
           <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '24px', width: '320px', border: '1px solid var(--border)' }}>
-            <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>確定重排？</p>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>所有已安排的賓客將移回待排區。可按「還原」回復。</p>
+            <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>確定重排？</p>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px' }}>所有已安排的賓客將移回待排區。可按「還原」回復。</p>
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowResetConfirm(false)} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '13px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>取消</button>
+              <button onClick={() => setShowResetConfirm(false)} style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '14px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>取消</button>
               <button onClick={() => {
                 setShowResetConfirm(false)
                 animateResetToSidebar()
-              }} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '13px', border: 'none', background: '#DC2626', color: 'white', cursor: 'pointer', fontWeight: 600 }}>重排</button>
+              }} style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '14px', border: 'none', background: '#DC2626', color: 'white', cursor: 'pointer', fontWeight: 600 }}>重排</button>
             </div>
           </div>
         </div>,

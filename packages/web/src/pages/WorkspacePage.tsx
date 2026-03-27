@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
@@ -195,9 +196,7 @@ export default function WorkspacePage() {
             onClick={() => setSidebarCollapsed(false)}
             title="展開側邊欄"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <path d="M5 3l4 4-4 4" />
-            </svg>
+            <ChevronRight size={14} className="shrink-0" style={{ color: 'var(--text-muted)' }} />
           </div>
           {/* 側邊欄 */}
           <div

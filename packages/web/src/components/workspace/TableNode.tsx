@@ -324,6 +324,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
       {showIcons && (
         <>
           <g
+            className="table-btn-edit"
             transform={`translate(${editX}, ${editY})`}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); setRenameValue(table.name); setShowRenameModal(true) }}
@@ -331,13 +332,15 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
           >
             <g className="table-icon-pop" style={{ '--icon-from-x': `${editFromX}px`, '--icon-from-y': `${editFromY}px` } as React.CSSProperties}>
               <circle r={iconR} fill="white" stroke="#D6D3D1" strokeWidth="1.5" />
-              <g fill="none" stroke="#78716C" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" transform="translate(-5,-5)">
-                <path d="M7.5 1.5 9.5 3.5 3 10 1 10 1 8 Z" />
-                <path d="M7.5 1.5 8.5 0.5 10 2 9.5 3.5 Z" />
+              {/* Pencil icon (lucide) */}
+              <g fill="none" stroke="#78716C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="translate(-6,-6) scale(0.5)">
+                <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+                <path d="m15 5 4 4" />
               </g>
             </g>
           </g>
           <g
+            className="table-btn-delete"
             transform={`translate(${deleteX}, ${deleteY})`}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); setShowActionConfirm(true) }}
@@ -345,7 +348,11 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
           >
             <g className="table-icon-pop" style={{ '--icon-from-x': `${deleteFromX}px`, '--icon-from-y': `${deleteFromY}px` } as React.CSSProperties}>
               <circle r={iconR} fill="white" stroke="#FECACA" strokeWidth="1.5" />
-              <path d="M-5-5L5 5M5-5L-5 5" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" />
+              {/* X icon (lucide) */}
+              <g fill="none" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="translate(-6,-6) scale(0.5)">
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </g>
             </g>
           </g>
         </>
@@ -590,11 +597,12 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
                   strokeWidth="1.5"
                   strokeLinejoin="round"
                 />
-                <g transform="translate(0, 0)">
-                  <path d="M6,0 A6.5,6.5 0 0,0 -4,-5" fill="none" stroke="#B08D57" strokeWidth="2.2" strokeLinecap="round" />
-                  <polygon points="-2,-9 -7,-3.5 -1,-3" fill="#B08D57" />
-                  <path d="M-6,0 A6.5,6.5 0 0,0 4,5" fill="none" stroke="#B08D57" strokeWidth="2.2" strokeLinecap="round" />
-                  <polygon points="2,9 7,3.5 1,3" fill="#B08D57" />
+                {/* ArrowLeftRight icon (lucide) */}
+                <g fill="none" stroke="#B08D57" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" transform="translate(-7,-7.5) scale(0.58)">
+                  <path d="M8 3 4 7l4 4" />
+                  <path d="M4 7h16" />
+                  <path d="m16 21 4-4-4-4" />
+                  <path d="M20 17H4" />
                 </g>
               </g>
             )}
@@ -633,17 +641,17 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
       <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowActionConfirm(false)} />
         <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '24px', width: '300px', border: '1px solid var(--border)' }}>
-          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+          <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
             {guests.length > 0 ? `清空「${table.name}」？` : `刪除「${table.name}」？`}
           </p>
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
             {guests.length > 0
               ? `此桌的 ${guests.length} 位賓客將移回未安排。`
               : '此桌為空桌，將直接刪除。'}
           </p>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button onClick={() => setShowActionConfirm(false)} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>取消</button>
-            <button onClick={handleActionConfirm} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', border: 'none', background: '#DC2626', color: 'white', cursor: 'pointer', fontWeight: 600 }}>
+            <button onClick={() => setShowActionConfirm(false)} style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '14px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>取消</button>
+            <button onClick={handleActionConfirm} style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '14px', border: 'none', background: '#DC2626', color: 'white', cursor: 'pointer', fontWeight: 600 }}>
               {guests.length > 0 ? '清空' : '刪除'}
             </button>
           </div>

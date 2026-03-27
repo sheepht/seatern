@@ -129,6 +129,23 @@ events.post('/:id/guests/batch', async (c) => {
   return c.json({ count: created.length, guests: created }, 201)
 })
 
+// PATCH /events/:eventId — 更新活動（名稱等）
+events.patch('/:eventId', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const { eventId } = c.req.param()
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  const body = await c.req.json<{ name?: string }>()
+  const updated = await prisma.event.update({
+    where: { id: eventId },
+    data: { ...(body.name !== undefined && { name: body.name }) },
+  })
+  return c.json(updated)
+})
+
 // PATCH /events/:eventId/guests/:guestId/table — 移動賓客到桌次
 events.patch('/:eventId/guests/:guestId/table', async (c) => {
   const ownerId = c.get('ownerId')
