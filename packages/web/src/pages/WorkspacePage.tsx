@@ -26,7 +26,6 @@ export default function WorkspacePage() {
   const moveGuestToSeat = useSeatingStore((s) => s.moveGuestToSeat)
   const setActiveDragGuest = useSeatingStore((s) => s.setActiveDragGuest)
   const setDragPreview = useSeatingStore((s) => s.setDragPreview)
-  const undo = useSeatingStore((s) => s.undo)
   const checkAvoidViolation = useSeatingStore((s) => s.checkAvoidViolation)
 
   const [activeGuest, setActiveGuest] = useState<Guest | null>(null)
@@ -50,17 +49,6 @@ export default function WorkspacePage() {
   useEffect(() => {
     if (eventId) loadEvent(eventId)
   }, [eventId, loadEvent])
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        e.preventDefault()
-        undo()
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [undo])
 
   /** 從 drag event 取得賓客 ID */
   const getGuestId = (event: DragStartEvent | DragOverEvent | DragEndEvent): string => {

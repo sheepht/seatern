@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useSeatingStore } from '@/stores/seating'
@@ -70,6 +70,194 @@ export function Toolbar() {
   const CATEGORY_BG: Record<string, string> = { '男方': '#DBEAFE', '女方': '#FEE2E2', '共同': '#F3F4F6' }
   const CATEGORY_CLR: Record<string, string> = { '男方': '#1E40AF', '女方': '#991B1B', '共同': '#374151' }
   const CATEGORY_BD: Record<string, string> = { '男方': '#BFDBFE', '女方': '#FECACA', '共同': '#D1D5DB' }
+
+  // 計算賓客在桌上的螢幕位置
+  const getSeatScreenPos = (
+    svgEl: SVGSVGElement,
+    ctm: DOMMatrix,
+    table: { positionX: number; positionY: number; capacity: number },
+    seatIndex: number,
+  ) => {
+    const radius = Math.max(58 + Math.min(table.capacity, 12) * 7, 88)
+    const seatRadius = radius - 34
+    const angle = ((2 * Math.PI) / table.capacity) * seatIndex - Math.PI / 2
+    const seatSvgX = table.positionX + Math.cos(angle) * seatRadius
+    const seatSvgY = table.positionY + Math.sin(angle) * seatRadius
+    const pt = svgEl.createSVGPoint()
+    pt.x = seatSvgX
+    pt.y = seatSvgY
+    return pt.matrixTransform(ctm)
+  }
+
+  // 建立浮動圓圈元素
+  const createChip = (
+    guest: typeof guests[0],
+    screenX: number,
+    screenY: number,
+    circleSize: number,
+    fontSize: number,
+  ) => {
+    const displayName = guest.name.length <= 2 ? guest.name : guest.name.slice(-2)
+    const chip = document.createElement('div')
+    chip.textContent = displayName
+    chip.style.cssText = `
+      position:fixed;
+      left:${screenX}px;
+      top:${screenY}px;
+      transform:translate(-50%,-50%);
+      width:${circleSize}px;
+      height:${circleSize}px;
+      border-radius:50%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:${fontSize}px;
+      font-weight:500;
+      font-family:'Noto Sans TC',sans-serif;
+      background:${CATEGORY_BG[guest.category] || '#F3F4F6'};
+      color:${CATEGORY_CLR[guest.category] || '#374151'};
+      border:1.5px solid white;
+      box-shadow:0 2px 8px rgba(0,0,0,0.15);
+      pointer-events:none;
+      transition:all 500ms cubic-bezier(0.4, 0, 0.2, 1);
+      z-index:9999;
+    `
+    return chip
+  }
+
+  const animateUndo = () => {
+    if (undoStack.length === 0) return
+
+    const svgEl = document.getElementById('floorplan-svg') as SVGSVGElement | null
+    if (!svgEl) { undo(); return }
+    const ctm = svgEl.getScreenCTM()
+    if (!ctm) { undo(); return }
+
+    const vb = svgEl.viewBox.baseVal
+    const svgRect = svgEl.getBoundingClientRect()
+    const svgScale = svgRect.width / vb.width
+    const circleSize = 40 * svgScale
+    const fontSize = Math.max(10, Math.round(16 * svgScale))
+
+    // 找出即將被 undo 的 entries
+    const last = undoStack[undoStack.length - 1]
+    const entriesToUndo = last.batchId
+      ? undoStack.filter((e) => e.batchId === last.batchId)
+      : [last]
+
+    // sidebar 位置（用於 unassigned 賓客）
+    const sidebarEl = document.querySelector('[data-droppable-id="unassigned"]') || document.querySelector('.overflow-y-auto')
+    const sidebarRect = sidebarEl?.getBoundingClientRect()
+    const sidebarX = 144
+    const sidebarTop = sidebarRect ? sidebarRect.top + 20 : 100
+    const sidebarHeight = sidebarRect ? sidebarRect.height - 40 : 400
+
+    // 收集每個受影響賓客的 起點 & 終點
+    type AnimItem = { guest: typeof guests[0]; fromX: number; fromY: number; toX: number; toY: number }
+    const animItems: AnimItem[] = []
+
+    for (const entry of entriesToUndo) {
+      const guest = guests.find((g) => g.id === entry.guestId)
+      if (!guest) continue
+
+      // 起點：賓客目前的位置
+      let fromX: number, fromY: number
+      const currentTable = guest.assignedTableId ? tables.find((t) => t.id === guest.assignedTableId) : null
+      if (currentTable && guest.seatIndex !== null) {
+        const pos = getSeatScreenPos(svgEl, ctm, currentTable, guest.seatIndex)
+        fromX = pos.x
+        fromY = pos.y
+      } else {
+        // 在 sidebar 中 — 嘗試找到 DOM 元素位置
+        const chipEl = document.querySelector(`[data-guest-id="${guest.id}"]`)
+        if (chipEl) {
+          const r = chipEl.getBoundingClientRect()
+          fromX = r.left + r.width / 2
+          fromY = r.top + r.height / 2
+        } else {
+          fromX = sidebarX
+          fromY = sidebarTop + Math.random() * sidebarHeight
+        }
+      }
+
+      // 終點：undo 後賓客回到的位置
+      let toX: number, toY: number
+      const targetTable = entry.fromTableId ? tables.find((t) => t.id === entry.fromTableId) : null
+      const targetSeatIndex = entry.prevSeatIndices.get(guest.id) ?? 0
+      if (targetTable && entry.fromTableId) {
+        const pos = getSeatScreenPos(svgEl, ctm, targetTable, targetSeatIndex)
+        toX = pos.x
+        toY = pos.y
+      } else {
+        // 回到 sidebar
+        toX = sidebarX
+        toY = sidebarTop + Math.random() * sidebarHeight
+      }
+
+      animItems.push({ guest, fromX, fromY, toX, toY })
+    }
+
+    if (animItems.length === 0) { undo(); return }
+
+    // 隱藏受影響的賓客（批量用 isResetting，單個用 flyingGuestIds）
+    const isBatch = animItems.length > 3
+    const flyingIds = new Set(animItems.map((item) => item.guest.id))
+    if (isBatch) {
+      useSeatingStore.setState({ isResetting: true })
+    } else {
+      useSeatingStore.setState({ flyingGuestIds: flyingIds })
+    }
+
+    // 建立 overlay
+    const overlay = document.createElement('div')
+    overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999'
+    document.body.appendChild(overlay)
+
+    const chips: HTMLDivElement[] = []
+    for (const item of animItems) {
+      const chip = createChip(item.guest, item.fromX, item.fromY, circleSize, fontSize)
+      overlay.appendChild(chip)
+      chips.push(chip)
+    }
+
+    // 觸發飛行動畫
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        chips.forEach((chip, i) => {
+          const item = animItems[i]
+          chip.style.left = `${item.toX}px`
+          chip.style.top = `${item.toY}px`
+          chip.style.transitionDelay = `${i * 20}ms`
+        })
+      })
+    })
+
+    // 動畫快結束時執行真正的 undo
+    setTimeout(() => {
+      undo()
+      // 延遲清除 flyingGuestIds，等 React render + useLayoutEffect (FLIP) 跑完再清
+      requestAnimationFrame(() => {
+        if (isBatch) {
+          useSeatingStore.setState({ isResetting: false })
+        } else {
+          useSeatingStore.setState({ flyingGuestIds: new Set() })
+        }
+      })
+      setTimeout(() => overlay.remove(), 200)
+    }, 450)
+  }
+
+  // Ctrl+Z 鍵盤快捷鍵
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault()
+        animateUndo()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  })
 
   const animateResetToSidebar = () => {
     const svgEl = document.getElementById('floorplan-svg') as SVGSVGElement | null
@@ -319,7 +507,7 @@ export function Toolbar() {
           </button>
 
           <button
-            onClick={undo}
+            onClick={animateUndo}
             disabled={undoStack.length === 0}
             className="px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
             style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}

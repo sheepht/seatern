@@ -32,6 +32,7 @@ export function GuestChip({ guest, animIndex }: Props) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      data-guest-id={guest.id}
       className={`px-2 py-0.5 text-sm cursor-grab select-none whitespace-nowrap ${
         isDragging ? 'opacity-30' : ''
       } ${animClass}`}

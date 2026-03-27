@@ -145,6 +145,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
   const guestsWithRecommendations = useSeatingStore((s) => s.guestsWithRecommendations)
   const allGuests = useSeatingStore((s) => s.guests)
   const isResetting = useSeatingStore((s) => s.isResetting)
+  const flyingGuestIds = useSeatingStore((s) => s.flyingGuestIds)
   const moveGuest = useSeatingStore((s) => s.moveGuest)
   const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
   const removeTable = useSeatingStore((s) => s.removeTable)
@@ -234,6 +235,10 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
       const dx = oldPos.x - newPos.x
       const dy = oldPos.y - newPos.y
       if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue
+
+      // 跳過正在飛行動畫中的賓客（undo 動畫已處理過渡）
+      const guestId = key.replace(/^guest-/, '').replace(/-(main|c\d+)$/, '')
+      if (flyingGuestIds.has(guestId) || isResetting) continue
 
       const el = seatRefsMap.current.get(key)
       if (!el) continue
@@ -454,13 +459,15 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
           else seatRefsMap.current.delete(key)
         }
 
+        const isFlying = flyingGuestIds.has(seat.guest!.id)
+
         if (seat.type === 'companion' || seat.type === 'overflow-companion') {
           const bgColor = CATEGORY_COLORS[seat.guest!.category] || '#F3F4F6'
           const textColor = CATEGORY_TEXT[seat.guest!.category] || '#374151'
           const totalCompanions = seat.guest!.attendeeCount - 1
           const isLast = seat.companionIndex === totalCompanions
           return (
-            <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)` }}>
+            <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)`, opacity: isFlying ? 0 : undefined }}>
               <circle
                 r={20}
                 fill={bgColor}
@@ -498,7 +505,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
         const guestProgress = Math.min(guestScore / 100, 1)
 
         return (
-          <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)` }}>
+          <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)`, opacity: isFlying ? 0 : undefined }}>
             {/* 滿意度進度圈（帶動畫，永遠顯示） */}
             <circle
               r={guestRingR}

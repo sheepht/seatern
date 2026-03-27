@@ -92,6 +92,8 @@ interface SeatingState {
   lastResetAt: number
   /** 重排動畫進行中（桌上賓客淡出） */
   isResetting: boolean
+  /** 正在飛行動畫中的賓客 ID（用於 undo 動畫隱藏個別賓客） */
+  flyingGuestIds: Set<string>
 
   // Undo stack
   undoStack: Array<{
@@ -154,6 +156,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   undoStack: [],
   lastResetAt: 0,
   isResetting: false,
+  flyingGuestIds: new Set(),
 
   loadEvent: async (eventId: string) => {
     set({ loading: true })
