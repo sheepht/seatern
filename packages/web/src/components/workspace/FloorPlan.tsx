@@ -1,8 +1,18 @@
 import { useCallback, useState, useRef, useEffect } from 'react'
 import { useSeatingStore, type Guest } from '@/stores/seating'
+import { recalculateAll } from '@/lib/satisfaction'
 import { TableNode } from './TableNode'
 import { SeatDropZone } from './SeatDropZone'
 import { GuestSeatOverlay } from './GuestSeatOverlay'
+
+interface Recommendation {
+  tableId: string
+  guestDelta: number
+  tableDelta: number
+  overallDelta: number
+  /** 模擬後的桌次平均滿意度（未四捨五入，用於 TableScoreRing 精確比較） */
+  newTableAvg: number
+}
 
 const CANVAS_WIDTH = 1200
 const CANVAS_HEIGHT = 800
@@ -20,10 +30,113 @@ interface ScreenSeat {
 export function FloorPlan() {
   const tables = useSeatingStore((s) => s.tables)
   const guests = useSeatingStore((s) => s.guests)
+  const hoveredGuestId = useSeatingStore((s) => s.hoveredGuestId)
+  const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
   const selectedTableId = useSeatingStore((s) => s.selectedTableId)
   const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
   const updateTablePosition = useSeatingStore((s) => s.updateTablePosition)
   const saveTablePosition = useSeatingStore((s) => s.saveTablePosition)
+
+  // 智慧推薦虛線
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
+  const recCacheRef = useRef<Map<string, Recommendation[]>>(new Map())
+  const recCacheVersionRef = useRef(0)
+  const throttleRef = useRef(false)
+
+  // guests/tables 變動時清快取（例如移動了賓客）
+  const dataVersion = guests.length + tables.length + guests.reduce((s, g) => s + (g.assignedTableId?.length ?? 0) + g.satisfactionScore, 0)
+  useEffect(() => {
+    recCacheRef.current.clear()
+    recCacheVersionRef.current++
+  }, [dataVersion])
+
+  useEffect(() => {
+    if (activeDragGuestId) {
+      setRecommendations([])
+      useSeatingStore.setState({ recommendationTableScores: new Map() })
+      return
+    }
+
+    if (!hoveredGuestId) {
+      setRecommendations([])
+      useSeatingStore.setState({ recommendationTableScores: new Map() })
+      throttleRef.current = false
+      return
+    }
+
+    // 有快取 → 直接用（也要同步更新 store）
+    const cached = recCacheRef.current.get(hoveredGuestId)
+    if (cached) {
+      setRecommendations(cached)
+      const scores = new Map<string, number>()
+      for (const rec of cached) scores.set(rec.tableId, rec.newTableAvg)
+      useSeatingStore.setState({ recommendationTableScores: scores })
+      return
+    }
+
+    // Throttle：第一次立即執行，後續 300ms 內忽略
+    if (throttleRef.current) return
+    throttleRef.current = true
+    setTimeout(() => { throttleRef.current = false }, 300)
+
+    const compute = () => {
+      const guest = guests.find((g) => g.id === hoveredGuestId)
+      if (!guest || !guest.assignedTableId || guest.rsvpStatus !== 'confirmed') return []
+
+      const currentGuestScore = guest.satisfactionScore
+      // 當前全場平均
+      const currentResult = recalculateAll(guests, tables)
+      const currentOverall = currentResult.overallAverage
+      const results: Recommendation[] = []
+
+      for (const t of tables) {
+        if (t.id === guest.assignedTableId) continue
+
+        const tableGuests = guests.filter(
+          (g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed',
+        )
+        const seatCount = tableGuests.reduce((s, g) => s + g.attendeeCount, 0)
+        if (seatCount + guest.attendeeCount > t.capacity) continue
+
+        const simGuests = guests.map((g) =>
+          g.id === hoveredGuestId ? { ...g, assignedTableId: t.id } : g,
+        )
+        const simResult = recalculateAll(simGuests, tables)
+
+        const newGuestScore = simResult.guests.find((g) => g.id === hoveredGuestId)?.satisfactionScore ?? 0
+        const newTableAvg = simResult.tables.find((ts) => ts.id === t.id)?.averageSatisfaction ?? 0
+
+        const guestDelta = Math.round(newGuestScore - currentGuestScore)
+        const rawTableDelta = newTableAvg - t.averageSatisfaction
+        const rawOverallDelta = simResult.overallAverage - currentOverall
+
+        // 賓客滿意度上升 AND（桌滿意度也上升 OR 全場平均上升）
+        if (guestDelta > 0 && (rawTableDelta > 0.1 || rawOverallDelta > 0.1)) {
+          results.push({
+            tableId: t.id,
+            guestDelta,
+            tableDelta: Math.round(rawTableDelta),
+            overallDelta: Math.round(rawOverallDelta),
+            newTableAvg,
+          })
+        }
+      }
+
+      results.sort((a, b) => (b.guestDelta + b.tableDelta) - (a.guestDelta + a.tableDelta))
+      return results.slice(0, 3)
+    }
+
+    const result = compute()
+    recCacheRef.current.set(hoveredGuestId, result)
+    setRecommendations(result)
+
+    // 把推薦桌的模擬分數存到 store，讓 TableScoreRing 顯示 ±N badge
+    const scores = new Map<string, number>()
+    for (const rec of result) {
+      scores.set(rec.tableId, rec.newTableAvg)
+    }
+    useSeatingStore.setState({ recommendationTableScores: scores })
+  }, [hoveredGuestId, activeDragGuestId, guests, tables])
 
   // 桌次拖曳狀態
   const [draggingTableId, setDraggingTableId] = useState<string | null>(null)
@@ -208,6 +321,53 @@ export function FloorPlan() {
             onMouseDown={(e) => handleMouseDown(table.id, e)}
           />
         ))}
+
+        {/* 智慧推薦虛線 */}
+        {recommendations.length > 0 && hoveredGuestId && (() => {
+          const guest = guests.find((g) => g.id === hoveredGuestId)
+          if (!guest || guest.seatIndex === null || !guest.assignedTableId) return null
+          const srcTable = tables.find((t) => t.id === guest.assignedTableId)
+          if (!srcTable) return null
+
+          // 計算賓客在 SVG 上的位置
+          const srcRadius = Math.max(58 + Math.min(srcTable.capacity, 12) * 7, 88)
+          const seatRadius = srcRadius - 34
+          const totalSlots = srcTable.capacity
+          const angle = ((2 * Math.PI) / totalSlots) * guest.seatIndex - Math.PI / 2
+          const guestX = srcTable.positionX + Math.cos(angle) * seatRadius
+          const guestY = srcTable.positionY + Math.sin(angle) * seatRadius
+
+          return recommendations.map((rec, i) => {
+            const targetTable = tables.find((t) => t.id === rec.tableId)
+            if (!targetTable) return null
+
+            const tx = targetTable.positionX
+            const ty = targetTable.positionY
+            // 線的中點（放 badge）
+            const mx = (guestX + tx) / 2
+            const my = (guestY + ty) / 2
+
+            return (
+              <g key={`rec-${i}`} opacity={0.9 - i * 0.15}>
+                {/* 虛線 */}
+                <line
+                  x1={guestX} y1={guestY} x2={tx} y2={ty}
+                  stroke="#B08D57"
+                  strokeWidth="2"
+                  strokeDasharray="8 5"
+                />
+                {/* 賓客 +N（線的中點） */}
+                <g transform={`translate(${mx}, ${my - 10})`}>
+                  <rect x={-16} y={-10} width={32} height={20} rx={10} fill="#16A34A" />
+                  <text y={4} textAnchor="middle" fill="white" fontSize="11" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
+                    +{rec.guestDelta}
+                  </text>
+                </g>
+                {/* 桌 ±N 由 TableScoreRing 透過 recommendationTableScores 顯示 */}
+              </g>
+            )
+          })
+        })()}
 
         {tables.length === 0 && (
           <text x={CANVAS_WIDTH / 2} y={CANVAS_HEIGHT / 2} textAnchor="middle" fill="#9CA3AF" fontSize="16">

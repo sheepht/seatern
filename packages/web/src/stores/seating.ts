@@ -78,6 +78,8 @@ interface SeatingState {
     previewTableScores: Map<string, number>
   } | null
   dragRejectTableId: string | null // 拖曳 hover 時無法放置的桌 ID（滿桌提示）
+  /** 智慧推薦：hover 賓客時各桌的預覽滿意度（用於顯示 ±N badge） */
+  recommendationTableScores: Map<string, number>
 
   // Undo stack
   undoStack: Array<{
@@ -127,6 +129,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   hoverSuppressedUntil: 0,
   dragPreview: null,
   dragRejectTableId: null,
+  recommendationTableScores: new Map(),
   undoStack: [],
 
   loadEvent: async (eventId: string) => {

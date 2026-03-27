@@ -67,9 +67,9 @@ function TableScoreRing({ score, originalScore, hasGuests }: { score: number; or
   const progress = Math.min(animatedScore / 100, 1)
   const color = getSatisfactionColor(animatedScore)
 
-  // 用未四捨五入的值算差異，顯示時才 round
+  // 用未四捨五入的值算差異，有意義的變化至少顯示 ±1
   const rawDelta = score - originalScore
-  const delta = Math.round(rawDelta)
+  const delta = rawDelta > 0.1 ? Math.max(1, Math.round(rawDelta)) : rawDelta < -0.1 ? Math.min(-1, Math.round(rawDelta)) : 0
   const scale = rawDelta > 0.1 ? 1.25 : rawDelta < -0.1 ? 0.8 : 1
 
   return (
@@ -137,6 +137,7 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
   const dragPreview = useSeatingStore((s) => s.dragPreview)
   const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
   const dragRejectTableId = useSeatingStore((s) => s.dragRejectTableId)
+  const recommendationTableScores = useSeatingStore((s) => s.recommendationTableScores)
   const allGuests = useSeatingStore((s) => s.guests)
 
   const guests = getTableGuests(table.id)
@@ -307,7 +308,7 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
 
       {/* 滿意度圓環進度條 + 中央數字（帶動畫） */}
       <TableScoreRing
-        score={guests.length > 0 ? (previewTableScore ?? table.averageSatisfaction) : 0}
+        score={guests.length > 0 ? (previewTableScore ?? recommendationTableScores.get(table.id) ?? table.averageSatisfaction) : 0}
         originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
         hasGuests={guests.length > 0}
       />
