@@ -1,6 +1,7 @@
 import { useCallback, useState, useRef, useEffect } from 'react'
 import { useSeatingStore, type Guest } from '@/stores/seating'
 import { recalculateAll } from '@/lib/satisfaction'
+import { computeAvoidancePath, getPathEndDirection } from '@/lib/path-routing'
 import { TableNode } from './TableNode'
 import { SeatDropZone } from './SeatDropZone'
 import { GuestSeatOverlay } from './GuestSeatOverlay'
@@ -408,24 +409,8 @@ export function FloorPlan() {
             ...tables.filter((t) => t.id === selectedTableId),
           ]
 
-          return (
-            <>
-              {orderedTables.map((table) => (
-                <TableNode
-                  key={table.id}
-                  table={table}
-                  isSelected={table.id === selectedTableId}
-                  isDragging={draggingTableId === table.id}
-                  isDimmed={shouldDim && !highlightedIds.has(table.id)}
-                  onMouseDown={(e) => handleMouseDown(table.id, e)}
-                />
-              ))}
-            </>
-          )
-        })()}
-
-        {/* 智慧推薦虛線 */}
-        {recommendations.length > 0 && hoveredGuestId && (() => {
+          /* 智慧推薦虛線放在桌子下層，讓桌子蓋住穿過的部分 */
+          const recLines = recommendations.length > 0 && hoveredGuestId && (() => {
           const guest = guests.find((g) => g.id === hoveredGuestId)
           if (!guest || guest.seatIndex === null || !guest.assignedTableId) return null
           const srcTable = tables.find((t) => t.id === guest.assignedTableId)
@@ -441,7 +426,7 @@ export function FloorPlan() {
 
           return (
             <>
-              {/* 虛線 + 箭頭 */}
+              {/* 曲線 + 箭頭 */}
               {recommendations.map((rec, i) => {
                 const targetTable = tables.find((t) => t.id === rec.tableId)
                 if (!targetTable) return null
@@ -451,19 +436,46 @@ export function FloorPlan() {
                 const targetRadius = Math.max(58 + Math.min(targetTable.capacity, 12) * 7, 88)
                 const guestCircleR = 23
 
-                const dx = tx - guestX
-                const dy = ty - guestY
-                const dist = Math.sqrt(dx * dx + dy * dy)
-                const ux = dx / dist
-                const uy = dy / dist
+                // 起終點：從賓客圓邊緣到桌子圓邊緣
+                const dx0 = tx - guestX
+                const dy0 = ty - guestY
+                const dist0 = Math.sqrt(dx0 * dx0 + dy0 * dy0) || 1
+                const ux0 = dx0 / dist0
+                const uy0 = dy0 / dist0
 
-                const startX = guestX + ux * (guestCircleR + 4)
-                const startY = guestY + uy * (guestCircleR + 4)
-                const endX = tx - ux * (targetRadius + 4)
-                const endY = ty - uy * (targetRadius + 4)
-                const mx = (startX + endX) / 2
-                const my = (startY + endY) / 2
+                const startX = guestX + ux0 * (guestCircleR + 4)
+                const startY = guestY + uy0 * (guestCircleR + 4)
+                const endX = tx - ux0 * (targetRadius + 4)
+                const endY = ty - uy0 * (targetRadius + 4)
 
+                // 所有桌子都是障礙（含來源桌），只排除目標桌
+                const obstacles = tables
+                  .filter((t) => t.id !== rec.tableId)
+                  .map((t) => ({
+                    cx: t.positionX,
+                    cy: t.positionY,
+                    r: Math.max(58 + Math.min(t.capacity, 12) * 7, 88),
+                  }))
+
+                // 來源桌資訊（讓路徑先從桌外出發）
+                const srcObstacle = {
+                  cx: srcTable.positionX,
+                  cy: srcTable.positionY,
+                  r: srcRadius,
+                }
+
+                // 計算避障路徑
+                const { d: pathD, midpoint } = computeAvoidancePath(
+                  { x: startX, y: startY },
+                  { x: endX, y: endY },
+                  obstacles,
+                  srcObstacle,
+                  CANVAS_WIDTH,
+                  CANVAS_HEIGHT,
+                )
+
+                // 用路徑末端方向畫箭頭
+                const { ux, uy } = getPathEndDirection(pathD)
                 const arrowSize = 16
                 const ax1 = endX - ux * arrowSize - uy * arrowSize * 0.5
                 const ay1 = endY - uy * arrowSize + ux * arrowSize * 0.5
@@ -479,8 +491,9 @@ export function FloorPlan() {
                         to { stroke-dashoffset: -16; }
                       }
                     `}</style>
-                    <line
-                      x1={startX} y1={startY} x2={endX} y2={endY}
+                    <path
+                      d={pathD}
+                      fill="none"
                       stroke="#B08D57"
                       strokeWidth="2.5"
                       strokeDasharray="10 6"
@@ -490,8 +503,8 @@ export function FloorPlan() {
                       points={`${endX},${endY} ${ax1},${ay1} ${ax2},${ay2}`}
                       fill="#B08D57"
                     />
-                    {/* 賓客 +N（線的中點，放大版） */}
-                    <g transform={`translate(${mx}, ${my - 12})`}>
+                    {/* 賓客 +N（曲線中點，放大版） */}
+                    <g transform={`translate(${midpoint.x}, ${midpoint.y - 12})`}>
                       <rect x={-20} y={-12} width={40} height={24} rx={12} fill="#16A34A" />
                       <text y={5} textAnchor="middle" fill="white" fontSize="14" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
                         +{rec.guestDelta}
@@ -500,6 +513,23 @@ export function FloorPlan() {
                   </g>
                 )
               })}
+            </>
+          )
+        })()
+
+          return (
+            <>
+              {recLines}
+              {orderedTables.map((table) => (
+                <TableNode
+                  key={table.id}
+                  table={table}
+                  isSelected={table.id === selectedTableId}
+                  isDragging={draggingTableId === table.id}
+                  isDimmed={shouldDim && !highlightedIds.has(table.id)}
+                  onMouseDown={(e) => handleMouseDown(table.id, e)}
+                />
+              ))}
             </>
           )
         })()}
