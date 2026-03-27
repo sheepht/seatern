@@ -11,6 +11,7 @@ interface ScreenSeat {
   tableId: string
   seatIndex: number
   guest: Guest | null // null = empty seat
+  isCompanion: boolean // 眷屬位（可 drop 但不可 drag）
   x: number
   y: number
   radius: number
@@ -79,20 +80,15 @@ export function FloorPlan() {
       // 為每個座位建立螢幕座標
       for (let i = 0; i < totalSlots; i++) {
         const angle = ((2 * Math.PI) / totalSlots) * i - Math.PI / 2
-        const guest = slotMap.get(i) || null
-        // 只顯示主人座位和空位的 overlay（眷屬位不需要獨立的 drag/drop）
-        const isCompanion = guest && tableGuests.some(
-          (g) => g.seatIndex !== null && g.id !== guest.id &&
-            i > g.seatIndex && i < g.seatIndex + g.attendeeCount,
-        )
         // 檢查是否為眷屬座位
-        const occupant = guest // 這個 slot 的主人
         let isCompanionSlot = false
+        let companionOwner: Guest | null = null
         for (const g of tableGuests) {
           if (g.seatIndex !== null && g.attendeeCount > 1) {
             for (let c = 1; c < g.attendeeCount; c++) {
               if ((g.seatIndex + c) % totalSlots === i) {
                 isCompanionSlot = true
+                companionOwner = g
                 break
               }
             }
@@ -100,13 +96,15 @@ export function FloorPlan() {
           if (isCompanionSlot) break
         }
 
-        // 眷屬座位不需要 drop zone（拖到主人即可）
-        if (isCompanionSlot) continue
+        // 眷屬座位也可以當 drop target（shift 會保持群組完整）
+        // 但不需要 draggable overlay（拖主人即可）
+        const guest = isCompanionSlot ? companionOwner : (slotMap.get(i) || null)
 
         allScreenSeats.push({
           tableId: t.id,
           seatIndex: i,
-          guest: slotMap.get(i) || null,
+          guest,
+          isCompanion: isCompanionSlot,
           x: tableCenterX + Math.cos(angle) * seatRadius * scale,
           y: tableCenterY + Math.sin(angle) * seatRadius * scale,
           radius: 20 * scale,
@@ -229,13 +227,13 @@ export function FloorPlan() {
             x={ss.x}
             y={ss.y}
             radius={ss.radius}
-            isEmpty={ss.guest === null}
+            isEmpty={ss.guest === null && !ss.isCompanion}
           />
         ))}
 
-        {/* 賓客座位 draggable overlay（只有有人的位子） */}
+        {/* 賓客座位 draggable overlay（主人座位，不含眷屬位） */}
         {screenSeats
-          .filter((ss) => ss.guest !== null)
+          .filter((ss) => ss.guest !== null && !ss.isCompanion)
           .map((ss) => (
             <GuestSeatOverlay
               key={`drag-${ss.guest!.id}`}

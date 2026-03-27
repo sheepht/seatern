@@ -399,12 +399,13 @@ function buildSeatLayout(
     slots = new Array(totalSlots).fill(null)
     for (const guest of guests) {
       const startIdx = guest.seatIndex ?? 0
+      const immovable = guest.attendeeCount > 1
       if (startIdx < totalSlots) {
-        slots[startIdx] = { guestId: guest.id, isCompanion: false }
+        slots[startIdx] = { guestId: guest.id, isCompanion: false, immovable }
       }
       for (let c = 1; c < guest.attendeeCount; c++) {
         const idx = (startIdx + c) % totalSlots
-        slots[idx] = { guestId: guest.id, isCompanion: true }
+        slots[idx] = { guestId: guest.id, isCompanion: true, immovable }
       }
     }
   }
