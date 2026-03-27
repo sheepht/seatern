@@ -10,8 +10,10 @@ interface Recommendation {
   guestDelta: number
   tableDelta: number
   overallDelta: number
-  /** 模擬後的桌次平均滿意度（未四捨五入，用於 TableScoreRing 精確比較） */
+  /** 模擬後的桌次平均滿意度（未四捨五入） */
   newTableAvg: number
+  /** 模擬後的賓客滿意度 */
+  newGuestScore: number
 }
 
 const CANVAS_WIDTH = 1200
@@ -50,27 +52,100 @@ export function FloorPlan() {
     recCacheVersionRef.current++
   }, [dataVersion])
 
+  // 背景掃描：找出所有有更好位置的賓客（顯示💡）
+  const bgScanVersionRef = useRef(0)
   useEffect(() => {
+    const version = ++bgScanVersionRef.current
+    const seatedGuests = guests.filter((g) => g.assignedTableId && g.rsvpStatus === 'confirmed')
+    if (seatedGuests.length === 0 || tables.length === 0) {
+      useSeatingStore.setState({ guestsWithRecommendations: new Set() })
+      return
+    }
+
+    // 用 setTimeout 分批計算，避免阻塞 UI
+    const result = new Set<string>()
+    let idx = 0
+    const batchSize = 3
+
+    const processBatch = () => {
+      if (bgScanVersionRef.current !== version) return // 資料已變，中止
+      const end = Math.min(idx + batchSize, seatedGuests.length)
+
+      for (; idx < end; idx++) {
+        const guest = seatedGuests[idx]
+        // 快取有結果就直接用
+        const cached = recCacheRef.current.get(guest.id)
+        if (cached) {
+          if (cached.length > 0) result.add(guest.id)
+          continue
+        }
+
+        // 簡化計算：只檢查是否存在任何雙贏桌（找到一個就停）
+        let found = false
+        const currentResult = recalculateAll(guests, tables)
+        const currentOverall = currentResult.overallAverage
+
+        for (const t of tables) {
+          if (t.id === guest.assignedTableId) continue
+          const tableGuests = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')
+          const seatCount = tableGuests.reduce((s, g) => s + g.attendeeCount, 0)
+          if (seatCount + guest.attendeeCount > t.capacity) continue
+
+          const simGuests = guests.map((g) => g.id === guest.id ? { ...g, assignedTableId: t.id } : g)
+          const simResult = recalculateAll(simGuests, tables)
+          const newGuestScore = simResult.guests.find((g) => g.id === guest.id)?.satisfactionScore ?? 0
+          const guestDelta = newGuestScore - guest.satisfactionScore
+          const rawTableDelta = (simResult.tables.find((ts) => ts.id === t.id)?.averageSatisfaction ?? 0) - t.averageSatisfaction
+          const rawOverallDelta = simResult.overallAverage - currentOverall
+
+          if (guestDelta > 0.1 && (rawTableDelta > 0.1 || rawOverallDelta > 0.1)) {
+            found = true
+            break
+          }
+        }
+        if (found) result.add(guest.id)
+      }
+
+      if (idx < seatedGuests.length) {
+        setTimeout(processBatch, 0) // 下一批
+      } else {
+        if (bgScanVersionRef.current === version) {
+          useSeatingStore.setState({ guestsWithRecommendations: result })
+        }
+      }
+    }
+
+    // 延遲 500ms 後開始背景掃描（等 UI 穩定）
+    const timer = setTimeout(processBatch, 500)
+    return () => clearTimeout(timer)
+  }, [dataVersion, guests, tables])
+
+  useEffect(() => {
+    const syncRecToStore = (recs: Recommendation[], guestId: string) => {
+      const scores = new Map<string, number>()
+      for (const rec of recs) scores.set(rec.tableId, rec.newTableAvg)
+      const bestGuest = recs.length > 0 ? { guestId, score: recs[0].newGuestScore } : null
+      useSeatingStore.setState({ recommendationTableScores: scores, recommendationGuestScore: bestGuest })
+    }
+
     if (activeDragGuestId) {
       setRecommendations([])
-      useSeatingStore.setState({ recommendationTableScores: new Map() })
+      syncRecToStore([], '')
       return
     }
 
     if (!hoveredGuestId) {
       setRecommendations([])
-      useSeatingStore.setState({ recommendationTableScores: new Map() })
+      syncRecToStore([], '')
       throttleRef.current = false
       return
     }
 
-    // 有快取 → 直接用（也要同步更新 store）
+    // 有快取 → 直接用
     const cached = recCacheRef.current.get(hoveredGuestId)
     if (cached) {
       setRecommendations(cached)
-      const scores = new Map<string, number>()
-      for (const rec of cached) scores.set(rec.tableId, rec.newTableAvg)
-      useSeatingStore.setState({ recommendationTableScores: scores })
+      syncRecToStore(cached, hoveredGuestId)
       return
     }
 
@@ -118,6 +193,7 @@ export function FloorPlan() {
             tableDelta: Math.round(rawTableDelta),
             overallDelta: Math.round(rawOverallDelta),
             newTableAvg,
+            newGuestScore,
           })
         }
       }
@@ -129,13 +205,7 @@ export function FloorPlan() {
     const result = compute()
     recCacheRef.current.set(hoveredGuestId, result)
     setRecommendations(result)
-
-    // 把推薦桌的模擬分數存到 store，讓 TableScoreRing 顯示 ±N badge
-    const scores = new Map<string, number>()
-    for (const rec of result) {
-      scores.set(rec.tableId, rec.newTableAvg)
-    }
-    useSeatingStore.setState({ recommendationTableScores: scores })
+    syncRecToStore(result, hoveredGuestId)
   }, [hoveredGuestId, activeDragGuestId, guests, tables])
 
   // 桌次拖曳狀態

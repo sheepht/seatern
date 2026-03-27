@@ -138,6 +138,8 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
   const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
   const dragRejectTableId = useSeatingStore((s) => s.dragRejectTableId)
   const recommendationTableScores = useSeatingStore((s) => s.recommendationTableScores)
+  const recommendationGuestScore = useSeatingStore((s) => s.recommendationGuestScore)
+  const guestsWithRecommendations = useSeatingStore((s) => s.guestsWithRecommendations)
   const allGuests = useSeatingStore((s) => s.guests)
 
   const guests = getTableGuests(table.id)
@@ -383,7 +385,8 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
         const bgColor = CATEGORY_COLORS[seat.guest!.category] || '#F3F4F6'
         const textColor = CATEGORY_TEXT[seat.guest!.category] || '#374151'
         const displayName = getDisplayName(seat.guest!.name)
-        const guestScore = previewScores?.get(seat.guest!.id) ?? seat.guest!.satisfactionScore
+        const recGuestScore = recommendationGuestScore?.guestId === seat.guest!.id ? recommendationGuestScore.score : undefined
+        const guestScore = previewScores?.get(seat.guest!.id) ?? recGuestScore ?? seat.guest!.satisfactionScore
         const guestSatColor = getSatisfactionColor(guestScore)
         const guestR = 20
         const guestRingR = guestR + 3
@@ -431,10 +434,9 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
             >
               {displayName}
             </text>
-            {/* 避免同桌違規：漫畫風怒氣對話框 */}
+            {/* 避免同桌違規：漫畫風怒氣對話框（右上） */}
             {violatingGuestIds.has(seat.guest!.id) && (
               <g transform={`translate(${guestR + 4}, ${-guestR - 4})`}>
-                {/* 漫畫對話框：圓形 + 右下尖角 */}
                 <path
                   d="M-9,7 A12,12 0 1,1 -5,10 L-14,16 Z"
                   fill="white"
@@ -442,8 +444,7 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
                   strokeWidth="1.5"
                   strokeLinejoin="round"
                 />
-                {/* 十字青筋（紅色，置中於圓形） */}
-                <g transform="translate(1,-1)">
+                <g transform="translate(0,-1)">
                   <path
                     d="M-1.5,-6 Q-1.5,-1.5 -6,-1.5 M1.5,-6 Q1.5,-1.5 6,-1.5 M-1.5,6 Q-1.5,1.5 -6,1.5 M1.5,6 Q1.5,1.5 6,1.5"
                     fill="none"
@@ -451,6 +452,28 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
                     strokeWidth="2"
                     strokeLinecap="round"
                   />
+                </g>
+              </g>
+            )}
+            {/* 💡 有更好位置提示（左上） */}
+            {guestsWithRecommendations.has(seat.guest!.id) && !violatingGuestIds.has(seat.guest!.id) && (
+              <g transform={`translate(${-guestR - 4}, ${-guestR - 4})`}>
+                {/* 對話框：圓形 + 右下尖角 */}
+                <path
+                  d="M9,7 A12,12 0 1,0 5,10 L14,16 Z"
+                  fill="white"
+                  stroke="#B08D57"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+                {/* 雙箭頭循環圖示 */}
+                <g transform="translate(0, 0)">
+                  {/* 上弧 + 箭頭 */}
+                  <path d="M6,0 A6.5,6.5 0 0,0 -4,-5" fill="none" stroke="#B08D57" strokeWidth="2.2" strokeLinecap="round" />
+                  <polygon points="-2,-9 -7,-3.5 -1,-3" fill="#B08D57" />
+                  {/* 下弧 + 箭頭 */}
+                  <path d="M-6,0 A6.5,6.5 0 0,0 4,5" fill="none" stroke="#B08D57" strokeWidth="2.2" strokeLinecap="round" />
+                  <polygon points="2,9 7,3.5 1,3" fill="#B08D57" />
                 </g>
               </g>
             )}
