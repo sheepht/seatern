@@ -25,11 +25,26 @@ interface Props {
 
 export function DragOverlayContent({ guest }: Props) {
   const dragPreview = useSeatingStore((s) => s.dragPreview)
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs)
+  const guests = useSeatingStore((s) => s.guests)
   const catStyle = CATEGORY_STYLES[guest.category] || DEFAULT_STYLE
   const displayName = getDisplayName(guest.name)
 
   // 預覽分數：hover 到座位時即時計算的分數
   const previewScore = dragPreview?.previewScores?.get(guest.id)
+
+  // 檢查拖曳目標桌是否有避免同桌衝突
+  const hasAvoidConflict = (() => {
+    if (!dragPreview) return false
+    const tableGuestIds = guests
+      .filter((g) => g.assignedTableId === dragPreview.tableId && g.rsvpStatus === 'confirmed' && g.id !== guest.id)
+      .map((g) => g.id)
+    return avoidPairs.some(
+      (ap) =>
+        (ap.guestAId === guest.id && tableGuestIds.includes(ap.guestBId)) ||
+        (ap.guestBId === guest.id && tableGuestIds.includes(ap.guestAId)),
+    )
+  })()
   const score = previewScore ?? guest.satisfactionScore
   const satColor = getSatisfactionColor(score)
 
@@ -127,6 +142,40 @@ export function DragOverlayContent({ guest }: Props) {
         >
           {delta > 0 ? '+' : ''}{Math.round(delta)}
         </div>
+      )}
+
+      {/* 避免同桌怒氣符號 */}
+      {hasAvoidConflict && (
+        <svg
+          width={30}
+          height={34}
+          style={{
+            position: 'absolute',
+            top: -14,
+            right: -14,
+            transform: `scale(${1 / scale})`,
+            pointerEvents: 'none',
+          }}
+        >
+          <g transform="translate(12, 12)">
+            <path
+              d="M-9,7 A12,12 0 1,1 -5,10 L-14,16 Z"
+              fill="white"
+              stroke="#DC2626"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+            <g transform="translate(1,-1)">
+              <path
+                d="M-1.5,-6 Q-1.5,-1.5 -6,-1.5 M1.5,-6 Q1.5,-1.5 6,-1.5 M-1.5,6 Q-1.5,1.5 -6,1.5 M1.5,6 Q1.5,1.5 6,1.5"
+                fill="none"
+                stroke="#DC2626"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </g>
+          </g>
+        </svg>
       )}
 
       {/* 眷屬 badge */}

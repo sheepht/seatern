@@ -146,18 +146,20 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
   // 檢查此桌是否有避免同桌違規，並記錄哪些賓客涉及
   const guestIds = guests.map((g) => g.id)
   const violatingGuestIds = new Set<string>()
-  const hasViolation = avoidPairs.some((ap) => {
+  for (const ap of avoidPairs) {
     if (guestIds.includes(ap.guestAId) && guestIds.includes(ap.guestBId)) {
       violatingGuestIds.add(ap.guestAId)
       violatingGuestIds.add(ap.guestBId)
-      return true
     }
-    return false
-  })
-  // some 只找到第一組就停了，補掃全部
-  if (hasViolation) {
+  }
+  // 拖曳預覽時：檢查被拖的賓客是否跟此桌的人有衝突
+  const previewDragId = dragPreview?.tableId === table.id ? dragPreview.draggedGuestId : null
+  if (previewDragId) {
     for (const ap of avoidPairs) {
-      if (guestIds.includes(ap.guestAId) && guestIds.includes(ap.guestBId)) {
+      const isConflict =
+        (ap.guestAId === previewDragId && guestIds.includes(ap.guestBId)) ||
+        (ap.guestBId === previewDragId && guestIds.includes(ap.guestAId))
+      if (isConflict) {
         violatingGuestIds.add(ap.guestAId)
         violatingGuestIds.add(ap.guestBId)
       }
@@ -252,7 +254,7 @@ export function TableNode({ table, isSelected, isDragging, onMouseDown }: Props)
         </g>
       )}
       {isRejectTable && (
-        <g transform={`translate(${radius * 0.8}, ${-radius - 8 - (hasViolation ? 36 : 0) - (isOverCapacity ? 36 : 0)})`}>
+        <g transform={`translate(${radius * 0.8}, ${-radius - 8 - (isOverCapacity ? 36 : 0)})`}>
           <rect x={0} y={0} width={64} height={32} rx={6} fill="#991B1B" />
           <polygon points="10,32 0,46 20,32" fill="#991B1B" />
           <text x={32} y={22} textAnchor="middle" fill="white" fontSize="16" fontWeight="600" fontFamily="'Noto Sans TC', sans-serif">
