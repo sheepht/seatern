@@ -66,7 +66,7 @@ export function calculateFitAll(
   const contentH = maxY - minY + padding * 2
 
   // zoom 使內容剛好 fit 進容器
-  const zoom = Math.max(0.25, Math.min(3, Math.min(containerW / contentW, containerH / contentH)))
+  const zoom = Math.max(0.25, Math.min(1, Math.min(containerW / contentW, containerH / contentH)))
 
   // pan 使內容居中
   const centerX = (minX + maxX) / 2

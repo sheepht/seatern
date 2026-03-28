@@ -38,9 +38,9 @@ describe('computeViewBox', () => {
     expect(result).toBe('0 0 4800 3200')
   })
 
-  it('handles zoom at max boundary (300%)', () => {
-    const result = computeViewBox(3, 0, 0, 1200, 800)
-    expect(result).toBe('0 0 400 266.6666666666667')
+  it('handles zoom at max boundary (100%)', () => {
+    const result = computeViewBox(1, 0, 0, 1200, 800)
+    expect(result).toBe('0 0 1200 800')
   })
 })
 
@@ -123,11 +123,12 @@ describe('calculateFitAll', () => {
     expect(result).toEqual({ zoom: 1, panX: 0, panY: 0 })
   })
 
-  it('clamps zoom to range [0.25, 3]', () => {
+  it('clamps zoom to range [0.25, 1]', () => {
     // Tables very far apart → zoom should be >= 0.25
     const tables = [makeTable('1', 0, 0), makeTable('2', 10000, 8000)]
     const result = calculateFitAll(tables, 800, 600)
     expect(result.zoom).toBeGreaterThanOrEqual(0.25)
+    expect(result.zoom).toBeLessThanOrEqual(1)
   })
 })
 

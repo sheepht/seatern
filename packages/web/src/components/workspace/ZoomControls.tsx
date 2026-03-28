@@ -9,7 +9,7 @@ interface Props {
   onSetZoom: (zoom: number) => void
 }
 
-const PRESETS = [0.5, 0.75, 1, 1.5, 2]
+const PRESETS = [0.25, 0.5, 0.75, 1]
 
 export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }: Props) {
   const [showPresets, setShowPresets] = useState(false)
@@ -28,7 +28,7 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }:
   }, [showPresets, showHelp])
 
   const atMin = zoom <= 0.25
-  const atMax = zoom >= 3
+  const atMax = zoom >= 1
 
   return (
     <div

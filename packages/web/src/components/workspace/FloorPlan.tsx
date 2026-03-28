@@ -321,7 +321,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       const prevPanY = panYRef.current
 
       const delta = isPinch ? -deltaY * 0.01 : -deltaY * 0.001
-      const nextZoom = Math.max(0.25, Math.min(3, prevZoom * (1 + delta)))
+      const nextZoom = Math.max(0.25, Math.min(1, prevZoom * (1 + delta)))
       if (nextZoom === prevZoom) return
 
       const rect = svg.getBoundingClientRect()
@@ -431,8 +431,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const zoomToTable = useCallback((tableId: string) => {
     const table = tables.find((t) => t.id === tableId)
     if (!table) return
-    const { panX: px, panY: py } = centerOnPoint(table.positionX, table.positionY, 1.5, cw, ch)
-    animateViewport(1.5, px, py, 400)
+    const { panX: px, panY: py } = centerOnPoint(table.positionX, table.positionY, 1, cw, ch)
+    animateViewport(1, px, py, 400)
   }, [tables, cw, ch, animateViewport])
 
   // 螢幕座標的座位位置（給 HTML drop zone + draggable overlay 用）
@@ -649,7 +649,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   // 以滑鼠位置為中心的 animated zoom helper
   const zoomByFactor = useCallback((factor: number) => {
     const prev = zoomRef.current
-    const next = Math.max(0.25, Math.min(3, prev * factor))
+    const next = Math.max(0.25, Math.min(1, prev * factor))
     if (next === prev) return
     const scale = next / prev
     const cx = mousePosRef.current.x
