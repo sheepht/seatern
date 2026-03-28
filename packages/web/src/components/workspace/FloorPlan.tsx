@@ -891,6 +891,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                   isSelected={table.id === selectedTableId}
                   isDragging={draggingTableId === table.id}
                   isDimmed={shouldDim && !highlightedIds.has(table.id)}
+                  zoom={zoom}
                   onMouseDown={(e) => handleMouseDown(table.id, e)}
                   onDoubleClick={() => zoomToTable(table.id)}
                 />

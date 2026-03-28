@@ -43,11 +43,20 @@ const CATEGORY_TEXT: Record<string, string> = {
   '共同': '#374151',
 }
 
+type ZoomLevel = 'detail' | 'normal' | 'overview'
+
+function getZoomLevel(zoom: number): ZoomLevel {
+  if (zoom > 1.2) return 'detail'
+  if (zoom < 0.6) return 'overview'
+  return 'normal'
+}
+
 interface Props {
   table: Table
   isSelected: boolean
   isDragging: boolean
   isDimmed?: boolean
+  zoom: number
   onMouseDown: (e: React.MouseEvent) => void
   onDoubleClick?: () => void
 }
@@ -134,7 +143,9 @@ function TableScoreRing({ score, originalScore, hasGuests }: { score: number; or
   )
 }
 
-export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown, onDoubleClick }: Props) {
+export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMouseDown, onDoubleClick }: Props) {
+  const zoomLevel = getZoomLevel(zoom)
+  const counterScale = 1 / zoom // 讓內容維持固定螢幕大小
   const getTableGuests = useSeatingStore((s) => s.getTableGuests)
   const getTableSeatCount = useSeatingStore((s) => s.getTableSeatCount)
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
@@ -360,9 +371,9 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
         </>
       )}
 
-      {/* 對話框 badge — 畫在桌子圓形之前，讓圓形蓋住尖角底部 */}
+      {/* 對話框 badge — counter-scale 維持固定螢幕大小 */}
       {isOverCapacity && (
-        <g transform={`translate(${radius * 0.8}, ${-radius - 8})`}>
+        <g transform={`translate(${radius * 0.8}, ${-radius - 8 * counterScale}) scale(${counterScale})`}>
           <rect x={0} y={0} width={88} height={32} rx={6} fill="#EA580C" />
           <polygon points="10,32 0,46 20,32" fill="#EA580C" />
           <text x={44} y={22} textAnchor="middle" fill="white" fontSize="16" fontWeight="600" fontFamily="'Noto Sans TC', sans-serif">
@@ -371,7 +382,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
         </g>
       )}
       {isRejectTable && (
-        <g transform={`translate(${radius * 0.8}, ${-radius - 8 - (isOverCapacity ? 36 : 0)})`}>
+        <g transform={`translate(${radius * 0.8}, ${-radius - (8 + (isOverCapacity ? 36 : 0)) * counterScale}) scale(${counterScale})`}>
           <rect x={0} y={0} width={64} height={32} rx={6} fill="#991B1B" />
           <polygon points="10,32 0,46 20,32" fill="#991B1B" />
           <text x={32} y={22} textAnchor="middle" fill="white" fontSize="16" fontWeight="600" fontFamily="'Noto Sans TC', sans-serif">
@@ -399,7 +410,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
         />
       )}
 
-      {/* 桌名（沿桌子上方弧形彎曲） */}
+      {/* 桌名（沿桌子上方弧形彎曲）— fontSize 補償 zoom 維持固定螢幕大小 */}
       <defs>
         <path
           id={`table-name-path-${table.id}`}
@@ -409,7 +420,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
       </defs>
       <text
         fill="#1C1917"
-        fontSize="20"
+        fontSize={20 * counterScale}
         fontWeight="bold"
         fontFamily="'Noto Sans TC', 'Plus Jakarta Sans', sans-serif"
       >
@@ -423,43 +434,87 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
         </textPath>
       </text>
 
-      {/* 滿意度圓環進度條 + 中央數字（帶動畫） */}
-      <TableScoreRing
-        score={guests.length > 0 ? (previewTableScore ?? recommendationTableScores.get(table.id) ?? table.averageSatisfaction) : 0}
-        originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
-        hasGuests={guests.length > 0}
-      />
+      {/* 滿意度圓環進度條 + 中央數字 — counter-scale 維持固定螢幕大小 */}
+      <g transform={`scale(${counterScale})`}>
+        {zoomLevel === 'overview' ? (
+          /* Overview 模式：只顯示數字 + 人數 */
+          <>
+            <text y={-2} textAnchor="middle" fontSize="22" fontWeight="800" fontFamily="'Plus Jakarta Sans', sans-serif"
+              style={{ fill: guests.length > 0 ? getSatisfactionColor(table.averageSatisfaction) : '#A8A29E' }}>
+              {guests.length > 0 ? Math.round(table.averageSatisfaction) : '空'}
+            </text>
+            <text y={18} textAnchor="middle" fontSize="12" fontWeight="500" fontFamily="'Plus Jakarta Sans', sans-serif" fill="#78716C">
+              {seatCount}/{table.capacity}人
+            </text>
+          </>
+        ) : (
+          <TableScoreRing
+            score={guests.length > 0 ? (previewTableScore ?? recommendationTableScores.get(table.id) ?? table.averageSatisfaction) : 0}
+            originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
+            hasGuests={guests.length > 0}
+          />
+        )}
+      </g>
 
-      {/* 眷屬群組：圓頭筆刷弧線 */}
-      {groupArcs.map((arc, i) => (
+      {/* 眷屬群組：圓頭筆刷弧線 — overview 模式隱藏 */}
+      {zoomLevel !== 'overview' && groupArcs.map((arc, i) => (
         <path
           key={`arc-${i}`}
           d={arc.path}
           fill="none"
           stroke={CATEGORY_COLORS[arc.category] || '#F3F4F6'}
-          strokeWidth="40"
+          strokeWidth={40 * counterScale}
           strokeLinecap="round"
           opacity={0.5}
         />
       ))}
 
-      {/* 空位（靜態，不需動畫，獨立一組避免干擾賓客的 DOM 順序） */}
-      {allSeats.filter((s) => s.type === 'empty').map((seat) => (
+      {/* Overview 模式：分類顏色條（取代個別賓客圓） */}
+      {zoomLevel === 'overview' && guests.length > 0 && (() => {
+        const counts: Record<string, number> = {}
+        for (const g of guests) {
+          const cat = g.category || '共同'
+          counts[cat] = (counts[cat] || 0) + 1
+        }
+        const total = guests.length
+        const barW = radius * 1.2
+        const barH = 8 * counterScale
+        const barY = 24 * counterScale // 在分數下方
+        let offsetX = -barW / 2
+        const segments: Array<{ x: number; w: number; color: string }> = []
+        for (const cat of ['男方', '女方', '共同']) {
+          const count = counts[cat] || 0
+          if (count === 0) continue
+          const w = (count / total) * barW
+          segments.push({ x: offsetX, w, color: CATEGORY_COLORS[cat] || '#F3F4F6' })
+          offsetX += w
+        }
+        return (
+          <g transform={`translate(0, ${barY})`}>
+            {segments.map((seg, i) => (
+              <rect key={i} x={seg.x} y={0} width={seg.w} height={barH} rx={barH / 2} fill={seg.color} />
+            ))}
+          </g>
+        )
+      })()}
+
+      {/* 空位（靜態）— overview 模式隱藏 */}
+      {zoomLevel !== 'overview' && allSeats.filter((s) => s.type === 'empty').map((seat) => (
         <circle
           key={`empty-${seat.seatIndex}`}
           cx={seat.x}
           cy={seat.y}
-          r={20}
+          r={20 * counterScale}
           fill="none"
           stroke="#D6D3D1"
-          strokeWidth="1.5"
-          strokeDasharray="4 3"
+          strokeWidth={1.5 * counterScale}
+          strokeDasharray={`${4 * counterScale} ${3 * counterScale}`}
         />
       ))}
 
-      {/* 賓客圖層 — 重排時立刻隱藏（浮動圓圈取代） */}
+      {/* 賓客圖層 — overview 模式隱藏，重排時立刻隱藏 */}
       <g style={{
-        opacity: isResetting ? 0 : 1,
+        opacity: isResetting ? 0 : zoomLevel === 'overview' ? 0 : 1,
       }}>
 
       {/* 有人的座位（賓客 + 眷屬），用 guest ID 作為穩定 key + FLIP 動畫 */}
@@ -480,18 +535,18 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
           return (
             <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)`, opacity: isFlying ? 0 : undefined }}>
               <circle
-                r={20}
+                r={20 * counterScale}
                 fill={bgColor}
                 stroke="white"
-                strokeWidth="1.5"
+                strokeWidth={1.5 * counterScale}
                 opacity={0.6}
               />
               {isLast && (
                 <text
-                  y={6}
+                  y={6 * counterScale}
                   textAnchor="middle"
                   fill={textColor}
-                  fontSize="14"
+                  fontSize={14 * counterScale}
                   fontWeight="600"
                   fontFamily="'Plus Jakarta Sans', sans-serif"
                   opacity={0.7}
@@ -510,8 +565,8 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
         const recGuestScore = recommendationGuestScore?.guestId === seat.guest!.id ? recommendationGuestScore.score : undefined
         const guestScore = previewScores?.get(seat.guest!.id) ?? recGuestScore ?? seat.guest!.satisfactionScore
         const guestSatColor = getSatisfactionColor(guestScore)
-        const guestR = 20
-        const guestRingR = guestR + 3
+        const guestR = 20 * counterScale
+        const guestRingR = guestR + 3 * counterScale
         const guestCircum = 2 * Math.PI * guestRingR
         const guestProgress = Math.min(guestScore / 100, 1)
 
@@ -522,13 +577,13 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
               r={guestRingR}
               fill="none"
               stroke="#E7E5E4"
-              strokeWidth="2"
+              strokeWidth={2 * counterScale}
             />
             {guestScore > 0 && (
               <circle
                 r={guestRingR}
                 fill="none"
-                strokeWidth="2"
+                strokeWidth={2 * counterScale}
                 strokeLinecap="round"
                 strokeDashoffset={guestCircum * 0.25}
                 transform="rotate(-90)"
@@ -544,13 +599,13 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
               r={guestR}
               fill={bgColor}
               stroke="white"
-              strokeWidth={1.5}
+              strokeWidth={1.5 * counterScale}
             />
             <text
-              y={6}
+              y={6 * counterScale}
               textAnchor="middle"
               fill={textColor}
-              fontSize="16"
+              fontSize={16 * counterScale}
               fontWeight="500"
               fontFamily="'Noto Sans TC', sans-serif"
             >
@@ -560,9 +615,9 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
         )
       })}
 
-      {/* 圖示層：怒氣 + 推薦（在所有賓客之上，不會被其他賓客蓋住） */}
-      {allSeats.filter((s) => s.type === 'guest' && s.guest).map((seat) => {
-        const guestR = 20
+      {/* 圖示層：怒氣 + 推薦（在所有賓客之上）— overview 模式隱藏 */}
+      {zoomLevel !== 'overview' && allSeats.filter((s) => s.type === 'guest' && s.guest).map((seat) => {
+        const guestR = 20 * counterScale
         const hasViolation = violatingGuestIds.has(seat.guest!.id)
         const hasRecommendation = guestsWithRecommendations.has(seat.guest!.id) && !hasViolation
 
