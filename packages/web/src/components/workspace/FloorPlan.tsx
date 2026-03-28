@@ -351,10 +351,14 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         if (document.activeElement?.closest('[role="dialog"]')) return
         e.preventDefault()
         spaceHeldRef.current = true
+        setSpaceHeld(true)
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') spaceHeldRef.current = false
+      if (e.code === 'Space') {
+        spaceHeldRef.current = false
+        setSpaceHeld(false)
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -524,6 +528,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const startPan = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     isPanningRef.current = true
+    setIsPanning(true)
     panStartRef.current = { x: e.clientX, y: e.clientY, panX, panY }
   }, [panX, panY])
 
@@ -588,6 +593,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const handleMouseUp = useCallback(() => {
     if (isPanningRef.current) {
       isPanningRef.current = false
+      setIsPanning(false)
       wasPanningRef.current = true // 防止 click 取消選中
       return
     }
@@ -630,40 +636,53 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     setPanY(Math.round(ch / 2 - scale * (ch / 2 - panYRef.current)))
   }, [cw, ch])
 
-  // ─── Canvas focus + 鍵盤快捷鍵 ─────────────────────
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    // Space pan 在 window listener 處理（需要追蹤 held 狀態）
-    if (e.key === '+' || e.key === '=') {
-      e.preventDefault()
-      zoomByFactor(1.25)
-    } else if (e.key === '-') {
-      e.preventDefault()
-      zoomByFactor(1 / 1.25)
-    } else if (e.key === '0') {
-      e.preventDefault()
-      fitAll(true)
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault()
-      setPanX((px) => Math.round(px + 100))
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault()
-      setPanX((px) => Math.round(px - 100))
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setPanY((py) => Math.round(py + 100))
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setPanY((py) => Math.round(py - 100))
-    }
-  }, [cw, ch, fitAll])
+  // ─── 鍵盤快捷鍵（window listener，不依賴 SVG focus）─────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 輸入框、dialog 內不攔截
+      const tag = (document.activeElement?.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+      if (document.activeElement?.hasAttribute('contenteditable')) return
+      if (document.activeElement?.closest('[role="dialog"]')) return
 
-  // 游標樣式
-  const cursorStyle = spaceHeldRef.current
-    ? (isPanningRef.current ? 'grabbing' : 'grab')
-    : (draggingTableId ? 'default' : undefined)
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault()
+        zoomByFactor(1.25)
+      } else if (e.key === '-') {
+        e.preventDefault()
+        zoomByFactor(1 / 1.25)
+      } else if (e.key === '0') {
+        e.preventDefault()
+        fitAll(true)
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        setPanX((px) => Math.round(px + 100))
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        setPanX((px) => Math.round(px - 100))
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setPanY((py) => Math.round(py + 100))
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setPanY((py) => Math.round(py - 100))
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [zoomByFactor, fitAll])
+
+  // Pan 游標狀態（用 state 而非 ref，確保 re-render 更新游標）
+  const [isPanning, setIsPanning] = useState(false)
+  const [spaceHeld, setSpaceHeld] = useState(false)
+
+  const cursorStyle = isPanning ? 'grabbing'
+    : spaceHeld ? 'grab'
+    : draggingTableId ? 'default'
+    : undefined
 
   return (
-    <div ref={containerRef} className="relative w-full h-full">
+    <div ref={containerRef} className="relative w-full h-full" style={cursorStyle ? { cursor: cursorStyle } : undefined}>
       {/* SVG 平面圖 — tabIndex={0} 讓畫布可以接收 focus 和鍵盤事件 */}
       <svg
         id="floorplan-svg"
@@ -678,7 +697,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onClick={handleCanvasClick}
-        onKeyDown={handleKeyDown}
       >
         <defs>
           <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
@@ -866,8 +884,15 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         )}
       </svg>
 
-      {/* HTML overlay 層（拖桌子時禁用） */}
-      <div style={{ pointerEvents: draggingTableId ? 'none' : undefined }}>
+      {/* HTML overlay 層（拖桌子時禁用）— wheel 事件穿透到 SVG */}
+      <div
+        style={{ pointerEvents: draggingTableId ? 'none' : undefined }}
+        onWheel={(e) => {
+          // 讓 wheel 事件穿透 overlay 到 SVG
+          e.stopPropagation()
+          handleWheel(e as any)
+        }}
+      >
         {/* 每個座位的 drop zone（含空位） */}
         {screenSeats.map((ss) => (
           <SeatDropZone
