@@ -266,6 +266,14 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const [panY, setPanY] = useState(0)
   const [containerSize, setContainerSize] = useState({ w: CANVAS_WIDTH, h: CANVAS_HEIGHT })
 
+  // Ref mirrors：讓 wheel handler 能在 useCallback([]) 中讀取最新值
+  const zoomRef = useRef(zoom)
+  const panXRef = useRef(panX)
+  const panYRef = useRef(panY)
+  zoomRef.current = zoom
+  panXRef.current = panX
+  panYRef.current = panY
+
   // ResizeObserver 追蹤容器大小
   useEffect(() => {
     const el = containerRef.current
@@ -306,23 +314,30 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
     wheelRafRef.current = requestAnimationFrame(() => {
       wheelRafRef.current = null
-      // Zoom: 以游標位置為中心
+      const svg = svgRef.current
+      if (!svg) return
+
+      // 從 ref 讀取最新值（不依賴 closure 捕獲的 stale state）
+      const prevZoom = zoomRef.current
+      const prevPanX = panXRef.current
+      const prevPanY = panYRef.current
+
       const delta = isPinch ? -deltaY * 0.01 : -deltaY * 0.001
-      const factor = 1 + delta
-      setZoom((prev) => {
-        const next = Math.max(0.25, Math.min(3, prev * factor))
-        // 調整 panX/panY 使游標位置不動
-        const svg = svgRef.current
-        if (svg) {
-          const rect = svg.getBoundingClientRect()
-          const cx = clientX - rect.left
-          const cy = clientY - rect.top
-          const scale = next / prev
-          setPanX((px) => Math.round(cx - scale * (cx - px)))
-          setPanY((py) => Math.round(cy - scale * (cy - py)))
-        }
-        return next
-      })
+      const nextZoom = Math.max(0.25, Math.min(3, prevZoom * (1 + delta)))
+      if (nextZoom === prevZoom) return
+
+      // 以游標位置為中心縮放
+      const rect = svg.getBoundingClientRect()
+      const cx = clientX - rect.left
+      const cy = clientY - rect.top
+      const scale = nextZoom / prevZoom
+      const nextPanX = Math.round(cx - scale * (cx - prevPanX))
+      const nextPanY = Math.round(cy - scale * (cy - prevPanY))
+
+      // 三個 setter 在同一層級呼叫（不嵌套），React 自動 batch
+      setZoom(nextZoom)
+      setPanX(nextPanX)
+      setPanY(nextPanY)
     })
   }, [])
 
@@ -604,26 +619,26 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     [setSelectedTable],
   )
 
+  // 以 viewport 中心為基準的 zoom helper
+  const zoomByFactor = useCallback((factor: number) => {
+    const prev = zoomRef.current
+    const next = Math.max(0.25, Math.min(3, prev * factor))
+    if (next === prev) return
+    const scale = next / prev
+    setZoom(next)
+    setPanX(Math.round(cw / 2 - scale * (cw / 2 - panXRef.current)))
+    setPanY(Math.round(ch / 2 - scale * (ch / 2 - panYRef.current)))
+  }, [cw, ch])
+
   // ─── Canvas focus + 鍵盤快捷鍵 ─────────────────────
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     // Space pan 在 window listener 處理（需要追蹤 held 狀態）
     if (e.key === '+' || e.key === '=') {
       e.preventDefault()
-      setZoom((z) => {
-        const next = Math.min(3, z * 1.25)
-        // 以 viewport 中心為基準
-        setPanX((px) => Math.round(cw / 2 - (cw / 2 - px) * (next / z)))
-        setPanY((py) => Math.round(ch / 2 - (ch / 2 - py) * (next / z)))
-        return next
-      })
+      zoomByFactor(1.25)
     } else if (e.key === '-') {
       e.preventDefault()
-      setZoom((z) => {
-        const next = Math.max(0.25, z / 1.25)
-        setPanX((px) => Math.round(cw / 2 - (cw / 2 - px) * (next / z)))
-        setPanY((py) => Math.round(ch / 2 - (ch / 2 - py) * (next / z)))
-        return next
-      })
+      zoomByFactor(1 / 1.25)
     } else if (e.key === '0') {
       e.preventDefault()
       fitAll(true)
@@ -901,22 +916,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       {tables.length > 0 && (
         <ZoomControls
           zoom={zoom}
-          onZoomIn={() => {
-            setZoom((z) => {
-              const next = Math.min(3, z * 1.25)
-              setPanX((px) => Math.round(cw / 2 - (cw / 2 - px) * (next / z)))
-              setPanY((py) => Math.round(ch / 2 - (ch / 2 - py) * (next / z)))
-              return next
-            })
-          }}
-          onZoomOut={() => {
-            setZoom((z) => {
-              const next = Math.max(0.25, z / 1.25)
-              setPanX((px) => Math.round(cw / 2 - (cw / 2 - px) * (next / z)))
-              setPanY((py) => Math.round(ch / 2 - (ch / 2 - py) * (next / z)))
-              return next
-            })
-          }}
+          onZoomIn={() => zoomByFactor(1.25)}
+          onZoomOut={() => zoomByFactor(1 / 1.25)}
           onFitAll={() => fitAll(true)}
           onSetZoom={(targetZoom) => {
             const { panX: px, panY: py } = centerOnPoint(
