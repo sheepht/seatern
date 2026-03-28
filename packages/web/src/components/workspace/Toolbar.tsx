@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Menu, History, Ban, Shuffle, Download, Lock } from 'lucide-react'
+import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2 } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
 import { AvoidPairModal } from './AvoidPairModal'
@@ -54,7 +54,8 @@ export function Toolbar() {
 
   const handleSave = async () => {
     setSaving(true)
-    const name = `快照 ${new Date().toLocaleString('zh-TW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+    const now = new Date()
+    const name = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     await saveSnapshot(name)
     setSaving(false)
   }
@@ -470,29 +471,29 @@ export function Toolbar() {
           <button
             onClick={handleAddTable}
             disabled={adding}
-            className="px-3.5 py-1.5 text-sm font-semibold text-white rounded cursor-pointer disabled:opacity-50 hover:brightness-90"
+            className="flex items-center gap-1.5 whitespace-nowrap px-3.5 py-1.5 text-sm font-semibold text-white rounded cursor-pointer disabled:opacity-50 hover:brightness-90"
             style={{ fontFamily: 'var(--font-display)', background: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
           >
-            + 新桌
+            <Plus size={14} /> 新桌
           </button>
 
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
+            className="flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
             style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
           >
-            {saving ? '儲存中...' : '儲存'}
+            <Save size={14} /> {saving ? '儲存中...' : '儲存'}
           </button>
 
           <button
             onClick={animateUndo}
             disabled={undoStack.length === 0}
-            className="px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
+            className="flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
             style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
             title="Ctrl+Z"
           >
-            還原
+            <Undo2 size={14} /> 還原
           </button>
 
           {/* ☰ 選單按鈕 */}
