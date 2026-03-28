@@ -595,11 +595,15 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     [draggingTableId, getSvgPoint, updateTablePosition, updateScreenPositions],
   )
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
     if (isPanningRef.current) {
+      const dx = e.clientX - panStartRef.current.x
+      const dy = e.clientY - panStartRef.current.y
+      const didMove = Math.abs(dx) > 3 || Math.abs(dy) > 3
       isPanningRef.current = false
       setIsPanning(false)
-      wasPanningRef.current = true // 防止 click 取消選中
+      // 只有真的拖動過才算 pan（防止 click 取消選中被吞掉）
+      wasPanningRef.current = didMove
       return
     }
     if (draggingTableId && didDragRef.current) {
@@ -621,9 +625,12 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const wasPanningRef = useRef(false)
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
-      // pan 結束後不要觸發 click（取消選中桌子）
+      // pan 結束後不觸發（真的拖動過才算）
       if (wasPanningRef.current) { wasPanningRef.current = false; return }
-      if (e.target === svgRef.current || (e.target as SVGElement).tagName === 'rect') {
+      // 點在桌子的 <g> 裡面 → 不取消選取（由 TableNode 處理）
+      const target = e.target as SVGElement
+      const isOnTable = target.closest?.('[data-table-id]')
+      if (!isOnTable) {
         setSelectedTable(null)
       }
     },
