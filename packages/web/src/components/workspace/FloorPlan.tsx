@@ -300,24 +300,22 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
   const spaceHeldRef = useRef(false)
 
-  // Wheel zoom — RAF throttle
+  // Wheel zoom — 用 native listener 確保 non-passive（trackpad pinch 需要 preventDefault）
   const wheelRafRef = useRef<number | null>(null)
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
-    if (wheelRafRef.current) return // throttle: 每幀只處理一次
+  const handleWheelNative = useCallback((e: WheelEvent) => {
+    e.preventDefault() // 阻止瀏覽器預設縮放（trackpad pinch）和捲動
+    if (wheelRafRef.current) return
 
-    // 在 RAF callback 之前先存好滑鼠座標和 delta（React SyntheticEvent 會被回收）
     const clientX = e.clientX
     const clientY = e.clientY
     const deltaY = e.deltaY
-    const isPinch = e.ctrlKey
+    const isPinch = e.ctrlKey // trackpad pinch → ctrlKey=true
 
     wheelRafRef.current = requestAnimationFrame(() => {
       wheelRafRef.current = null
       const svg = svgRef.current
       if (!svg) return
 
-      // 從 ref 讀取最新值（不依賴 closure 捕獲的 stale state）
       const prevZoom = zoomRef.current
       const prevPanX = panXRef.current
       const prevPanY = panYRef.current
@@ -326,7 +324,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       const nextZoom = Math.max(0.25, Math.min(3, prevZoom * (1 + delta)))
       if (nextZoom === prevZoom) return
 
-      // 以游標位置為中心縮放
       const rect = svg.getBoundingClientRect()
       const cx = clientX - rect.left
       const cy = clientY - rect.top
@@ -334,12 +331,19 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       const nextPanX = Math.round(cx - scale * (cx - prevPanX))
       const nextPanY = Math.round(cy - scale * (cy - prevPanY))
 
-      // 三個 setter 在同一層級呼叫（不嵌套），React 自動 batch
       setZoom(nextZoom)
       setPanX(nextPanX)
       setPanY(nextPanY)
     })
   }, [])
+
+  // 掛載 native wheel listener（non-passive），確保 trackpad pinch 的 preventDefault 生效
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    el.addEventListener('wheel', handleWheelNative, { passive: false })
+    return () => el.removeEventListener('wheel', handleWheelNative)
+  }, [handleWheelNative])
 
   // Space 鍵追蹤（pan 模式）
   useEffect(() => {
@@ -378,7 +382,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     duration = 300,
   ) => {
     if (animRef.current) cancelAnimationFrame(animRef.current)
-    const startZoom = zoom, startPanX = panX, startPanY = panY
+    // 從 ref 讀取起始值（避免 stale closure）
+    const startZoom = zoomRef.current, startPanX = panXRef.current, startPanY = panYRef.current
     const startTime = performance.now()
     const tick = (now: number) => {
       const t = Math.min((now - startTime) / duration, 1)
@@ -393,7 +398,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       }
     }
     animRef.current = requestAnimationFrame(tick)
-  }, [zoom, panX, panY])
+  }, [])
 
   // cleanup animation on unmount
   useEffect(() => () => { if (animRef.current) cancelAnimationFrame(animRef.current) }, [])
@@ -625,16 +630,27 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     [setSelectedTable],
   )
 
-  // 以 viewport 中心為基準的 zoom helper
+  // 追蹤滑鼠在容器中的位置（+/- 快捷鍵 zoom 以滑鼠為中心）
+  const mousePosRef = useRef({ x: 0, y: 0 })
+  const handleGlobalMouseMove = useCallback((e: React.MouseEvent) => {
+    const container = containerRef.current
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    mousePosRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }, [])
+
+  // 以滑鼠位置為中心的 animated zoom helper
   const zoomByFactor = useCallback((factor: number) => {
     const prev = zoomRef.current
     const next = Math.max(0.25, Math.min(3, prev * factor))
     if (next === prev) return
     const scale = next / prev
-    setZoom(next)
-    setPanX(Math.round(cw / 2 - scale * (cw / 2 - panXRef.current)))
-    setPanY(Math.round(ch / 2 - scale * (ch / 2 - panYRef.current)))
-  }, [cw, ch])
+    const cx = mousePosRef.current.x
+    const cy = mousePosRef.current.y
+    const targetPanX = Math.round(cx - scale * (cx - panXRef.current))
+    const targetPanY = Math.round(cy - scale * (cy - panYRef.current))
+    animateViewport(next, targetPanX, targetPanY, 150)
+  }, [animateViewport])
 
   // ─── 鍵盤快捷鍵（window listener，不依賴 SVG focus）─────
   useEffect(() => {
@@ -656,21 +672,21 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         fitAll(true)
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault()
-        setPanX((px) => Math.round(px + 100))
+        animateViewport(zoomRef.current, panXRef.current + 100, panYRef.current, 150)
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
-        setPanX((px) => Math.round(px - 100))
+        animateViewport(zoomRef.current, panXRef.current - 100, panYRef.current, 150)
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
-        setPanY((py) => Math.round(py + 100))
+        animateViewport(zoomRef.current, panXRef.current, panYRef.current + 100, 150)
       } else if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setPanY((py) => Math.round(py - 100))
+        animateViewport(zoomRef.current, panXRef.current, panYRef.current - 100, 150)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [zoomByFactor, fitAll])
+  }, [zoomByFactor, fitAll, animateViewport])
 
   // Pan 游標狀態（用 state 而非 ref，確保 re-render 更新游標）
   const [isPanning, setIsPanning] = useState(false)
@@ -682,7 +698,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     : undefined
 
   return (
-    <div ref={containerRef} className="relative w-full h-full" style={cursorStyle ? { cursor: cursorStyle } : undefined}>
+    <div ref={containerRef} className="relative w-full h-full" style={cursorStyle ? { cursor: cursorStyle } : undefined} onMouseMove={handleGlobalMouseMove}>
       {/* SVG 平面圖 — tabIndex={0} 讓畫布可以接收 focus 和鍵盤事件 */}
       <svg
         id="floorplan-svg"
@@ -691,7 +707,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         viewBox={viewBoxStr}
         className="w-full h-full bg-[#FAFAFA] outline-none"
         style={{ userSelect: 'none', overflow: 'hidden', cursor: cursorStyle }}
-        onWheel={handleWheel}
         onMouseDown={handleSvgMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -884,15 +899,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         )}
       </svg>
 
-      {/* HTML overlay 層（拖桌子時禁用）— wheel 事件穿透到 SVG */}
-      <div
-        style={{ pointerEvents: draggingTableId ? 'none' : undefined }}
-        onWheel={(e) => {
-          // 讓 wheel 事件穿透 overlay 到 SVG
-          e.stopPropagation()
-          handleWheel(e as any)
-        }}
-      >
+      {/* HTML overlay 層（拖桌子時禁用） */}
+      <div style={{ pointerEvents: draggingTableId ? 'none' : undefined }}>
         {/* 每個座位的 drop zone（含空位） */}
         {screenSeats.map((ss) => (
           <SeatDropZone
