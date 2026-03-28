@@ -5,3 +5,4 @@ dist/
 .env.local
 packages/db/prisma/generated/
 .claude/skills/gstack/
+.gstack/
