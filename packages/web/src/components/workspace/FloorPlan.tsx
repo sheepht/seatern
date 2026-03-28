@@ -297,14 +297,17 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
     if (wheelRafRef.current) return // throttle: 每幀只處理一次
+
+    // 在 RAF callback 之前先存好滑鼠座標和 delta（React SyntheticEvent 會被回收）
+    const clientX = e.clientX
+    const clientY = e.clientY
+    const deltaY = e.deltaY
+    const isPinch = e.ctrlKey
+
     wheelRafRef.current = requestAnimationFrame(() => {
       wheelRafRef.current = null
-      const isPinch = e.ctrlKey // trackpad pinch
-      if (!isPinch && !e.shiftKey && Math.abs(e.deltaX) < Math.abs(e.deltaY) * 0.5 === false) {
-        // 兩指滑動（non-pinch, horizontal-ish）→ pan
-      }
       // Zoom: 以游標位置為中心
-      const delta = isPinch ? -e.deltaY * 0.01 : -e.deltaY * 0.001
+      const delta = isPinch ? -deltaY * 0.01 : -deltaY * 0.001
       const factor = 1 + delta
       setZoom((prev) => {
         const next = Math.max(0.25, Math.min(3, prev * factor))
@@ -312,8 +315,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         const svg = svgRef.current
         if (svg) {
           const rect = svg.getBoundingClientRect()
-          const cx = e.clientX - rect.left
-          const cy = e.clientY - rect.top
+          const cx = clientX - rect.left
+          const cy = clientY - rect.top
           const scale = next / prev
           setPanX((px) => Math.round(cx - scale * (cx - px)))
           setPanY((py) => Math.round(cy - scale * (cy - py)))
@@ -502,11 +505,21 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     return () => window.removeEventListener('resize', updateScreenPositions)
   }, [updateScreenPositions])
 
+  // 開始 pan（共用邏輯）
+  const startPan = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    isPanningRef.current = true
+    panStartRef.current = { x: e.clientX, y: e.clientY, panX, panY }
+  }, [panX, panY])
+
   const handleMouseDown = useCallback(
     (tableId: string, e: React.MouseEvent) => {
-      e.stopPropagation()
       // Space 按住或中鍵 → pan 模式，不拖桌子
-      if (spaceHeldRef.current || e.button === 1) return
+      if (spaceHeldRef.current || e.button === 1) {
+        startPan(e)
+        return
+      }
+      e.stopPropagation()
 
       const table = tables.find((t) => t.id === tableId)
       if (!table) return
@@ -518,17 +531,22 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       didDragRef.current = false
       setSelectedTable(tableId)
     },
-    [tables, getSvgPoint, setSelectedTable],
+    [tables, getSvgPoint, setSelectedTable, startPan],
   )
 
-  // SVG 上的 mousedown（畫布背景或 Space/中鍵拖曳 → pan）
+  // SVG 上的 mousedown（畫布背景拖曳 → pan，或 Space/中鍵）
   const handleSvgMouseDown = useCallback((e: React.MouseEvent) => {
+    // Space 或中鍵 → 永遠 pan
     if (spaceHeldRef.current || e.button === 1) {
-      e.preventDefault()
-      isPanningRef.current = true
-      panStartRef.current = { x: e.clientX, y: e.clientY, panX, panY }
+      startPan(e)
+      return
     }
-  }, [panX, panY])
+    // 左鍵點擊畫布背景 → 也觸發 pan（不是點在桌子上）
+    const target = e.target as SVGElement
+    if (target === svgRef.current || target.tagName === 'rect' || target.tagName === 'pattern') {
+      startPan(e)
+    }
+  }, [startPan])
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -555,6 +573,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const handleMouseUp = useCallback(() => {
     if (isPanningRef.current) {
       isPanningRef.current = false
+      wasPanningRef.current = true // 防止 click 取消選中
       return
     }
     if (draggingTableId && didDragRef.current) {
@@ -573,8 +592,11 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     setDraggingTableId(null)
   }, [draggingTableId, saveTablePosition, tables, updateTablePosition, updateScreenPositions])
 
+  const wasPanningRef = useRef(false)
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
+      // pan 結束後不要觸發 click（取消選中桌子）
+      if (wasPanningRef.current) { wasPanningRef.current = false; return }
       if (e.target === svgRef.current || (e.target as SVGElement).tagName === 'rect') {
         setSelectedTable(null)
       }
