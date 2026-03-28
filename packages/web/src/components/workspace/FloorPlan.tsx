@@ -1,10 +1,13 @@
-import { useCallback, useState, useRef, useEffect } from 'react'
+import { useCallback, useState, useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from 'react'
 import { useSeatingStore, type Guest } from '@/stores/seating'
 import { recalculateAll } from '@/lib/satisfaction'
 import { computeAvoidancePath, getPathEndDirection } from '@/lib/path-routing'
+import { calculateFitAll, centerOnPoint } from '@/lib/viewport'
 import { TableNode } from './TableNode'
 import { SeatDropZone } from './SeatDropZone'
 import { GuestSeatOverlay } from './GuestSeatOverlay'
+import { ZoomControls } from './ZoomControls'
+import { Minimap } from './Minimap'
 
 interface Recommendation {
   tableId: string
@@ -34,7 +37,11 @@ interface ScreenSeat {
   radius: number
 }
 
-export function FloorPlan() {
+export interface FloorPlanHandle {
+  fitAll: (animated?: boolean) => void
+}
+
+export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, ref) {
   const tables = useSeatingStore((s) => s.tables)
   const guests = useSeatingStore((s) => s.guests)
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
@@ -253,6 +260,154 @@ export function FloorPlan() {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // ─── Zoom / Pan 狀態 ──────────────────────────────────
+  const [zoom, setZoom] = useState(1)
+  const [panX, setPanX] = useState(0)
+  const [panY, setPanY] = useState(0)
+  const [containerSize, setContainerSize] = useState({ w: CANVAS_WIDTH, h: CANVAS_HEIGHT })
+
+  // ResizeObserver 追蹤容器大小
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect
+      if (width > 0 && height > 0) setContainerSize({ w: width, h: height })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // ViewBox 計算（division-by-zero guard）
+  const cw = containerSize.w || CANVAS_WIDTH
+  const ch = containerSize.h || CANVAS_HEIGHT
+  const viewBoxX = -panX / zoom
+  const viewBoxY = -panY / zoom
+  const viewBoxW = cw / zoom
+  const viewBoxH = ch / zoom
+  const viewBoxStr = `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`
+
+  // Pan 狀態追蹤
+  const isPanningRef = useRef(false)
+  const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
+  const spaceHeldRef = useRef(false)
+
+  // Wheel zoom — RAF throttle
+  const wheelRafRef = useRef<number | null>(null)
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault()
+    if (wheelRafRef.current) return // throttle: 每幀只處理一次
+    wheelRafRef.current = requestAnimationFrame(() => {
+      wheelRafRef.current = null
+      const isPinch = e.ctrlKey // trackpad pinch
+      if (!isPinch && !e.shiftKey && Math.abs(e.deltaX) < Math.abs(e.deltaY) * 0.5 === false) {
+        // 兩指滑動（non-pinch, horizontal-ish）→ pan
+      }
+      // Zoom: 以游標位置為中心
+      const delta = isPinch ? -e.deltaY * 0.01 : -e.deltaY * 0.001
+      const factor = 1 + delta
+      setZoom((prev) => {
+        const next = Math.max(0.25, Math.min(3, prev * factor))
+        // 調整 panX/panY 使游標位置不動
+        const svg = svgRef.current
+        if (svg) {
+          const rect = svg.getBoundingClientRect()
+          const cx = e.clientX - rect.left
+          const cy = e.clientY - rect.top
+          const scale = next / prev
+          setPanX((px) => Math.round(cx - scale * (cx - px)))
+          setPanY((py) => Math.round(cy - scale * (cy - py)))
+        }
+        return next
+      })
+    })
+  }, [])
+
+  // Space 鍵追蹤（pan 模式）
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) {
+        const tag = (document.activeElement?.tagName || '').toLowerCase()
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+        if (document.activeElement?.hasAttribute('contenteditable')) return
+        if (document.activeElement?.closest('[role="dialog"]')) return
+        e.preventDefault()
+        spaceHeldRef.current = true
+      }
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') spaceHeldRef.current = false
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
+  }, [])
+
+  // ─── Viewport 動畫 ──────────────────────────────────
+  const animRef = useRef<number | null>(null)
+
+  const animateViewport = useCallback((
+    targetZoom: number,
+    targetPanX: number,
+    targetPanY: number,
+    duration = 300,
+  ) => {
+    if (animRef.current) cancelAnimationFrame(animRef.current)
+    const startZoom = zoom, startPanX = panX, startPanY = panY
+    const startTime = performance.now()
+    const tick = (now: number) => {
+      const t = Math.min((now - startTime) / duration, 1)
+      const ease = 1 - Math.pow(1 - t, 3) // ease-out cubic
+      setZoom(startZoom + (targetZoom - startZoom) * ease)
+      setPanX(Math.round(startPanX + (targetPanX - startPanX) * ease))
+      setPanY(Math.round(startPanY + (targetPanY - startPanY) * ease))
+      if (t < 1) {
+        animRef.current = requestAnimationFrame(tick)
+      } else {
+        animRef.current = null
+      }
+    }
+    animRef.current = requestAnimationFrame(tick)
+  }, [zoom, panX, panY])
+
+  // cleanup animation on unmount
+  useEffect(() => () => { if (animRef.current) cancelAnimationFrame(animRef.current) }, [])
+
+  const fitAll = useCallback((animated = true) => {
+    const { zoom: z, panX: px, panY: py } = calculateFitAll(tables, cw, ch)
+    if (animated) {
+      animateViewport(z, px, py, 300)
+    } else {
+      setZoom(z)
+      setPanX(px)
+      setPanY(py)
+    }
+  }, [tables, cw, ch, animateViewport])
+
+  useImperativeHandle(ref, () => ({ fitAll }), [fitAll])
+
+  // 初始載入時 fit-all（等桌子載完）
+  const initialFitDoneRef = useRef(false)
+  useEffect(() => {
+    if (tables.length > 0 && !initialFitDoneRef.current) {
+      initialFitDoneRef.current = true
+      const { zoom: z, panX: px, panY: py } = calculateFitAll(tables, cw, ch)
+      setZoom(z)
+      setPanX(px)
+      setPanY(py)
+    }
+  }, [tables.length, cw, ch])
+
+  const zoomToTable = useCallback((tableId: string) => {
+    const table = tables.find((t) => t.id === tableId)
+    if (!table) return
+    const { panX: px, panY: py } = centerOnPoint(table.positionX, table.positionY, 1.5, cw, ch)
+    animateViewport(1.5, px, py, 400)
+  }, [tables, cw, ch, animateViewport])
+
   // 螢幕座標的座位位置（給 HTML drop zone + draggable overlay 用）
   const [screenSeats, setScreenSeats] = useState<ScreenSeat[]>([])
 
@@ -336,9 +491,13 @@ export function FloorPlan() {
     setScreenSeats(allScreenSeats)
   }, [tables, guests])
 
-  // 桌次位置或大小改變時更新 overlay
-  useEffect(() => {
+  // 桌次位置、大小、或 zoom/pan 改變時更新 overlay
+  // useLayoutEffect 確保在 paint 前更新，避免 overlay 閃爍
+  useLayoutEffect(() => {
     updateScreenPositions()
+  }, [updateScreenPositions, zoom, panX, panY])
+
+  useEffect(() => {
     window.addEventListener('resize', updateScreenPositions)
     return () => window.removeEventListener('resize', updateScreenPositions)
   }, [updateScreenPositions])
@@ -346,6 +505,9 @@ export function FloorPlan() {
   const handleMouseDown = useCallback(
     (tableId: string, e: React.MouseEvent) => {
       e.stopPropagation()
+      // Space 按住或中鍵 → pan 模式，不拖桌子
+      if (spaceHeldRef.current || e.button === 1) return
+
       const table = tables.find((t) => t.id === tableId)
       if (!table) return
 
@@ -359,28 +521,57 @@ export function FloorPlan() {
     [tables, getSvgPoint, setSelectedTable],
   )
 
+  // SVG 上的 mousedown（畫布背景或 Space/中鍵拖曳 → pan）
+  const handleSvgMouseDown = useCallback((e: React.MouseEvent) => {
+    if (spaceHeldRef.current || e.button === 1) {
+      e.preventDefault()
+      isPanningRef.current = true
+      panStartRef.current = { x: e.clientX, y: e.clientY, panX, panY }
+    }
+  }, [panX, panY])
+
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      // Pan 模式
+      if (isPanningRef.current) {
+        const dx = e.clientX - panStartRef.current.x
+        const dy = e.clientY - panStartRef.current.y
+        setPanX(Math.round(panStartRef.current.panX + dx))
+        setPanY(Math.round(panStartRef.current.panY + dy))
+        return
+      }
+      // 桌子拖曳
       if (!draggingTableId) return
       didDragRef.current = true
       const point = getSvgPoint(e.clientX, e.clientY)
       const offset = dragOffsetRef.current
-      updateTablePosition(
-        draggingTableId,
-        Math.max(50, Math.min(CANVAS_WIDTH - 50, point.x - offset.x)),
-        Math.max(50, Math.min(CANVAS_HEIGHT - 50, point.y - offset.y)),
-      )
+      // 不再限制 CANVAS_WIDTH/HEIGHT，zoom/pan 下畫布無界
+      updateTablePosition(draggingTableId, point.x - offset.x, point.y - offset.y)
       updateScreenPositions()
     },
     [draggingTableId, getSvgPoint, updateTablePosition, updateScreenPositions],
   )
 
   const handleMouseUp = useCallback(() => {
+    if (isPanningRef.current) {
+      isPanningRef.current = false
+      return
+    }
     if (draggingTableId && didDragRef.current) {
+      // Grid snap: 桌子位置吸附到最近的 50px 格線
+      const table = tables.find((t) => t.id === draggingTableId)
+      if (table) {
+        const snappedX = Math.round(table.positionX / 50) * 50
+        const snappedY = Math.round(table.positionY / 50) * 50
+        if (snappedX !== table.positionX || snappedY !== table.positionY) {
+          updateTablePosition(draggingTableId, snappedX, snappedY)
+          updateScreenPositions()
+        }
+      }
       saveTablePosition(draggingTableId, dragStartPosRef.current.x, dragStartPosRef.current.y)
     }
     setDraggingTableId(null)
-  }, [draggingTableId, saveTablePosition])
+  }, [draggingTableId, saveTablePosition, tables, updateTablePosition, updateScreenPositions])
 
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
@@ -391,26 +582,74 @@ export function FloorPlan() {
     [setSelectedTable],
   )
 
+  // ─── Canvas focus + 鍵盤快捷鍵 ─────────────────────
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Space pan 在 window listener 處理（需要追蹤 held 狀態）
+    if (e.key === '+' || e.key === '=') {
+      e.preventDefault()
+      setZoom((z) => {
+        const next = Math.min(3, z * 1.25)
+        // 以 viewport 中心為基準
+        setPanX((px) => Math.round(cw / 2 - (cw / 2 - px) * (next / z)))
+        setPanY((py) => Math.round(ch / 2 - (ch / 2 - py) * (next / z)))
+        return next
+      })
+    } else if (e.key === '-') {
+      e.preventDefault()
+      setZoom((z) => {
+        const next = Math.max(0.25, z / 1.25)
+        setPanX((px) => Math.round(cw / 2 - (cw / 2 - px) * (next / z)))
+        setPanY((py) => Math.round(ch / 2 - (ch / 2 - py) * (next / z)))
+        return next
+      })
+    } else if (e.key === '0') {
+      e.preventDefault()
+      fitAll(true)
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      setPanX((px) => Math.round(px + 100))
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      setPanX((px) => Math.round(px - 100))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setPanY((py) => Math.round(py + 100))
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setPanY((py) => Math.round(py - 100))
+    }
+  }, [cw, ch, fitAll])
+
+  // 游標樣式
+  const cursorStyle = spaceHeldRef.current
+    ? (isPanningRef.current ? 'grabbing' : 'grab')
+    : (draggingTableId ? 'default' : undefined)
+
   return (
     <div ref={containerRef} className="relative w-full h-full">
-      {/* SVG 平面圖 */}
+      {/* SVG 平面圖 — tabIndex={0} 讓畫布可以接收 focus 和鍵盤事件 */}
       <svg
         id="floorplan-svg"
         ref={svgRef}
-        viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
-        className="w-full h-full bg-[#FAFAFA]"
-        style={{ userSelect: 'none', overflow: 'visible' }}
+        tabIndex={0}
+        viewBox={viewBoxStr}
+        className="w-full h-full bg-[#FAFAFA] outline-none"
+        style={{ userSelect: 'none', overflow: 'hidden', cursor: cursorStyle }}
+        onWheel={handleWheel}
+        onMouseDown={handleSvgMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onClick={handleCanvasClick}
+        onKeyDown={handleKeyDown}
       >
         <defs>
           <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
             <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#E5E7EB" strokeWidth="0.5" />
           </pattern>
         </defs>
-        <rect width={CANVAS_WIDTH} height={CANVAS_HEIGHT} fill="url(#grid)" />
+        {/* Grid 背景覆蓋大範圍，確保 zoom/pan 時都有格線 */}
+        <rect x={-5000} y={-5000} width={10000} height={10000} fill="url(#grid)" />
 
         {/* 推薦虛線時需要 dim 的桌子 */}
         {(() => {
@@ -441,7 +680,7 @@ export function FloorPlan() {
 
           if (isUnassigned) {
             // 待排賓客：線從側欄賓客位置出發（SVG 左邊外面）
-            guestY = CANVAS_HEIGHT / 2 // fallback
+            guestY = viewBoxY + viewBoxH / 2 // fallback
             const svgEl = svgRef.current
             const chipEl = document.querySelector(`[data-guest-id="${guest.id}"]`)
             if (svgEl && chipEl) {
@@ -518,8 +757,8 @@ export function FloorPlan() {
                   { x: endX, y: endY },
                   obstacles,
                   srcObstacle,
-                  CANVAS_WIDTH,
-                  CANVAS_HEIGHT,
+                  Math.max(CANVAS_WIDTH, ...tables.map((t) => t.positionX + 200)),
+                  Math.max(CANVAS_HEIGHT, ...tables.map((t) => t.positionY + 200)),
                 )
 
                 // 用路徑末端方向畫箭頭
@@ -576,6 +815,7 @@ export function FloorPlan() {
                   isDragging={draggingTableId === table.id}
                   isDimmed={shouldDim && !highlightedIds.has(table.id)}
                   onMouseDown={(e) => handleMouseDown(table.id, e)}
+                  onDoubleClick={() => zoomToTable(table.id)}
                 />
               ))}
             </>
@@ -583,7 +823,7 @@ export function FloorPlan() {
         })()}
 
         {tables.length === 0 && (
-          <text x={CANVAS_WIDTH / 2} y={CANVAS_HEIGHT / 2} textAnchor="middle" fill="#9CA3AF" fontSize="16">
+          <text x={viewBoxX + viewBoxW / 2} y={viewBoxY + viewBoxH / 2} textAnchor="middle" fill="#9CA3AF" fontSize="16">
             尚未建立桌次，請點擊上方「新增桌次」
           </text>
         )}
@@ -619,6 +859,55 @@ export function FloorPlan() {
             />
           ))}
       </div>
+
+      {/* Minimap — 畫布右下角 */}
+      <Minimap
+        tables={tables}
+        guests={guests}
+        zoom={zoom}
+        panX={panX}
+        panY={panY}
+        containerWidth={cw}
+        containerHeight={ch}
+        onNavigate={(lx, ly) => {
+          const { panX: px, panY: py } = centerOnPoint(lx, ly, zoom, cw, ch)
+          animateViewport(zoom, px, py, 200)
+        }}
+      />
+
+      {/* Zoom Controls — 畫布左下角 */}
+      {tables.length > 0 && (
+        <ZoomControls
+          zoom={zoom}
+          onZoomIn={() => {
+            setZoom((z) => {
+              const next = Math.min(3, z * 1.25)
+              setPanX((px) => Math.round(cw / 2 - (cw / 2 - px) * (next / z)))
+              setPanY((py) => Math.round(ch / 2 - (ch / 2 - py) * (next / z)))
+              return next
+            })
+          }}
+          onZoomOut={() => {
+            setZoom((z) => {
+              const next = Math.max(0.25, z / 1.25)
+              setPanX((px) => Math.round(cw / 2 - (cw / 2 - px) * (next / z)))
+              setPanY((py) => Math.round(ch / 2 - (ch / 2 - py) * (next / z)))
+              return next
+            })
+          }}
+          onFitAll={() => fitAll(true)}
+          onSetZoom={(targetZoom) => {
+            const { panX: px, panY: py } = centerOnPoint(
+              viewBoxX + viewBoxW / 2,
+              viewBoxY + viewBoxH / 2,
+              targetZoom,
+              cw,
+              ch,
+            )
+            animateViewport(targetZoom, px, py, 200)
+          }}
+        />
+      )}
     </div>
   )
-}
+})

@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2 } from 'lucide-react'
+import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
+import { calculateGridLayout } from '@/lib/viewport'
 import { AvoidPairModal } from './AvoidPairModal'
 
-export function Toolbar() {
+interface ToolbarProps {
+  onFitAll?: () => void
+}
+
+export function Toolbar({ onFitAll }: ToolbarProps = {}) {
   const eventName = useSeatingStore((s) => s.eventName)
   const tables = useSeatingStore((s) => s.tables)
   const addTable = useSeatingStore((s) => s.addTable)
@@ -35,6 +40,9 @@ export function Toolbar() {
   const [showRenameEvent, setShowRenameEvent] = useState(false)
   const [renameEventValue, setRenameEventValue] = useState('')
   const [showMenu, setShowMenu] = useState(false)
+  const [showArrangeConfirm, setShowArrangeConfirm] = useState(false)
+  const [arranging, setArranging] = useState(false)
+  const autoArrangeTables = useSeatingStore((s) => s.autoArrangeTables)
 
   const handleRenameEvent = () => {
     const trimmed = renameEventValue.trim()
@@ -68,6 +76,21 @@ export function Toolbar() {
   const confirmRestore = () => {
     restoreSnapshot(snapshots[0].id)
     setShowRestoreConfirm(false)
+  }
+
+  const handleAutoArrange = async () => {
+    setArranging(true)
+    setShowArrangeConfirm(false)
+    try {
+      const positions = calculateGridLayout(tables)
+      await autoArrangeTables(positions)
+      // 排完後自動 fit-all
+      onFitAll?.()
+    } catch (err: any) {
+      alert(err.message || '保存失敗，已恢復原排列')
+    } finally {
+      setArranging(false)
+    }
   }
 
   const CATEGORY_BG: Record<string, string> = { '男方': '#DBEAFE', '女方': '#FEE2E2', '共同': '#F3F4F6' }
@@ -468,6 +491,48 @@ export function Toolbar() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
+          {/* Auto-arrange */}
+          <div className="relative">
+            <button
+              onClick={() => setShowArrangeConfirm(!showArrangeConfirm)}
+              disabled={tables.length === 0 || arranging}
+              className="flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
+              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
+              title="自動排列桌次"
+            >
+              <LayoutGrid size={14} /> {arranging ? '排列中...' : '排列'}
+            </button>
+            {showArrangeConfirm && (
+              <div
+                className="absolute top-full right-0 mt-1.5 rounded-lg border shadow-md p-3 z-50 min-w-[200px]"
+                style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', fontSize: 13 }}
+              >
+                <div className="mb-2" style={{ color: 'var(--text-primary)' }}>
+                  重新排列所有桌次？
+                </div>
+                <div className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+                  可以復原（Ctrl+Z）
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => setShowArrangeConfirm(false)}
+                    className="px-3 py-1 text-sm rounded border cursor-pointer hover:bg-black/5"
+                    style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)' }}
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleAutoArrange}
+                    className="px-3 py-1 text-sm font-semibold text-white rounded cursor-pointer hover:brightness-90"
+                    style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
+                  >
+                    排列
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={handleAddTable}
             disabled={adding}

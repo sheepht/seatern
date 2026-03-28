@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import {
@@ -13,7 +13,7 @@ import {
 } from '@dnd-kit/core'
 import { useSeatingStore, type Guest, type AvoidPair } from '@/stores/seating'
 import { Toolbar } from '@/components/workspace/Toolbar'
-import { FloorPlan } from '@/components/workspace/FloorPlan'
+import { FloorPlan, type FloorPlanHandle } from '@/components/workspace/FloorPlan'
 import { SidePanel } from '@/components/workspace/SidePanel'
 import { DragOverlayContent } from '@/components/workspace/DragOverlayContent'
 import { ViolationModal } from '@/components/workspace/ViolationModal'
@@ -31,6 +31,7 @@ export default function WorkspacePage() {
 
   const [activeGuest, setActiveGuest] = useState<Guest | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const floorPlanRef = useRef<FloorPlanHandle>(null)
 
   // 違規確認 modal 狀態
   const [pendingMove, setPendingMove] = useState<{
@@ -182,7 +183,7 @@ export default function WorkspacePage() {
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
       <div className="h-screen flex flex-col bg-gray-50">
-        <Toolbar />
+        <Toolbar onFitAll={() => floorPlanRef.current?.fitAll(true)} />
 
         <div className="flex-1 flex overflow-hidden">
           {/* 折疊時的展開條（永遠渲染，寬度跟側邊欄同步動畫） */}
@@ -218,7 +219,7 @@ export default function WorkspacePage() {
             </div>
           </div>
           <div className="flex-1 min-w-0">
-            <FloorPlan />
+            <FloorPlan ref={floorPlanRef} />
           </div>
         </div>
 

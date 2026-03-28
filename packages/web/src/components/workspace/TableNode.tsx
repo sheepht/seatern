@@ -49,6 +49,7 @@ interface Props {
   isDragging: boolean
   isDimmed?: boolean
   onMouseDown: (e: React.MouseEvent) => void
+  onDoubleClick?: () => void
 }
 
 /**
@@ -133,7 +134,7 @@ function TableScoreRing({ score, originalScore, hasGuests }: { score: number; or
   )
 }
 
-export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown }: Props) {
+export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown, onDoubleClick }: Props) {
   const getTableGuests = useSeatingStore((s) => s.getTableGuests)
   const getTableSeatCount = useSeatingStore((s) => s.getTableSeatCount)
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
@@ -314,6 +315,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, onMouseDown
       data-table-id={table.id}
       transform={`translate(${table.positionX}, ${table.positionY})`}
       onMouseDown={onMouseDown}
+      onDoubleClick={onDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}

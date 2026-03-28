@@ -124,6 +124,10 @@ interface SeatingState {
         oldName: string
         newName: string
       }
+    | {
+        type: 'auto-arrange'
+        positions: Map<string, { fromX: number; fromY: number }>
+      }
   >
 
   // Actions
@@ -148,6 +152,7 @@ interface SeatingState {
   addAvoidPair: (guestAId: string, guestBId: string, reason?: string) => Promise<void>
   removeAvoidPair: (pairId: string) => Promise<void>
   checkAvoidViolation: (guestId: string, tableId: string) => AvoidPair | null
+  autoArrangeTables: (positions: Array<{ tableId: string; x: number; y: number }>) => Promise<void>
 
   // Computed helpers
   getTableGuests: (tableId: string) => Guest[]
@@ -558,6 +563,26 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       return
     }
 
+    // ─── 還原「自動排列」：所有桌子回到原始位置 ───
+    if (last.type === 'auto-arrange') {
+      const updatedTables = tables.map((t) => {
+        const prev = last.positions.get(t.id)
+        return prev ? { ...t, positionX: prev.fromX, positionY: prev.fromY } : t
+      })
+      set({ tables: updatedTables, undoStack: undoStack.slice(0, -1) })
+      if (eventId) {
+        for (const [tableId, { fromX, fromY }] of last.positions) {
+          fetch(`/api/events/${eventId}/tables/${tableId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ positionX: fromX, positionY: fromY }),
+          }).catch(console.error)
+        }
+      }
+      return
+    }
+
     // ─── 還原「移動賓客」 ───
     // 批次還原：如果最後一筆有 batchId，找出所有同 batch 的 entry 一起還原
     const entriesToUndo = last.batchId
@@ -821,6 +846,47 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       credentials: 'include',
       body: JSON.stringify({ positionX: table.positionX, positionY: table.positionY }),
     }).catch(console.error)
+  },
+
+  autoArrangeTables: async (positions) => {
+    const { tables, eventId, undoStack } = get()
+    // 記錄原始位置（undo 用）
+    const prevPositions = new Map<string, { fromX: number; fromY: number }>()
+    for (const t of tables) prevPositions.set(t.id, { fromX: t.positionX, fromY: t.positionY })
+
+    // 更新 store
+    const updatedTables = tables.map((t) => {
+      const pos = positions.find((p) => p.tableId === t.id)
+      return pos ? { ...t, positionX: pos.x, positionY: pos.y } : t
+    })
+    set({
+      tables: updatedTables,
+      undoStack: [...undoStack, { type: 'auto-arrange' as const, positions: prevPositions }],
+    })
+
+    // 批次存 DB
+    if (eventId) {
+      try {
+        await Promise.all(
+          positions.map((p) =>
+            fetch(`/api/events/${eventId}/tables/${p.tableId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ positionX: p.x, positionY: p.y }),
+            }).then((res) => { if (!res.ok) throw new Error(`Save failed: ${p.tableId}`) }),
+          ),
+        )
+      } catch {
+        // 失敗 → 自動 revert
+        const reverted = get().tables.map((t) => {
+          const prev = prevPositions.get(t.id)
+          return prev ? { ...t, positionX: prev.fromX, positionY: prev.fromY } : t
+        })
+        set({ tables: reverted, undoStack: get().undoStack.slice(0, -1) })
+        throw new Error('保存失敗，已恢復原排列')
+      }
+    }
   },
 
   saveSnapshot: async (name) => {
