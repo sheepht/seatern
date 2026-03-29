@@ -199,9 +199,9 @@ export default function WorkspacePage() {
           >
             <ChevronRight size={14} className="shrink-0" style={{ color: 'var(--text-muted)' }} />
           </div>
-          {/* 側邊欄 */}
+          {/* 側邊欄 — z-index 高於 SVG 溢出的推薦線 */}
           <div
-            className="shrink-0 overflow-hidden"
+            className="shrink-0 overflow-hidden relative z-10"
             style={{
               width: sidebarCollapsed ? 0 : 288,
               borderRight: sidebarCollapsed ? 'none' : '1px solid var(--border)',
