@@ -85,7 +85,7 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
     // isResetting 隱藏整個賓客 <g> 層（含 arcs、icons、空位）
     useSeatingStore.setState({
       isResetting: true,
-      hoverSuppressedUntil: Date.now() + 2000,
+      hoverSuppressedUntil: Date.now() + 5000, // 足夠長，cleanup 時會自然過期
       hoveredGuestId: null,
     })
 
@@ -186,12 +186,14 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
       })
     })
 
-    // 動畫結束後清理：顯示賓客圖層
+    // 動畫結束後清理：等最後一個 chip 飛完再顯示
+    // 總時間 = 最後一個 chip 的 delay + transition duration + buffer
+    const totalAnimTime = chips.length * 20 + 500 + 100
     setTimeout(() => {
       useSeatingStore.setState({ isResetting: false })
       setTimeout(() => overlay.remove(), 200)
       setAssigning(false)
-    }, 650)
+    }, totalAnimTime)
   }
 
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')

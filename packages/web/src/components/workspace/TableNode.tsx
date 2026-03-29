@@ -428,7 +428,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
       </text>
 
       {/* 滿意度圓環進度條 + 中央數字 — counter-scale 維持固定螢幕大小 */}
-      <g transform={`scale(${counterScale})`} style={{ opacity: isResetting ? 0 : 1, transition: 'opacity 200ms' }}>
+      <g transform={`scale(${counterScale})`} style={{ opacity: isResetting ? 0 : 1 }}>
         <TableScoreRing
           score={guests.length > 0 ? (previewTableScore ?? recommendationTableScores.get(table.id) ?? table.averageSatisfaction) : 0}
           originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
