@@ -99,31 +99,45 @@ const MIN_TABLE_DISTANCE = 250 // 兩桌中心最小距離（不重疊）
 export function findFreePosition(
   existingTables: Table[],
   spacing = 250,
-  startOffset = 200,
 ): { x: number; y: number } {
-  if (existingTables.length === 0) return { x: startOffset, y: startOffset }
+  if (existingTables.length === 0) return { x: 200, y: 200 }
 
-  // 逐格掃描，row by row，找第一個不跟任何現有桌子重疊的位置
-  const cols = 20 // 掃描寬度上限
-  const rows = 20
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const x = startOffset + col * spacing
-      const y = startOffset + row * spacing
+  // 以現有桌子群的中心為基準
+  const centerX = existingTables.reduce((s, t) => s + t.positionX, 0) / existingTables.length
+  const centerY = existingTables.reduce((s, t) => s + t.positionY, 0) / existingTables.length
 
-      const collides = existingTables.some((t) => {
-        const dx = t.positionX - x
-        const dy = t.positionY - y
-        return Math.abs(dx) < MIN_TABLE_DISTANCE && Math.abs(dy) < MIN_TABLE_DISTANCE
-      })
+  // snap 中心到最近的 grid 點
+  const gridCenterX = Math.round(centerX / spacing) * spacing
+  const gridCenterY = Math.round(centerY / spacing) * spacing
 
-      if (!collides) return { x, y }
+  // 產生候選位置：從中心向外擴展的螺旋掃描
+  const candidates: Array<{ x: number; y: number; dist: number }> = []
+  const range = 15 // 掃描半徑
+  for (let dy = -range; dy <= range; dy++) {
+    for (let dx = -range; dx <= range; dx++) {
+      const x = gridCenterX + dx * spacing
+      const y = gridCenterY + dy * spacing
+      if (x < 50 || y < 50) continue // 不要放到太左上角
+      const distSq = dx * dx + dy * dy
+      candidates.push({ x, y, dist: distSq })
     }
   }
 
-  // fallback: 放在所有桌子的右邊
+  // 按離中心的距離排序（由近到遠）→ 優先填內圍空隙
+  candidates.sort((a, b) => a.dist - b.dist)
+
+  for (const c of candidates) {
+    const collides = existingTables.some((t) => {
+      const ddx = Math.abs(t.positionX - c.x)
+      const ddy = Math.abs(t.positionY - c.y)
+      return ddx < MIN_TABLE_DISTANCE && ddy < MIN_TABLE_DISTANCE
+    })
+    if (!collides) return { x: c.x, y: c.y }
+  }
+
+  // fallback
   const maxX = Math.max(...existingTables.map((t) => t.positionX))
-  return { x: maxX + spacing, y: startOffset }
+  return { x: maxX + spacing, y: gridCenterY }
 }
 
 // ─── Auto-arrange grid layout ────────────────────────
