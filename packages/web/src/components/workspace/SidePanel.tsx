@@ -81,10 +81,11 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
       }
     }
 
-    // Step 2: 預先隱藏整個賓客圖層 + 抑制所有互動
-    // isResetting 隱藏整個賓客 <g> 層（含 arcs、icons、空位）
+    // Step 2: 隱藏「待排賓客」的桌上圓圈 + 抑制互動
+    // 只隱藏即將飛入的賓客，已在桌上的賓客保持可見
+    const flyingIds = new Set(unassigned.map((g) => g.id))
     useSeatingStore.setState({
-      isResetting: true,
+      flyingGuestIds: flyingIds,
       hoverSuppressedUntil: Date.now() + 5000, // 足夠長，cleanup 時會自然過期
       hoveredGuestId: null,
     })
@@ -93,7 +94,7 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
     try {
       await autoAssignGuests()
     } catch (err: any) {
-      useSeatingStore.setState({ isResetting: false })
+      useSeatingStore.setState({ flyingGuestIds: new Set() })
       alert(err.message || '自動分配失敗')
       setAssigning(false)
       return
@@ -101,7 +102,7 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
 
     // Step 4: 計算每位賓客在桌上的目標螢幕位置
     if (!svgEl || !ctm || chipPositions.size === 0) {
-      useSeatingStore.setState({ isResetting: false })
+      useSeatingStore.setState({ flyingGuestIds: new Set() })
       setAssigning(false)
       return
     }
@@ -190,7 +191,7 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
     // 總時間 = 最後一個 chip 的 delay + transition duration + buffer
     const totalAnimTime = chips.length * 20 + 500 + 100
     setTimeout(() => {
-      useSeatingStore.setState({ isResetting: false })
+      useSeatingStore.setState({ flyingGuestIds: new Set() })
       setTimeout(() => overlay.remove(), 200)
       setAssigning(false)
     }, totalAnimTime)

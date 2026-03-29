@@ -214,8 +214,13 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
   // 預覽時需要所有賓客資料（被位移的人可能需要查找）
   const guestPool = isPreviewTable ? allGuests.filter((g) => g.rsvpStatus === 'confirmed') : filteredGuests
 
+  // 飛行動畫中的賓客視為尚未入座（空位+弧線不提前更新）
+  const layoutGuests = flyingGuestIds.size > 0
+    ? guestPool.filter((g) => !flyingGuestIds.has(g.id))
+    : guestPool
+
   // 所有座位（含空位），依 capacity 固定數量
-  const allSeats = buildSeatLayout(guestPool, table.capacity, radius, previewSlots)
+  const allSeats = buildSeatLayout(layoutGuests, table.capacity, radius, previewSlots)
 
   // FLIP 動畫：追蹤座位元素的前一次位置
   const seatRefsMap = useRef<Map<string, SVGGElement>>(new Map())
