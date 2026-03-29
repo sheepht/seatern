@@ -39,6 +39,7 @@ interface ScreenSeat {
 
 export interface FloorPlanHandle {
   fitAll: (animated?: boolean) => void
+  panToPoint: (x: number, y: number) => void
 }
 
 export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, ref) {
@@ -414,7 +415,13 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     }
   }, [tables, cw, ch, animateViewport])
 
-  useImperativeHandle(ref, () => ({ fitAll }), [fitAll])
+  const panToPoint = useCallback((x: number, y: number) => {
+    const z = zoomRef.current
+    const { panX: px, panY: py } = centerOnPoint(x, y, z, cw, ch)
+    animateViewport(z, px, py, 300)
+  }, [cw, ch, animateViewport])
+
+  useImperativeHandle(ref, () => ({ fitAll, panToPoint }), [fitAll, panToPoint])
 
   // 初始載入時 fit-all（等桌子載完）
   const initialFitDoneRef = useRef(false)

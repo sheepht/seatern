@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { recalculateAll } from '@/lib/satisfaction'
 import { autoAssignGuests as runAutoAssign } from '@/lib/auto-assign'
+import { findFreePosition } from '@/lib/viewport'
 import { buildSlotArray, placeGuest, extractSeatIndices, type Slot } from '@/lib/seat-shift'
 
 // ─── Types ──────────────────────────────────────────
@@ -947,16 +948,12 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       const existingCount = tables.length
 
       for (let i = 0; i < tablesToAdd; i++) {
-        const num = existingCount + i + 1
-        const cols = Math.ceil(Math.sqrt(num + 1))
-        const row = Math.floor((existingCount + i) / cols)
-        const col = (existingCount + i) % cols
+        const currentTbls = get().tables
+        const num = currentTbls.length + 1
+        const pos = findFreePosition(currentTbls)
         const name = `第${num}桌`
-        const posX = 200 + col * 250
-        const posY = 200 + row * 250
 
-        // 直接呼叫 addTable（會存 DB + 更新 store）
-        await get().addTable(name, posX, posY)
+        await get().addTable(name, pos.x, pos.y)
         const latestTables = get().tables
         const newTable = latestTables.find((t) => t.name === name)
         if (newTable) newTableIds.push(newTable.id)

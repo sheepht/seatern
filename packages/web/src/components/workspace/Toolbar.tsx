@@ -4,14 +4,15 @@ import { useNavigate } from 'react-router-dom'
 import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
-import { calculateGridLayout } from '@/lib/viewport'
+import { calculateGridLayout, findFreePosition } from '@/lib/viewport'
 import { AvoidPairModal } from './AvoidPairModal'
 
 interface ToolbarProps {
   onFitAll?: () => void
+  onPanToTable?: (x: number, y: number) => void
 }
 
-export function Toolbar({ onFitAll }: ToolbarProps = {}) {
+export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
   const eventName = useSeatingStore((s) => s.eventName)
   const tables = useSeatingStore((s) => s.tables)
   const addTable = useSeatingStore((s) => s.addTable)
@@ -53,10 +54,10 @@ export function Toolbar({ onFitAll }: ToolbarProps = {}) {
   const handleAddTable = async () => {
     setAdding(true)
     const num = tables.length + 1
-    const cols = Math.ceil(Math.sqrt(num + 1))
-    const row = Math.floor(tables.length / cols)
-    const col = tables.length % cols
-    await addTable(`第${num}桌`, 200 + col * 250, 200 + row * 250)
+    const pos = findFreePosition(tables)
+    await addTable(`第${num}桌`, pos.x, pos.y)
+    // 畫面平移到新桌子（不改 zoom）
+    onPanToTable?.(pos.x, pos.y)
     setAdding(false)
   }
 

@@ -183,7 +183,10 @@ export default function WorkspacePage() {
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
       <div className="h-screen flex flex-col bg-gray-50">
-        <Toolbar onFitAll={() => floorPlanRef.current?.fitAll(true)} />
+        <Toolbar
+          onFitAll={() => floorPlanRef.current?.fitAll(true)}
+          onPanToTable={(x, y) => floorPlanRef.current?.panToPoint(x, y)}
+        />
 
         <div className="flex-1 flex overflow-hidden">
           {/* 折疊時的展開條（永遠渲染，寬度跟側邊欄同步動畫） */}

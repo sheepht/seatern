@@ -92,6 +92,40 @@ export function centerOnPoint(
   }
 }
 
+// ─── 找不重疊的空位 ─────────────────────────────────
+
+const TABLE_COLLISION_RADIUS = 200 // 兩桌中心最小距離
+
+export function findFreePosition(
+  existingTables: Table[],
+  spacing = 250,
+  startOffset = 200,
+): { x: number; y: number } {
+  // 嘗試 grid 位置，找第一個不跟任何現有桌子重疊的
+  const maxAttempts = 100
+  for (let i = 0; i < maxAttempts; i++) {
+    const cols = Math.max(3, Math.ceil(Math.sqrt(existingTables.length + i + 1)))
+    const x = startOffset + (i % cols) * spacing
+    const y = startOffset + Math.floor(i / cols) * spacing
+
+    const collides = existingTables.some((t) => {
+      const dx = t.positionX - x
+      const dy = t.positionY - y
+      return Math.sqrt(dx * dx + dy * dy) < TABLE_COLLISION_RADIUS
+    })
+
+    if (!collides) return { x, y }
+  }
+
+  // fallback: 放在最右下角的桌子旁邊
+  if (existingTables.length > 0) {
+    const maxX = Math.max(...existingTables.map((t) => t.positionX))
+    const maxY = Math.max(...existingTables.map((t) => t.positionY))
+    return { x: maxX + spacing, y: maxY }
+  }
+  return { x: startOffset, y: startOffset }
+}
+
 // ─── Auto-arrange grid layout ────────────────────────
 
 export interface GridPosition {
