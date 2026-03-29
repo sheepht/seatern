@@ -46,7 +46,7 @@ const CATEGORY_TEXT: Record<string, string> = {
 type ZoomLevel = 'detail' | 'normal' | 'overview'
 
 function getZoomLevel(zoom: number): ZoomLevel {
-  if (zoom >= 0.9) return 'normal'
+  if (zoom >= 0.8) return 'normal'
   return 'overview'
 }
 
