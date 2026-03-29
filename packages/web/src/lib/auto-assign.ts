@@ -3,7 +3,7 @@
  *
  * 策略：貪婪分群 + 局部搜尋
  * Step 1: 按群組和偏好分群，填入桌子
- * Step 2: 嘗試交換兩人，只接受改善全場平均的交換
+ * Step 2: 嘗試單人移動和兩人交換，只接受改善全場平均的操作
  *
  * 只排「未分配」的賓客，保留已排的不動。
  */
@@ -130,8 +130,8 @@ export function autoAssignGuests(
   // 放不下的賓客不硬塞（caller 應確保桌子容量足夠）
 
   // ─── Step 2: 確定性局部搜尋 ─────────────────────────
-  // 掃描所有可能的兩人交換，每輪找到最大改善的交換並執行，
-  // 直到沒有任何交換能改善為止。完全確定性，同輸入同結果。
+  // 每輪同時嘗試「單人移動」和「兩人交換」，選最大改善的執行，
+  // 直到沒有任何操作能改善為止。完全確定性，同輸入同結果。
 
   const simGuests = guests.map((g) => {
     const tableId = assigned.get(g.id)
@@ -151,13 +151,33 @@ export function autoAssignGuests(
     }
   }
 
-  const MAX_ROUNDS = 20 // 最多改善 20 輪（每輪掃描所有配對）
+  const MAX_ROUNDS = 20 // 最多改善 20 輪
   for (let round = 0; round < MAX_ROUNDS; round++) {
     refreshSeatCounts()
     let bestImprovement = 0.01 // 最小改善門檻
-    let bestSwap: [string, string] | null = null
+    let bestMove: { type: 'move'; guestId: string; tableId: string } | { type: 'swap'; a: string; b: string } | null = null
     let bestScore = currentScore
 
+    // 2a: 嘗試單人移動（把一個人移到另一桌）
+    for (const guestId of assignedIds) {
+      const guest = simGuests.find((g) => g.id === guestId)!
+      for (const t of tables) {
+        if (t.id === guest.assignedTableId) continue
+        const targetSeats = tableSeatCounts.get(t.id) || 0
+        if (targetSeats + guest.attendeeCount > t.capacity) continue
+
+        const moved = simGuests.map((g) => g.id === guestId ? { ...g, assignedTableId: t.id } : g)
+        const newScore = recalculateAll(moved, tables, avoidPairs).overallAverage
+        const improvement = newScore - currentScore
+        if (improvement > bestImprovement) {
+          bestImprovement = improvement
+          bestMove = { type: 'move', guestId, tableId: t.id }
+          bestScore = newScore
+        }
+      }
+    }
+
+    // 2b: 嘗試兩人交換
     for (let i = 0; i < assignedIds.length; i++) {
       for (let j = i + 1; j < assignedIds.length; j++) {
         const gA = simGuests.find((g) => g.id === assignedIds[i])!
@@ -182,23 +202,87 @@ export function autoAssignGuests(
         const improvement = newScore - currentScore
         if (improvement > bestImprovement) {
           bestImprovement = improvement
-          bestSwap = [assignedIds[i], assignedIds[j]]
+          bestMove = { type: 'swap', a: assignedIds[i], b: assignedIds[j] }
           bestScore = newScore
         }
       }
     }
 
-    if (!bestSwap) break // 沒有任何改善，結束
+    if (!bestMove) break // 沒有任何改善，結束
 
-    // 執行最佳交換
-    const gA = simGuests.find((g) => g.id === bestSwap[0])!
-    const gB = simGuests.find((g) => g.id === bestSwap[1])!
-    const tmpTable = gA.assignedTableId
-    gA.assignedTableId = gB.assignedTableId
-    gB.assignedTableId = tmpTable
-    assigned.set(bestSwap[0], gA.assignedTableId!)
-    assigned.set(bestSwap[1], gB.assignedTableId!)
+    // 執行最佳操作
+    if (bestMove.type === 'move') {
+      const guest = simGuests.find((g) => g.id === bestMove.guestId)!
+      guest.assignedTableId = bestMove.tableId
+      assigned.set(bestMove.guestId, bestMove.tableId)
+    } else {
+      const gA = simGuests.find((g) => g.id === bestMove.a)!
+      const gB = simGuests.find((g) => g.id === bestMove.b)!
+      const tmpTable = gA.assignedTableId
+      gA.assignedTableId = gB.assignedTableId
+      gB.assignedTableId = tmpTable
+      assigned.set(bestMove.a, gA.assignedTableId!)
+      assigned.set(bestMove.b, gB.assignedTableId!)
+    }
     currentScore = bestScore
+  }
+
+  // ─── Step 3: 消除「想換桌」標記 ────────────────────────
+  // 用跟 FloorPlan 背景掃描完全相同的條件，掃描「所有已入座賓客」
+  // （不只新分配的），反覆移動直到沒有任何人會被標上「想換桌」圖示。
+  const allSeatedIds = simGuests
+    .filter((g) => g.assignedTableId && g.rsvpStatus === 'confirmed')
+    .map((g) => g.id)
+
+  const MAX_ELIM_ROUNDS = 50
+  for (let round = 0; round < MAX_ELIM_ROUNDS; round++) {
+    refreshSeatCounts()
+    // 每輪重算所有人的滿意度（Step 1/2 只更新 assignedTableId，分數是舊的）
+    const baseResult = recalculateAll(simGuests, tables, avoidPairs)
+    const baseOverall = baseResult.overallAverage
+    // 建立 guestId → 當前真實滿意度 的查找表
+    const currentScores = new Map<string, number>()
+    for (const gs of baseResult.guests) currentScores.set(gs.id, gs.satisfactionScore)
+    // 建立 tableId → 當前真實桌均滿意度 的查找表
+    const currentTableAvgs = new Map<string, number>()
+    for (const ts of baseResult.tables) currentTableAvgs.set(ts.id, ts.averageSatisfaction)
+
+    // 找出所有會被標記「想換桌」的賓客，選改善最大的執行
+    let bestCandidate: { guestId: string; tableId: string; guestDelta: number } | null = null
+
+    for (const guestId of allSeatedIds) {
+      const guest = simGuests.find((g) => g.id === guestId)!
+      if (!guest.assignedTableId) continue
+      const guestCurrentScore = currentScores.get(guestId) ?? 0
+
+      for (const t of tables) {
+        if (t.id === guest.assignedTableId) continue
+        const targetSeats = tableSeatCounts.get(t.id) || 0
+        if (targetSeats + guest.attendeeCount > t.capacity) continue
+
+        const moved = simGuests.map((g) => g.id === guestId ? { ...g, assignedTableId: t.id } : g)
+        const simResult = recalculateAll(moved, tables, avoidPairs)
+        const newGuestScore = simResult.guests.find((g) => g.id === guestId)?.satisfactionScore ?? 0
+        const guestDelta = newGuestScore - guestCurrentScore
+        const rawTableDelta = (simResult.tables.find((ts) => ts.id === t.id)?.averageSatisfaction ?? 0)
+          - (currentTableAvgs.get(t.id) ?? 0)
+        const rawOverallDelta = simResult.overallAverage - baseOverall
+
+        // 跟 FloorPlan.tsx 背景掃描完全相同的條件
+        if (guestDelta > 0.1 && (rawTableDelta > 0.1 || rawOverallDelta > 0.1)) {
+          if (!bestCandidate || guestDelta > bestCandidate.guestDelta) {
+            bestCandidate = { guestId, tableId: t.id, guestDelta }
+          }
+        }
+      }
+    }
+
+    if (!bestCandidate) break // 沒有任何人想換桌了
+
+    // 執行移動（如果是原本就入座的賓客，也加入 assigned 讓 caller 知道）
+    const guest = simGuests.find((g) => g.id === bestCandidate.guestId)!
+    guest.assignedTableId = bestCandidate.tableId
+    assigned.set(bestCandidate.guestId, bestCandidate.tableId)
   }
 
   return [...assigned.entries()].map(([guestId, tableId]) => ({ guestId, tableId }))

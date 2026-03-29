@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid } from 'lucide-react'
@@ -410,17 +410,26 @@ export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
     }, 450)
   }
 
+  const isResetting = useSeatingStore((s) => s.isResetting)
+
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
-  const assigned = getTotalAssignedSeats()
-  const total = getTotalConfirmedSeats()
+  const liveAssigned = getTotalAssignedSeats()
+  const liveTotal = getTotalConfirmedSeats()
   const seated = confirmed.filter((g) => g.assignedTableId)
   const previewScores = dragPreview?.previewScores ?? (recommendationPreviewScores.size > 0 ? recommendationPreviewScores : null)
   const getScore = (g: typeof confirmed[0]) => previewScores?.get(g.id) ?? g.satisfactionScore
-  const t = seated.length
-  const green = seated.filter((g) => getScore(g) >= 75).length
-  const yellow = seated.filter((g) => getScore(g) >= 50 && getScore(g) < 75).length
-  const orange = seated.filter((g) => getScore(g) >= 25 && getScore(g) < 50).length
-  const red = seated.filter((g) => getScore(g) < 25).length
+  const liveT = seated.length
+  const liveGreen = seated.filter((g) => getScore(g) >= 75).length
+  const liveYellow = seated.filter((g) => getScore(g) >= 50 && getScore(g) < 75).length
+  const liveOrange = seated.filter((g) => getScore(g) >= 25 && getScore(g) < 50).length
+  const liveRed = seated.filter((g) => getScore(g) < 25).length
+
+  // 飛行動畫期間（isResetting）凍結數值，等動畫結束才更新
+  const frozenStats = useRef({ assigned: liveAssigned, total: liveTotal, t: liveT, green: liveGreen, yellow: liveYellow, orange: liveOrange, red: liveRed })
+  if (!isResetting) {
+    frozenStats.current = { assigned: liveAssigned, total: liveTotal, t: liveT, green: liveGreen, yellow: liveYellow, orange: liveOrange, red: liveRed }
+  }
+  const { assigned, total, t, green, yellow, orange, red } = frozenStats.current
 
   return (
     <>
