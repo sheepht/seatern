@@ -150,7 +150,7 @@ export interface GridPosition {
 
 export function calculateGridLayout(
   tables: Table[],
-  spacing = 250,
+  spacing = 300,
   startOffset = 200,
 ): GridPosition[] {
   if (tables.length === 0) return []
