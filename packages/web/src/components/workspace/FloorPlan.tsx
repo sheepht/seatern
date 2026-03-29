@@ -705,7 +705,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     : undefined
 
   return (
-    <div ref={containerRef} className="relative w-full h-full" style={cursorStyle ? { cursor: cursorStyle } : undefined} onMouseMove={handleGlobalMouseMove}>
+    <div ref={containerRef} className="relative w-full h-full overflow-hidden" style={cursorStyle ? { cursor: cursorStyle } : undefined} onMouseMove={handleGlobalMouseMove}>
       {/* SVG 平面圖 — tabIndex={0} 讓畫布可以接收 focus 和鍵盤事件 */}
       <svg
         id="floorplan-svg"
@@ -713,7 +713,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         tabIndex={0}
         viewBox={viewBoxStr}
         className="w-full h-full bg-[#FAFAFA] outline-none"
-        style={{ userSelect: 'none', overflow: 'hidden', cursor: cursorStyle }}
+        style={{ userSelect: 'none', overflow: 'visible', cursor: cursorStyle }}
         onMouseDown={handleSvgMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
