@@ -790,8 +790,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           }
 
           return (
-            <>
-              {/* 曲線 + 箭頭 */}
+            <g style={{ pointerEvents: 'none' }}>
+              {/* 曲線 + 箭頭 — pointer-events:none 避免擋住側欄互動 */}
               {recommendations.map((rec, i) => {
                 const targetTable = tables.find((t) => t.id === rec.tableId)
                 if (!targetTable) return null
@@ -877,7 +877,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                   </g>
                 )
               })}
-            </>
+            </g>
           )
         })()
 
