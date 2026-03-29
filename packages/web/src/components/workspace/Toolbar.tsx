@@ -583,21 +583,20 @@ export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
                   undoStack: [...undoStack, { type: 'auto-assign' as const, assignments: allConfirmed.map((g) => ({ guestId: g.id, fromTableId: g.assignedTableId || null, fromSeatIndex: g.seatIndex })), createdTableIds: [] }],
                 })
 
-                // 存 DB
+                // 存 DB（批次一次寫入）
                 const { eventId } = useSeatingStore.getState()
                 if (eventId) {
-                  Promise.all(
-                    finalGuests
-                      .filter((g) => g.rsvpStatus === 'confirmed')
-                      .map((g) =>
-                        fetch(`/api/events/${eventId}/guests/${g.id}/table`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          credentials: 'include',
-                          body: JSON.stringify({ tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null }),
-                        }).catch(console.error),
-                      ),
-                  )
+                  const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed')
+                  fetch(`/api/events/${eventId}/guests/assign-batch`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                      assignments: confirmed.map((g) => ({
+                        guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null,
+                      })),
+                    }),
+                  }).catch(console.error)
                 }
               }}
               className="flex items-center gap-1 whitespace-nowrap px-2.5 py-1.5 text-xs font-medium rounded border cursor-pointer hover:bg-purple-50"

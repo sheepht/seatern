@@ -146,6 +146,34 @@ events.patch('/:eventId', async (c) => {
   return c.json(updated)
 })
 
+// PATCH /events/:eventId/guests/assign-batch — 批次更新賓客桌次分配（自動分配用）
+events.patch('/:eventId/guests/assign-batch', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const { eventId } = c.req.param()
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  const body = await c.req.json<{
+    assignments: Array<{ guestId: string; tableId: string | null; seatIndex?: number | null }>
+  }>()
+
+  await prisma.$transaction(
+    body.assignments.map((a) =>
+      prisma.guest.update({
+        where: { id: a.guestId },
+        data: {
+          assignedTableId: a.tableId,
+          seatIndex: a.tableId === null ? null : (a.seatIndex ?? null),
+        },
+      })
+    )
+  )
+
+  return c.json({ count: body.assignments.length })
+})
+
 // PATCH /events/:eventId/guests/:guestId/table — 移動賓客到桌次
 events.patch('/:eventId/guests/:guestId/table', async (c) => {
   const ownerId = c.get('ownerId')

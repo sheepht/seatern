@@ -519,12 +519,14 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         selectedTableId: get().selectedTableId === tableId ? null : get().selectedTableId,
       })
       if (eventId) {
-        for (const g of tableGuests) {
-          fetch(`/api/events/${eventId}/guests/${g.id}/table`, {
+        if (tableGuests.length > 0) {
+          fetch(`/api/events/${eventId}/guests/assign-batch`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ tableId: null, seatIndex: null }),
+            body: JSON.stringify({
+              assignments: tableGuests.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
+            }),
           }).catch(console.error)
         }
         fetch(`/api/events/${eventId}/tables/${tableId}`, {
@@ -611,14 +613,16 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       })
       set({ guests: finalGuests, tables: finalTables, undoStack: undoStack.slice(0, -1) })
       if (eventId) {
-        for (const a of last.assignments) {
-          fetch(`/api/events/${eventId}/guests/${a.guestId}/table`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ tableId: a.fromTableId, seatIndex: a.fromSeatIndex ?? null }),
-          }).catch(console.error)
-        }
+        fetch(`/api/events/${eventId}/guests/assign-batch`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            assignments: last.assignments.map((a) => ({
+              guestId: a.guestId, tableId: a.fromTableId, seatIndex: a.fromSeatIndex ?? null,
+            })),
+          }),
+        }).catch(console.error)
         // 刪除自動新增的桌子
         for (const tableId of last.createdTableIds) {
           fetch(`/api/events/${eventId}/tables/${tableId}`, {
@@ -672,21 +676,16 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       undoStack: remainingStack,
     })
 
-    // 後端同步：還原所有受影響的賓客（批次還原時要同步每一筆）
+    // 後端同步：批次還原所有受影響的賓客
     if (eventId) {
       const synced = new Set<string>()
+      const batchAssignments: Array<{ guestId: string; tableId: string | null; seatIndex: number | null }> = []
       for (const entry of entriesToUndo) {
         if (entry.type === 'add-table') continue
         // 被拖的賓客
         if (!synced.has(entry.guestId)) {
           synced.add(entry.guestId)
-          const prevIdx = entry.prevSeatIndices.get(entry.guestId) ?? null
-          fetch(`/api/events/${eventId}/guests/${entry.guestId}/table`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ tableId: entry.fromTableId, seatIndex: prevIdx }),
-          }).catch(console.error)
+          batchAssignments.push({ guestId: entry.guestId, tableId: entry.fromTableId, seatIndex: entry.prevSeatIndices.get(entry.guestId) ?? null })
         }
         // 其他被位移的賓客
         for (const [id, idx] of entry.prevSeatIndices) {
@@ -694,15 +693,18 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
             synced.add(id)
             const currentGuest = guests.find((g) => g.id === id)
             if (currentGuest && currentGuest.seatIndex !== idx) {
-              fetch(`/api/events/${eventId}/guests/${id}/table`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ tableId: currentGuest.assignedTableId, seatIndex: idx }),
-              }).catch(console.error)
+              batchAssignments.push({ guestId: id, tableId: currentGuest.assignedTableId ?? null, seatIndex: idx })
             }
           }
         }
+      }
+      if (batchAssignments.length > 0) {
+        fetch(`/api/events/${eventId}/guests/assign-batch`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ assignments: batchAssignments }),
+        }).catch(console.error)
       }
     }
   },
@@ -784,15 +786,15 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     set({ guests: finalGuests, tables: finalTables, undoStack: [...undoStack, ...undoEntries] })
 
-    if (eventId) {
-      for (const g of tableGuests) {
-        fetch(`/api/events/${eventId}/guests/${g.id}/table`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ tableId: null, seatIndex: null }),
-        }).catch(console.error)
-      }
+    if (eventId && tableGuests.length > 0) {
+      fetch(`/api/events/${eventId}/guests/assign-batch`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          assignments: tableGuests.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
+        }),
+      }).catch(console.error)
     }
   },
 
@@ -821,18 +823,16 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     set({ guests: updatedGuests, tables: updatedTables, selectedTableId: null, undoStack: [...undoStack, ...undoEntries], lastResetAt: Date.now(), isResetting: false })
 
-    // 批次清除後端座位分配
+    // 批次清除後端座位分配（一次寫入）
     if (eventId) {
-      Promise.all(
-        assigned.map((g) =>
-          fetch(`/api/events/${eventId}/guests/${g.id}/table`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ tableId: null, seatIndex: null }),
-          }).catch(console.error),
-        ),
-      )
+      fetch(`/api/events/${eventId}/guests/assign-batch`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          assignments: assigned.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
+        }),
+      }).catch(console.error)
     }
   },
 
@@ -1040,20 +1040,21 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       undoStack: [...currentStack, { type: 'auto-assign' as const, assignments: undoData, createdTableIds: newTableIds }],
     })
 
-    // 存 DB
+    // 存 DB（批次一次寫入）
     if (eventId) {
       try {
-        await Promise.all(
-          assignments.map((a) => {
-            const guest = finalGuests.find((g) => g.id === a.guestId)
-            return fetch(`/api/events/${eventId}/guests/${a.guestId}/table`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ tableId: a.tableId, seatIndex: guest?.seatIndex ?? null }),
-            }).then((res) => { if (!res.ok) throw new Error(`Save failed: ${a.guestId}`) })
+        const res = await fetch(`/api/events/${eventId}/guests/assign-batch`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            assignments: assignments.map((a) => {
+              const guest = finalGuests.find((g) => g.id === a.guestId)
+              return { guestId: a.guestId, tableId: a.tableId, seatIndex: guest?.seatIndex ?? null }
+            }),
           }),
-        )
+        })
+        if (!res.ok) throw new Error('Save failed')
       } catch {
         // 失敗 → 自動 revert
         const reverted = get().guests.map((g) => {
@@ -1184,13 +1185,15 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
           body: JSON.stringify({ id: st.tableId, name: st.name || '桌', positionX: st.positionX, positionY: st.positionY }),
         }).catch(console.error)
       }
-      // 還原賓客座位
-      for (const sg of snapData.guests) {
-        fetch(`/api/events/${eventId}/guests/${sg.guestId}/table`, {
+      // 還原賓客座位（批次一次寫入）
+      if (snapData.guests.length > 0) {
+        fetch(`/api/events/${eventId}/guests/assign-batch`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ tableId: sg.tableId, seatIndex: sg.seatIndex ?? null }),
+          body: JSON.stringify({
+            assignments: snapData.guests.map((sg) => ({ guestId: sg.guestId, tableId: sg.tableId, seatIndex: sg.seatIndex ?? null })),
+          }),
         }).catch(console.error)
       }
       // 刪除快照後新增的桌
