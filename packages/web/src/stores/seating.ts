@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { recalculateAll } from '@/lib/satisfaction'
+import { autoAssignGuests as runAutoAssign } from '@/lib/auto-assign'
 import { buildSlotArray, placeGuest, extractSeatIndices, type Slot } from '@/lib/seat-shift'
 
 // ─── Types ──────────────────────────────────────────
@@ -128,6 +129,10 @@ interface SeatingState {
         type: 'auto-arrange'
         positions: Map<string, { fromX: number; fromY: number }>
       }
+    | {
+        type: 'auto-assign'
+        assignments: Array<{ guestId: string; fromTableId: string | null }>
+      }
   >
 
   // Actions
@@ -153,6 +158,7 @@ interface SeatingState {
   removeAvoidPair: (pairId: string) => Promise<void>
   checkAvoidViolation: (guestId: string, tableId: string) => AvoidPair | null
   autoArrangeTables: (positions: Array<{ tableId: string; x: number; y: number }>) => Promise<void>
+  autoAssignGuests: () => Promise<void>
 
   // Computed helpers
   getTableGuests: (tableId: string) => Guest[]
@@ -583,6 +589,35 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       return
     }
 
+    // ─── 還原「自動分配」：所有賓客回到原始桌次 ───
+    if (last.type === 'auto-assign') {
+      const updatedGuests = guests.map((g) => {
+        const orig = last.assignments.find((a) => a.guestId === g.id)
+        return orig ? { ...g, assignedTableId: orig.fromTableId, seatIndex: null } : g
+      })
+      const result = recalculateAll(updatedGuests, tables, avoidPairs)
+      const finalGuests = updatedGuests.map((g) => {
+        const score = result.guests.find((gs) => gs.id === g.id)
+        return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
+      })
+      const finalTables = tables.map((t) => {
+        const score = result.tables.find((ts) => ts.id === t.id)
+        return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
+      })
+      set({ guests: finalGuests, tables: finalTables, undoStack: undoStack.slice(0, -1) })
+      if (eventId) {
+        for (const a of last.assignments) {
+          fetch(`/api/events/${eventId}/guests/${a.guestId}/table`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ tableId: a.fromTableId, seatIndex: null }),
+          }).catch(console.error)
+        }
+      }
+      return
+    }
+
     // ─── 還原「移動賓客」 ───
     // 批次還原：如果最後一筆有 batchId，找出所有同 batch 的 entry 一起還原
     const entriesToUndo = last.batchId
@@ -884,6 +919,71 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
           return prev ? { ...t, positionX: prev.fromX, positionY: prev.fromY } : t
         })
         set({ tables: reverted, undoStack: get().undoStack.slice(0, -1) })
+        throw new Error('保存失敗，已恢復原排列')
+      }
+    }
+  },
+
+  autoAssignGuests: async () => {
+    const { guests, tables, avoidPairs, undoStack, eventId } = get()
+
+    const assignments = runAutoAssign(guests, tables, avoidPairs)
+    if (assignments.length === 0) return
+
+    // 記錄原始分配（undo 用）
+    const undoData = assignments.map((a) => ({
+      guestId: a.guestId,
+      fromTableId: guests.find((g) => g.id === a.guestId)?.assignedTableId || null,
+    }))
+
+    // 更新 store
+    const updatedGuests = guests.map((g) => {
+      const assignment = assignments.find((a) => a.guestId === g.id)
+      return assignment ? { ...g, assignedTableId: assignment.tableId } : g
+    })
+
+    // 重算滿意度
+    const result = recalculateAll(updatedGuests, tables, avoidPairs)
+    const finalGuests = updatedGuests.map((g) => {
+      const score = result.guests.find((gs) => gs.id === g.id)
+      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
+    })
+    const finalTables = tables.map((t) => {
+      const score = result.tables.find((ts) => ts.id === t.id)
+      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
+    })
+
+    set({
+      guests: finalGuests,
+      tables: finalTables,
+      undoStack: [...undoStack, { type: 'auto-assign' as const, assignments: undoData }],
+    })
+
+    // 存 DB
+    if (eventId) {
+      try {
+        await Promise.all(
+          assignments.map((a) =>
+            fetch(`/api/events/${eventId}/guests/${a.guestId}/table`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ tableId: a.tableId, seatIndex: null }),
+            }).then((res) => { if (!res.ok) throw new Error(`Save failed: ${a.guestId}`) }),
+          ),
+        )
+      } catch {
+        // 失敗 → 自動 revert
+        const reverted = get().guests.map((g) => {
+          const orig = undoData.find((u) => u.guestId === g.id)
+          return orig ? { ...g, assignedTableId: orig.fromTableId } : g
+        })
+        const revertResult = recalculateAll(reverted, tables, avoidPairs)
+        const revertedGuests = reverted.map((g) => {
+          const score = revertResult.guests.find((gs) => gs.id === g.id)
+          return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
+        })
+        set({ guests: revertedGuests, undoStack: get().undoStack.slice(0, -1) })
         throw new Error('保存失敗，已恢復原排列')
       }
     }

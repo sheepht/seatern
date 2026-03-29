@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Wand2 } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
 import { GuestChip } from './GuestChip'
@@ -55,9 +55,12 @@ const CATEGORY_ORDER = ['男方', '女方', '共同']
 
 export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
   const guests = useSeatingStore((s) => s.guests)
+  const tables = useSeatingStore((s) => s.tables)
   const getUnassignedGuests = useSeatingStore((s) => s.getUnassignedGuests)
+  const autoAssignGuests = useSeatingStore((s) => s.autoAssignGuests)
 
   const [search, setSearch] = useState('')
+  const [assigning, setAssigning] = useState(false)
 
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
 
@@ -135,6 +138,27 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
               )}
             </div>
             <div className="flex items-center gap-1">
+              {unassignedGuests.length > 0 && tables.length > 0 && (
+                <button
+                  onClick={async () => {
+                    setAssigning(true)
+                    try {
+                      await autoAssignGuests()
+                    } catch (err: any) {
+                      alert(err.message || '自動分配失敗')
+                    } finally {
+                      setAssigning(false)
+                    }
+                  }}
+                  disabled={assigning}
+                  className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded cursor-pointer disabled:opacity-50 hover:brightness-90"
+                  style={{ background: 'var(--accent)', color: 'white', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-display)' }}
+                  title="自動分配所有待排賓客"
+                >
+                  <Wand2 size={12} />
+                  {assigning ? '分配中...' : '自動分配'}
+                </button>
+              )}
               {isOver && (
                 <span className="text-xs" style={{ color: 'var(--accent-dark)' }}>放開以取消安排</span>
               )}
