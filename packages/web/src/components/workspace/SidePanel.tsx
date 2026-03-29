@@ -81,17 +81,23 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
       }
     }
 
-    // Step 2: 執行分配
+    // Step 2: 預先隱藏這些賓客（避免分配後閃現在桌上）
+    const assignedIds = new Set(chipPositions.keys())
+    useSeatingStore.setState({ flyingGuestIds: assignedIds })
+
+    // Step 3: 執行分配
     try {
       await autoAssignGuests()
     } catch (err: any) {
+      useSeatingStore.setState({ flyingGuestIds: new Set() })
       alert(err.message || '自動分配失敗')
       setAssigning(false)
       return
     }
 
-    // Step 3: 計算每位賓客在桌上的目標螢幕位置
+    // Step 4: 計算每位賓客在桌上的目標螢幕位置
     if (!svgEl || !ctm || chipPositions.size === 0) {
+      useSeatingStore.setState({ flyingGuestIds: new Set() })
       setAssigning(false)
       return
     }
@@ -106,10 +112,6 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
     const svgScale = svgRect.width / vb.width
     const circleSize = 40 * svgScale
     const fontSize = Math.max(10, Math.round(16 * svgScale))
-
-    // 隱藏剛被分配的賓客（讓浮動圓圈取代）
-    const assignedIds = new Set(chipPositions.keys())
-    useSeatingStore.setState({ flyingGuestIds: assignedIds })
 
     // 建立浮動 overlay
     const overlay = document.createElement('div')
