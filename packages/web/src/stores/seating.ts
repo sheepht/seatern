@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { recalculateAll } from '@/lib/satisfaction'
-import { autoAssignGuests as runAutoAssign } from '@/lib/auto-assign'
+import { autoAssignGuests as runAutoAssign, type AutoAssignMode } from '@/lib/auto-assign'
 import { findFreePosition } from '@/lib/viewport'
 import { buildSlotArray, placeGuest, extractSeatIndices, type Slot } from '@/lib/seat-shift'
 
@@ -132,7 +132,7 @@ interface SeatingState {
       }
     | {
         type: 'auto-assign'
-        assignments: Array<{ guestId: string; fromTableId: string | null }>
+        assignments: Array<{ guestId: string; fromTableId: string | null; fromSeatIndex?: number | null }>
         createdTableIds: string[] // 自動新增的桌子，undo 時要刪除
       }
   >
@@ -160,7 +160,7 @@ interface SeatingState {
   removeAvoidPair: (pairId: string) => Promise<void>
   checkAvoidViolation: (guestId: string, tableId: string) => AvoidPair | null
   autoArrangeTables: (positions: Array<{ tableId: string; x: number; y: number }>) => Promise<void>
-  autoAssignGuests: () => Promise<void>
+  autoAssignGuests: (mode?: AutoAssignMode) => Promise<void>
 
   // Computed helpers
   getTableGuests: (tableId: string) => Guest[]
@@ -593,10 +593,10 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     // ─── 還原「自動分配」：賓客回到原始桌次 + 刪除自動新增的桌子 ───
     if (last.type === 'auto-assign') {
-      // 還原賓客分配
+      // 還原賓客分配（含 seatIndex）
       const updatedGuests = guests.map((g) => {
         const orig = last.assignments.find((a) => a.guestId === g.id)
-        return orig ? { ...g, assignedTableId: orig.fromTableId, seatIndex: null } : g
+        return orig ? { ...g, assignedTableId: orig.fromTableId, seatIndex: orig.fromSeatIndex ?? null } : g
       })
       // 刪除自動新增的桌子
       const remainingTables = tables.filter((t) => !last.createdTableIds.includes(t.id))
@@ -616,7 +616,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ tableId: a.fromTableId, seatIndex: null }),
+            body: JSON.stringify({ tableId: a.fromTableId, seatIndex: a.fromSeatIndex ?? null }),
           }).catch(console.error)
         }
         // 刪除自動新增的桌子
@@ -936,7 +936,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     }
   },
 
-  autoAssignGuests: async () => {
+  autoAssignGuests: async (mode: AutoAssignMode = 'balanced') => {
     const { guests, tables, avoidPairs, undoStack, eventId } = get()
     const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
     const unassigned = confirmed.filter((g) => !g.assignedTableId)
@@ -974,14 +974,14 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     }
 
     const latestGuests = get().guests
-    const assignments = runAutoAssign(latestGuests, currentTables, avoidPairs)
+    const assignments = runAutoAssign(latestGuests, currentTables, avoidPairs, mode)
     if (assignments.length === 0) return
 
     // 記錄原始分配（undo 用）
-    const undoData = assignments.map((a) => ({
-      guestId: a.guestId,
-      fromTableId: latestGuests.find((g) => g.id === a.guestId)?.assignedTableId || null,
-    }))
+    const undoData = assignments.map((a) => {
+      const g = latestGuests.find((g) => g.id === a.guestId)
+      return { guestId: a.guestId, fromTableId: g?.assignedTableId || null, fromSeatIndex: g?.seatIndex ?? null }
+    })
 
     // 更新 store：設定 assignedTableId + 自動分配 seatIndex
     const updatedGuests = latestGuests.map((g) => {

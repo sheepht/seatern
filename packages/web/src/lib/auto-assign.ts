@@ -3,13 +3,19 @@
  *
  * 策略：貪婪分群 + 局部搜尋
  * Step 1: 按群組和偏好分群，填入桌子
- * Step 2: 嘗試單人移動和兩人交換，只接受改善全場平均的操作
+ * Step 2: 嘗試單人移動和兩人交換，依模式選擇接受條件
+ *
+ * 兩種模式：
+ * - balanced: 最大化全場平均滿意度（皆大歡喜）
+ * - maximize-happy: 最大化 85+ 高滿意度人數（讓關係好的人盡量湊在一起）
  *
  * 只排「未分配」的賓客，保留已排的不動。
  */
 
 import type { Guest, Table, AvoidPair } from '@/stores/seating'
 import { recalculateAll } from './satisfaction'
+
+export type AutoAssignMode = 'balanced' | 'maximize-happy'
 
 interface Assignment {
   guestId: string
@@ -24,6 +30,7 @@ export function autoAssignGuests(
   guests: Guest[],
   tables: Table[],
   avoidPairs: AvoidPair[],
+  mode: AutoAssignMode = 'balanced',
 ): Assignment[] {
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
   const unassigned = confirmed.filter((g) => !g.assignedTableId)
@@ -138,7 +145,9 @@ export function autoAssignGuests(
     return tableId ? { ...g, assignedTableId: tableId } : g
   })
 
-  let currentScore = recalculateAll(simGuests, tables, avoidPairs).overallAverage
+  const baseResult = recalculateAll(simGuests, tables, avoidPairs)
+  let currentAvg = baseResult.overallAverage
+  let currentHappyCount = countHappy(baseResult)
   const assignedIds = [...assigned.keys()]
 
   // 預算每桌座位數（避免重複計算）
@@ -151,12 +160,25 @@ export function autoAssignGuests(
     }
   }
 
+  // 比較函式：根據模式決定「新結果是否比現在好」
+  // 回傳正數代表改善，越大越好
+  const evaluateImprovement = (result: ReturnType<typeof recalculateAll>): number => {
+    if (mode === 'maximize-happy') {
+      const newHappy = countHappy(result)
+      const happyDelta = newHappy - currentHappyCount
+      if (happyDelta > 0) return happyDelta * 100 + (result.overallAverage - currentAvg)
+      if (happyDelta === 0 && result.overallAverage > currentAvg) return result.overallAverage - currentAvg
+      return 0
+    }
+    return result.overallAverage - currentAvg
+  }
+
   const MAX_ROUNDS = 20 // 最多改善 20 輪
   for (let round = 0; round < MAX_ROUNDS; round++) {
     refreshSeatCounts()
     let bestImprovement = 0.01 // 最小改善門檻
     let bestMove: { type: 'move'; guestId: string; tableId: string } | { type: 'swap'; a: string; b: string } | null = null
-    let bestScore = currentScore
+    let bestResult: ReturnType<typeof recalculateAll> | null = null
 
     // 2a: 嘗試單人移動（把一個人移到另一桌）
     for (const guestId of assignedIds) {
@@ -167,12 +189,12 @@ export function autoAssignGuests(
         if (targetSeats + guest.attendeeCount > t.capacity) continue
 
         const moved = simGuests.map((g) => g.id === guestId ? { ...g, assignedTableId: t.id } : g)
-        const newScore = recalculateAll(moved, tables, avoidPairs).overallAverage
-        const improvement = newScore - currentScore
+        const result = recalculateAll(moved, tables, avoidPairs)
+        const improvement = evaluateImprovement(result)
         if (improvement > bestImprovement) {
           bestImprovement = improvement
           bestMove = { type: 'move', guestId, tableId: t.id }
-          bestScore = newScore
+          bestResult = result
         }
       }
     }
@@ -198,17 +220,17 @@ export function autoAssignGuests(
           if (g.id === gB.id) return { ...g, assignedTableId: gA.assignedTableId }
           return g
         })
-        const newScore = recalculateAll(swapped, tables, avoidPairs).overallAverage
-        const improvement = newScore - currentScore
+        const result = recalculateAll(swapped, tables, avoidPairs)
+        const improvement = evaluateImprovement(result)
         if (improvement > bestImprovement) {
           bestImprovement = improvement
           bestMove = { type: 'swap', a: assignedIds[i], b: assignedIds[j] }
-          bestScore = newScore
+          bestResult = result
         }
       }
     }
 
-    if (!bestMove) break // 沒有任何改善，結束
+    if (!bestMove || !bestResult) break // 沒有任何改善，結束
 
     // 執行最佳操作
     if (bestMove.type === 'move') {
@@ -224,7 +246,8 @@ export function autoAssignGuests(
       assigned.set(bestMove.a, gA.assignedTableId!)
       assigned.set(bestMove.b, gB.assignedTableId!)
     }
-    currentScore = bestScore
+    currentAvg = bestResult.overallAverage
+    currentHappyCount = countHappy(bestResult)
   }
 
   // ─── Step 3: 消除「想換桌」標記 ────────────────────────
@@ -286,4 +309,10 @@ export function autoAssignGuests(
   }
 
   return [...assigned.entries()].map(([guestId, tableId]) => ({ guestId, tableId }))
+}
+
+const HAPPY_THRESHOLD = 85
+
+function countHappy(result: ReturnType<typeof recalculateAll>): number {
+  return result.guests.filter((g) => g.satisfactionScore >= HAPPY_THRESHOLD).length
 }

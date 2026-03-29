@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useDroppable } from '@dnd-kit/core'
-import { ChevronLeft, Wand2 } from 'lucide-react'
+import { ChevronLeft, Wand2, Scale, Star } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
 import { GuestChip } from './GuestChip'
+import type { AutoAssignMode } from '@/lib/auto-assign'
 
 function TableActions({ tableId, guestCount }: { tableId: string; guestCount: number }) {
   const moveGuest = useSeatingStore((s) => s.moveGuest)
@@ -61,11 +63,12 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
 
   const [search, setSearch] = useState('')
   const [assigning, setAssigning] = useState(false)
+  const [showModeModal, setShowModeModal] = useState(false)
 
   const CATEGORY_BG: Record<string, string> = { '男方': '#DBEAFE', '女方': '#FEE2E2', '共同': '#F3F4F6' }
   const CATEGORY_CLR: Record<string, string> = { '男方': '#1E40AF', '女方': '#991B1B', '共同': '#374151' }
 
-  const animateAutoAssign = async () => {
+  const animateAutoAssign = async (mode: AutoAssignMode = 'balanced') => {
     setAssigning(true)
     const svgEl = document.getElementById('floorplan-svg') as SVGSVGElement | null
     const ctm = svgEl?.getScreenCTM()
@@ -92,7 +95,7 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
 
     // Step 3: 執行分配
     try {
-      await autoAssignGuests()
+      await autoAssignGuests(mode)
     } catch (err: any) {
       useSeatingStore.setState({ flyingGuestIds: new Set() })
       alert(err.message || '自動分配失敗')
@@ -275,7 +278,7 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
             <div className="flex items-center gap-1">
               {unassignedGuests.length > 0 && (
                 <button
-                  onClick={animateAutoAssign}
+                  onClick={() => setShowModeModal(true)}
                   disabled={assigning}
                   className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded cursor-pointer disabled:opacity-50 hover:brightness-90"
                   style={{ background: 'var(--accent)', color: 'white', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-display)' }}
@@ -375,6 +378,101 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
           )}
         </div>
       </div>
+
+      {showModeModal && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowModeModal(false)} />
+          <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '28px', width: '400px', border: '1px solid var(--border)' }}>
+            <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '18px', fontFamily: 'var(--font-display)' }}>
+              選擇分配模式
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* 均衡模式 */}
+              <button
+                onClick={() => { setShowModeModal(false); animateAutoAssign('balanced') }}
+                className="cursor-pointer hover:brightness-95"
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: '14px',
+                  padding: '16px', borderRadius: '10px',
+                  border: '1px solid var(--border)', background: 'var(--bg-primary)',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: '2px', height: '72px', flexShrink: 0, marginTop: '2px' }}>
+                  {[25, 50, 75, 100].map((pct) => (
+                    <div key={pct} style={{ position: 'absolute', bottom: `${pct}%`, left: 0, right: 0, borderTop: '1px dashed #9CA3AF', opacity: 0.6 }} />
+                  ))}
+                  {[68, 70, 72, 75, 75, 75, 75, 75, 75, 75].map((h, i) => (
+                    <div key={i} style={{
+                      width: '4px', borderRadius: '1.5px', position: 'relative', zIndex: 1,
+                      height: `${h}%`,
+                      background: h >= 75 ? '#16A34A' : h >= 50 ? '#CA8A04' : h >= 25 ? '#EA580C' : '#DC2626',
+                    }} />
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                    均衡模式
+                  </div>
+                  <div style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '8px' }}>
+                    最大化全場平均滿意度，讓每個人都盡量滿意
+                  </div>
+                  <div style={{ fontSize: '13px', lineHeight: '1.8' }}>
+                    <div style={{ color: '#16A34A' }}>✓ 整體分數較高，落差較小</div>
+                    <div style={{ color: '#EA580C' }}>△ 極高分的人可能較少</div>
+                  </div>
+                </div>
+              </button>
+              {/* 極致模式 */}
+              <button
+                onClick={() => { setShowModeModal(false); animateAutoAssign('maximize-happy') }}
+                className="cursor-pointer hover:brightness-95"
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: '14px',
+                  padding: '16px', borderRadius: '10px',
+                  border: '1px solid var(--border)', background: 'var(--bg-primary)',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: '2px', height: '72px', flexShrink: 0, marginTop: '2px' }}>
+                  {[25, 50, 75, 100].map((pct) => (
+                    <div key={pct} style={{ position: 'absolute', bottom: `${pct}%`, left: 0, right: 0, borderTop: '1px dashed #9CA3AF', opacity: 0.6 }} />
+                  ))}
+                  {[28, 32, 62, 66, 70, 74, 76, 78, 100, 100].map((h, i) => (
+                    <div key={i} style={{
+                      width: '4px', borderRadius: '1.5px', position: 'relative', zIndex: 1,
+                      height: `${h}%`,
+                      background: h >= 75 ? '#16A34A' : h >= 50 ? '#CA8A04' : h >= 25 ? '#EA580C' : '#DC2626',
+                    }} />
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                    極致模式
+                  </div>
+                  <div style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '8px' }}>
+                    盡量讓關係好的人湊在一起，衝高滿意度
+                  </div>
+                  <div style={{ fontSize: '13px', lineHeight: '1.8' }}>
+                    <div style={{ color: '#16A34A' }}>✓ 更多人達到極高滿意度</div>
+                    <div style={{ color: '#EA580C' }}>△ 部分人的分數可能較低</div>
+                  </div>
+                </div>
+              </button>
+            </div>
+            <div style={{ marginTop: '16px', textAlign: 'right' }}>
+              <button
+                onClick={() => setShowModeModal(false)}
+                className="cursor-pointer hover:bg-black/5"
+                style={{ padding: '8px 18px', borderRadius: '6px', fontSize: '14px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)' }}
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

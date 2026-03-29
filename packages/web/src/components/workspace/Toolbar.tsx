@@ -577,7 +577,7 @@ export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
                 useSeatingStore.setState({
                   guests: finalGuests,
                   tables: finalTables,
-                  undoStack: [...undoStack, { type: 'auto-assign' as const, assignments: allConfirmed.map((g) => ({ guestId: g.id, fromTableId: g.assignedTableId || null })), createdTableIds: [] }],
+                  undoStack: [...undoStack, { type: 'auto-assign' as const, assignments: allConfirmed.map((g) => ({ guestId: g.id, fromTableId: g.assignedTableId || null, fromSeatIndex: g.seatIndex })), createdTableIds: [] }],
                 })
 
                 // 存 DB
