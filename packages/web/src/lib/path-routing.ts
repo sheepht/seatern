@@ -120,8 +120,8 @@ export function computeAvoidancePath(
 
   // Catmull-Rom → cubic bezier 平滑
   const d = catmullRomToSvgPath(pts)
-  // badge 放在箭頭前 ~100px，從終點往回找
-  const badgePt = findPointBackFromEnd(pts, 100)
+  // badge 放在箭頭前 ~50px，從終點往回找
+  const badgePt = findPointBackFromEnd(pts, 50)
   return { d, midpoint: badgePt }
 }
 

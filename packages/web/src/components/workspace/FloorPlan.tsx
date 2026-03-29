@@ -772,6 +772,12 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           const guestX = srcTable.positionX + Math.cos(angle) * seatRadius
           const guestY = srcTable.positionY + Math.sin(angle) * seatRadius
 
+          // badge 顏色邏輯：1條綠、多條同分都黃、多條不同分最高綠其餘黃
+          const seatedDeltas = recommendations.map((r) => r.guestDelta)
+          const seatedMaxDelta = Math.max(...seatedDeltas)
+          const seatedAllSame = new Set(seatedDeltas).size === 1
+          const seatedOnlyOne = recommendations.length === 1
+
           return (
             <g style={{ pointerEvents: 'none' }}>
               {recommendations.map((rec, i) => {
@@ -819,6 +825,9 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                 const ax2 = endX - ux * arrowSize + uy * arrowSize * 0.5
                 const ay2 = endY - uy * arrowSize - ux * arrowSize * 0.5
 
+                const badgeColor = seatedOnlyOne ? '#16A34A' : (seatedAllSame ? '#CA8A04' : (rec.guestDelta === seatedMaxDelta ? '#16A34A' : '#CA8A04'))
+                const lineColor = badgeColor === '#16A34A' ? '#16A34A' : '#B08D57'
+
                 return (
                   <g key={`rec-${i}`} opacity={0.9 - i * 0.15}>
                     <style>{`
@@ -830,17 +839,17 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                     <path
                       d={pathD}
                       fill="none"
-                      stroke="#B08D57"
+                      stroke={lineColor}
                       strokeWidth="2.5"
                       strokeDasharray="10 6"
                       style={{ animation: `rec-flow-${i} 0.6s linear infinite` }}
                     />
                     <polygon
                       points={`${endX},${endY} ${ax1},${ay1} ${ax2},${ay2}`}
-                      fill="#B08D57"
+                      fill={lineColor}
                     />
-                    <g transform={`translate(${midpoint.x}, ${midpoint.y - 12})`}>
-                      <rect x={-20} y={-12} width={40} height={24} rx={12} fill="#16A34A" />
+                    <g transform={`translate(${midpoint.x}, ${midpoint.y})`}>
+                      <rect x={-20} y={-12} width={40} height={24} rx={12} fill={badgeColor} />
                       <text y={5} textAnchor="middle" fill="white" fontSize="14" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
                         +{rec.guestDelta}
                       </text>
@@ -893,6 +902,12 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         const startScreenX = chipRect.right + 4
         const startScreenY = chipRect.top + chipRect.height / 2
 
+        // delta 顯示：guestDelta 對待排賓客是絕對分數，減去目前分數得 delta
+        const currentScore = guest.satisfactionScore
+        const deltas = recommendations.map((r) => r.guestDelta - currentScore)
+        const maxDelta = Math.max(...deltas)
+        const allSame = new Set(deltas).size === 1
+
         return createPortal(
           <svg
             style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 9998 }}
@@ -927,7 +942,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
               const endScreenX = tableScreen.x - ux * (screenRadius + 4)
               const endScreenY = tableScreen.y - uy * (screenRadius + 4)
 
-              // 簡單的二次貝茲曲線（垂直偏移 15%）
+              // 簡單的二次貝茲曲線（垂直偏移 12%）
               const mx = (startScreenX + endScreenX) / 2
               const my = (startScreenY + endScreenY) / 2
               const offset = dist * 0.12
@@ -943,29 +958,36 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
               const ax2 = endScreenX - ux * arrowSize + uy * arrowSize * 0.5
               const ay2 = endScreenY - uy * arrowSize - ux * arrowSize * 0.5
 
-              // badge 位置（曲線上 55% 處）
-              const t = 0.55
-              const badgeX = (1-t)*(1-t)*startScreenX + 2*(1-t)*t*cx + t*t*endScreenX
-              const badgeY = (1-t)*(1-t)*startScreenY + 2*(1-t)*t*cy + t*t*endScreenY
+              // badge 位置：貝茲曲線上箭頭前 ~50px
+              const chordLen = Math.sqrt((endScreenX - startScreenX) ** 2 + (endScreenY - startScreenY) ** 2) || 1
+              const bt = Math.max(0.5, 1 - 50 / chordLen)
+              const badgeX = (1-bt)*(1-bt)*startScreenX + 2*(1-bt)*bt*cx + bt*bt*endScreenX
+              const badgeY = (1-bt)*(1-bt)*startScreenY + 2*(1-bt)*bt*cy + bt*bt*endScreenY
+
+              const delta = rec.guestDelta - currentScore
+              // 只有1條 → 綠色；多條且分數都一樣 → 都黃色；多條不同分 → 最高綠色其餘黃色
+              const onlyOne = recommendations.length === 1
+              const badgeColor = onlyOne ? '#16A34A' : (allSame ? '#CA8A04' : (delta === maxDelta ? '#16A34A' : '#CA8A04'))
+              const lineColor = badgeColor === '#16A34A' ? '#16A34A' : '#B08D57'
 
               return (
                 <g key={`rec-overlay-${i}`} opacity={0.9 - i * 0.15}>
                   <path
                     d={pathD}
                     fill="none"
-                    stroke="#B08D57"
+                    stroke={lineColor}
                     strokeWidth="2.5"
                     strokeDasharray="10 6"
                     style={{ animation: `rec-overlay-flow 0.6s linear infinite` }}
                   />
                   <polygon
                     points={`${endScreenX},${endScreenY} ${ax1},${ay1} ${ax2},${ay2}`}
-                    fill="#B08D57"
+                    fill={lineColor}
                   />
-                  <g transform={`translate(${badgeX}, ${badgeY - 12})`}>
-                    <rect x={-20} y={-12} width={40} height={24} rx={12} fill="#16A34A" />
+                  <g transform={`translate(${badgeX}, ${badgeY})`}>
+                    <rect x={-20} y={-12} width={40} height={24} rx={12} fill={badgeColor} />
                     <text y={5} textAnchor="middle" fill="white" fontSize="13" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
-                      {rec.guestDelta}
+                      +{delta}
                     </text>
                   </g>
                 </g>
