@@ -196,6 +196,8 @@ export default function WorkspacePage() {
               width: sidebarCollapsed ? 28 : 0,
               borderRight: sidebarCollapsed ? '1px solid var(--border)' : 'none',
               transition: 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+              position: 'relative',
+              zIndex: 20,
             }}
             onClick={() => setSidebarCollapsed(false)}
             title="展開側邊欄"
