@@ -902,9 +902,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         const startScreenX = chipRect.right + 4
         const startScreenY = chipRect.top + chipRect.height / 2
 
-        // delta 顯示：guestDelta 對待排賓客是絕對分數，減去目前分數得 delta
-        const currentScore = guest.satisfactionScore
-        const deltas = recommendations.map((r) => r.guestDelta - currentScore)
+        // 待排賓客的 guestDelta 是絕對分數（newGuestScore），直接當 +N 顯示
+        const deltas = recommendations.map((r) => r.guestDelta)
         const maxDelta = Math.max(...deltas)
         const allSame = new Set(deltas).size === 1
 
@@ -964,7 +963,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
               const badgeX = (1-bt)*(1-bt)*startScreenX + 2*(1-bt)*bt*cx + bt*bt*endScreenX
               const badgeY = (1-bt)*(1-bt)*startScreenY + 2*(1-bt)*bt*cy + bt*bt*endScreenY
 
-              const delta = rec.guestDelta - currentScore
+              const delta = rec.guestDelta
               // 只有1條 → 綠色；多條且分數都一樣 → 都黃色；多條不同分 → 最高綠色其餘黃色
               const onlyOne = recommendations.length === 1
               const badgeColor = onlyOne ? '#16A34A' : (allSame ? '#CA8A04' : (delta === maxDelta ? '#16A34A' : '#CA8A04'))
