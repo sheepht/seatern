@@ -926,29 +926,97 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
   autoAssignGuests: async () => {
     const { guests, tables, avoidPairs, undoStack, eventId } = get()
+    const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
+    const unassigned = confirmed.filter((g) => !g.assignedTableId)
+    if (unassigned.length === 0) return
 
-    const assignments = runAutoAssign(guests, tables, avoidPairs)
+    // 檢查容量是否足夠，不夠就自動新增桌子
+    const totalSeatsNeeded = unassigned.reduce((s, g) => s + g.attendeeCount, 0)
+    const totalRemaining = tables.reduce((s, t) => {
+      const seated = confirmed.filter((g) => g.assignedTableId === t.id)
+      const used = seated.reduce((ss, g) => ss + g.attendeeCount, 0)
+      return s + Math.max(0, t.capacity - used)
+    }, 0)
+
+    let currentTables = tables
+    const newTableIds: string[] = []
+    if (totalSeatsNeeded > totalRemaining) {
+      const deficit = totalSeatsNeeded - totalRemaining
+      const defaultCapacity = 10
+      const tablesToAdd = Math.ceil(deficit / defaultCapacity)
+      const existingCount = tables.length
+
+      for (let i = 0; i < tablesToAdd; i++) {
+        const num = existingCount + i + 1
+        const cols = Math.ceil(Math.sqrt(num + 1))
+        const row = Math.floor((existingCount + i) / cols)
+        const col = (existingCount + i) % cols
+        const name = `第${num}桌`
+        const posX = 200 + col * 250
+        const posY = 200 + row * 250
+
+        // 直接呼叫 addTable（會存 DB + 更新 store）
+        await get().addTable(name, posX, posY)
+        const latestTables = get().tables
+        const newTable = latestTables.find((t) => t.name === name)
+        if (newTable) newTableIds.push(newTable.id)
+      }
+      // 重新讀取最新的 tables
+      currentTables = get().tables
+    }
+
+    const latestGuests = get().guests
+    const assignments = runAutoAssign(latestGuests, currentTables, avoidPairs)
     if (assignments.length === 0) return
 
     // 記錄原始分配（undo 用）
     const undoData = assignments.map((a) => ({
       guestId: a.guestId,
-      fromTableId: guests.find((g) => g.id === a.guestId)?.assignedTableId || null,
+      fromTableId: latestGuests.find((g) => g.id === a.guestId)?.assignedTableId || null,
     }))
 
-    // 更新 store
-    const updatedGuests = guests.map((g) => {
+    // 更新 store：設定 assignedTableId + 自動分配 seatIndex
+    const updatedGuests = latestGuests.map((g) => {
       const assignment = assignments.find((a) => a.guestId === g.id)
       return assignment ? { ...g, assignedTableId: assignment.tableId } : g
     })
 
+    // 為新分配的賓客自動分配 seatIndex
+    for (const t of currentTables) {
+      const tableGuests = updatedGuests.filter(
+        (g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed',
+      )
+      const needsIndex = tableGuests.filter((g) => g.seatIndex === null)
+      if (needsIndex.length === 0) continue
+
+      const usedIndices = new Set<number>()
+      for (const g of tableGuests) {
+        if (g.seatIndex !== null) {
+          usedIndices.add(g.seatIndex)
+          for (let c = 1; c < g.attendeeCount; c++) {
+            usedIndices.add((g.seatIndex + c) % t.capacity)
+          }
+        }
+      }
+      let nextFree = 0
+      for (const g of needsIndex) {
+        while (usedIndices.has(nextFree)) nextFree++
+        g.seatIndex = nextFree
+        usedIndices.add(nextFree)
+        for (let c = 1; c < g.attendeeCount; c++) {
+          usedIndices.add(nextFree + c)
+        }
+        nextFree++
+      }
+    }
+
     // 重算滿意度
-    const result = recalculateAll(updatedGuests, tables, avoidPairs)
+    const result = recalculateAll(updatedGuests, currentTables, avoidPairs)
     const finalGuests = updatedGuests.map((g) => {
       const score = result.guests.find((gs) => gs.id === g.id)
       return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
     })
-    const finalTables = tables.map((t) => {
+    const finalTables = currentTables.map((t) => {
       const score = result.tables.find((ts) => ts.id === t.id)
       return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
     })
@@ -956,21 +1024,22 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     set({
       guests: finalGuests,
       tables: finalTables,
-      undoStack: [...undoStack, { type: 'auto-assign' as const, assignments: undoData }],
+      undoStack: [...get().undoStack, { type: 'auto-assign' as const, assignments: undoData }],
     })
 
     // 存 DB
     if (eventId) {
       try {
         await Promise.all(
-          assignments.map((a) =>
-            fetch(`/api/events/${eventId}/guests/${a.guestId}/table`, {
+          assignments.map((a) => {
+            const guest = finalGuests.find((g) => g.id === a.guestId)
+            return fetch(`/api/events/${eventId}/guests/${a.guestId}/table`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
-              body: JSON.stringify({ tableId: a.tableId, seatIndex: null }),
-            }).then((res) => { if (!res.ok) throw new Error(`Save failed: ${a.guestId}`) }),
-          ),
+              body: JSON.stringify({ tableId: a.tableId, seatIndex: guest?.seatIndex ?? null }),
+            }).then((res) => { if (!res.ok) throw new Error(`Save failed: ${a.guestId}`) })
+          }),
         )
       } catch {
         // 失敗 → 自動 revert

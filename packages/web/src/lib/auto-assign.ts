@@ -127,20 +127,7 @@ export function autoAssignGuests(
     }
   }
 
-  // 處理放不下的賓客（所有桌都滿了）→ 放到剩餘容量最大的桌
-  for (const guest of remaining) {
-    if (assigned.has(guest.id)) continue
-    let bestTable: string | null = null
-    let bestCap = -Infinity
-    for (const t of tables) {
-      const cap = tableRemaining.get(t.id) || 0
-      if (cap > bestCap) { bestCap = cap; bestTable = t.id }
-    }
-    if (bestTable) {
-      assigned.set(guest.id, bestTable)
-      tableRemaining.set(bestTable, (tableRemaining.get(bestTable) || 0) - guest.attendeeCount)
-    }
-  }
+  // 放不下的賓客不硬塞（caller 應確保桌子容量足夠）
 
   // ─── Step 2: 局部搜尋 ──────────────────────────────
 
