@@ -1,4 +1,5 @@
 import { useCallback, useState, useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useSeatingStore, type Guest } from '@/stores/seating'
 import { recalculateAll } from '@/lib/satisfaction'
 import { computeAvoidancePath, getPathEndDirection } from '@/lib/path-routing'
@@ -733,6 +734,10 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
             <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#E5E7EB" strokeWidth="0.5" />
           </pattern>
+          {/* 裁切推薦虛線，不讓線跑到側欄後面 */}
+          <clipPath id="viewbox-clip">
+            <rect x={viewBoxX} y={viewBoxY} width={viewBoxW} height={viewBoxH} />
+          </clipPath>
         </defs>
         {/* Grid 背景覆蓋大範圍，確保 zoom/pan 時都有格線 */}
         <rect x={-5000} y={-5000} width={10000} height={10000} fill="url(#grid)" />
@@ -760,47 +765,22 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           if (!guest) return null
 
           const isUnassigned = !guest.assignedTableId
-          let guestX: number, guestY: number
-          let srcTable: (typeof tables)[number] | undefined
-          let srcRadius = 0
 
-          if (isUnassigned) {
-            // 待排賓客：線從側欄賓客位置出發（SVG 左邊外面）
-            guestY = viewBoxY + viewBoxH / 2 // fallback
-            const svgEl = svgRef.current
-            const chipEl = document.querySelector(`[data-guest-id="${guest.id}"]`)
-            if (svgEl && chipEl) {
-              const chipRect = chipEl.getBoundingClientRect()
-              const ctm = svgEl.getScreenCTM()
-              if (ctm) {
-                const pt = svgEl.createSVGPoint()
-                // 賓客 chip 的右邊緣 + 偏移（螢幕座標）→ SVG 座標，讓線從 chip 右邊出發不重疊
-                pt.x = chipRect.right + 6
-                pt.y = chipRect.top + chipRect.height / 2
-                const svgPt = pt.matrixTransform(ctm.inverse())
-                guestX = svgPt.x
-                guestY = svgPt.y
-              } else {
-                guestX = -80
-              }
-            } else {
-              guestX = -80
-            }
-          } else {
-            if (guest.seatIndex === null) return null
-            srcTable = tables.find((t) => t.id === guest.assignedTableId)
-            if (!srcTable) return null
-            srcRadius = Math.max(58 + Math.min(srcTable.capacity, 12) * 7, 88)
-            const seatRadius = srcRadius - 34
-            const totalSlots = srcTable.capacity
-            const angle = ((2 * Math.PI) / totalSlots) * guest.seatIndex - Math.PI / 2
-            guestX = srcTable.positionX + Math.cos(angle) * seatRadius
-            guestY = srcTable.positionY + Math.sin(angle) * seatRadius
-          }
+          // 待排賓客的推薦線改用 HTML overlay 渲染（見下方 unassignedRecOverlay）
+          if (isUnassigned) return null
+
+          if (guest.seatIndex === null) return null
+          const srcTable = tables.find((t) => t.id === guest.assignedTableId)
+          if (!srcTable) return null
+          const srcRadius = Math.max(58 + Math.min(srcTable.capacity, 12) * 7, 88)
+          const seatRadius = srcRadius - 34
+          const totalSlots = srcTable.capacity
+          const angle = ((2 * Math.PI) / totalSlots) * guest.seatIndex - Math.PI / 2
+          const guestX = srcTable.positionX + Math.cos(angle) * seatRadius
+          const guestY = srcTable.positionY + Math.sin(angle) * seatRadius
 
           return (
             <g style={{ pointerEvents: 'none' }}>
-              {/* 曲線 + 箭頭 — pointer-events:none 避免擋住側欄互動 */}
               {recommendations.map((rec, i) => {
                 const targetTable = tables.find((t) => t.id === rec.tableId)
                 if (!targetTable) return null
@@ -808,21 +788,18 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                 const tx = targetTable.positionX
                 const ty = targetTable.positionY
                 const targetRadius = Math.max(58 + Math.min(targetTable.capacity, 12) * 7, 88)
-                const guestCircleR = isUnassigned ? 0 : 23
 
-                // 起終點
                 const dx0 = tx - guestX
                 const dy0 = ty - guestY
                 const dist0 = Math.sqrt(dx0 * dx0 + dy0 * dy0) || 1
                 const ux0 = dx0 / dist0
                 const uy0 = dy0 / dist0
 
-                const startX = isUnassigned ? guestX : guestX + ux0 * (guestCircleR + 4)
-                const startY = isUnassigned ? guestY : guestY + uy0 * (guestCircleR + 4)
+                const startX = guestX + ux0 * 27
+                const startY = guestY + uy0 * 27
                 const endX = tx - ux0 * (targetRadius + 4)
                 const endY = ty - uy0 * (targetRadius + 4)
 
-                // 所有桌子都是障礙（含來源桌），只排除目標桌
                 const obstacles = tables
                   .filter((t) => t.id !== rec.tableId)
                   .map((t) => ({
@@ -831,13 +808,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                     r: Math.max(58 + Math.min(t.capacity, 12) * 7, 88),
                   }))
 
-                // 來源桌資訊（讓路徑先從桌外出發）
-                // 待排賓客：用虛擬障礙強制線先往右走
-                const srcObstacle = srcTable
-                  ? { cx: srcTable.positionX, cy: srcTable.positionY, r: srcRadius }
-                  : { cx: guestX - 20, cy: guestY, r: 30 }
+                const srcObstacle = { cx: srcTable.positionX, cy: srcTable.positionY, r: srcRadius }
 
-                // 計算避障路徑
                 const { d: pathD, midpoint } = computeAvoidancePath(
                   { x: startX, y: startY },
                   { x: endX, y: endY },
@@ -847,7 +819,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                   Math.max(CANVAS_HEIGHT, ...tables.map((t) => t.positionY + 200)),
                 )
 
-                // 用路徑末端方向畫箭頭
                 const { ux, uy } = getPathEndDirection(pathD)
                 const arrowSize = 16
                 const ax1 = endX - ux * arrowSize - uy * arrowSize * 0.5
@@ -857,7 +828,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
                 return (
                   <g key={`rec-${i}`} opacity={0.9 - i * 0.15}>
-                    {/* 流動虛線動畫 */}
                     <style>{`
                       @keyframes rec-flow-${i} {
                         from { stroke-dashoffset: 0; }
@@ -876,11 +846,10 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                       points={`${endX},${endY} ${ax1},${ay1} ${ax2},${ay2}`}
                       fill="#B08D57"
                     />
-                    {/* 賓客 +N（曲線中點，放大版） */}
                     <g transform={`translate(${midpoint.x}, ${midpoint.y - 12})`}>
                       <rect x={-20} y={-12} width={40} height={24} rx={12} fill="#16A34A" />
                       <text y={5} textAnchor="middle" fill="white" fontSize="14" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
-                        {isUnassigned ? rec.guestDelta : `+${rec.guestDelta}`}
+                        +{rec.guestDelta}
                       </text>
                     </g>
                   </g>
@@ -915,6 +884,105 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           </text>
         )}
       </svg>
+
+      {/* 待排賓客的推薦虛線 — 用 HTML overlay 渲染，讓線從側欄賓客 chip 出發 */}
+      {recommendations.length > 0 && hoveredGuestId && (() => {
+        const guest = guests.find((g) => g.id === hoveredGuestId)
+        if (!guest || guest.assignedTableId) return null // 只處理待排賓客
+
+        const svgEl = svgRef.current
+        const chipEl = document.querySelector(`[data-guest-id="${guest.id}"]`)
+        if (!svgEl || !chipEl) return null
+        const chipRect = chipEl.getBoundingClientRect()
+        const ctm = svgEl.getScreenCTM()
+        if (!ctm) return null
+
+        // 起點：賓客 chip 的右邊緣
+        const startScreenX = chipRect.right + 4
+        const startScreenY = chipRect.top + chipRect.height / 2
+
+        return createPortal(
+          <svg
+            style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 9998 }}
+          >
+            <style>{`
+              @keyframes rec-overlay-flow {
+                from { stroke-dashoffset: 0; }
+                to { stroke-dashoffset: -16; }
+              }
+            `}</style>
+            {recommendations.map((rec, i) => {
+              const targetTable = tables.find((t) => t.id === rec.tableId)
+              if (!targetTable) return null
+
+              const targetRadius = Math.max(58 + Math.min(targetTable.capacity, 12) * 7, 88)
+
+              // 目標桌邊緣的螢幕座標
+              const pt = svgEl.createSVGPoint()
+              pt.x = targetTable.positionX
+              pt.y = targetTable.positionY
+              const tableScreen = pt.matrixTransform(ctm)
+
+              // 從起點到桌心的方向
+              const dx = tableScreen.x - startScreenX
+              const dy = tableScreen.y - startScreenY
+              const dist = Math.sqrt(dx * dx + dy * dy) || 1
+              const ux = dx / dist
+              const uy = dy / dist
+
+              // 終點在桌邊緣
+              const screenRadius = targetRadius * (ctm.a) // SVG scale → screen scale
+              const endScreenX = tableScreen.x - ux * (screenRadius + 4)
+              const endScreenY = tableScreen.y - uy * (screenRadius + 4)
+
+              // 簡單的二次貝茲曲線（垂直偏移 15%）
+              const mx = (startScreenX + endScreenX) / 2
+              const my = (startScreenY + endScreenY) / 2
+              const offset = dist * 0.12
+              const cx = mx - uy * offset
+              const cy = my + ux * offset
+
+              const pathD = `M${startScreenX},${startScreenY} Q${cx},${cy} ${endScreenX},${endScreenY}`
+
+              // 箭頭
+              const arrowSize = 12
+              const ax1 = endScreenX - ux * arrowSize - uy * arrowSize * 0.5
+              const ay1 = endScreenY - uy * arrowSize + ux * arrowSize * 0.5
+              const ax2 = endScreenX - ux * arrowSize + uy * arrowSize * 0.5
+              const ay2 = endScreenY - uy * arrowSize - ux * arrowSize * 0.5
+
+              // badge 位置（曲線上 55% 處）
+              const t = 0.55
+              const badgeX = (1-t)*(1-t)*startScreenX + 2*(1-t)*t*cx + t*t*endScreenX
+              const badgeY = (1-t)*(1-t)*startScreenY + 2*(1-t)*t*cy + t*t*endScreenY
+
+              return (
+                <g key={`rec-overlay-${i}`} opacity={0.9 - i * 0.15}>
+                  <path
+                    d={pathD}
+                    fill="none"
+                    stroke="#B08D57"
+                    strokeWidth="2.5"
+                    strokeDasharray="10 6"
+                    style={{ animation: `rec-overlay-flow 0.6s linear infinite` }}
+                  />
+                  <polygon
+                    points={`${endScreenX},${endScreenY} ${ax1},${ay1} ${ax2},${ay2}`}
+                    fill="#B08D57"
+                  />
+                  <g transform={`translate(${badgeX}, ${badgeY - 12})`}>
+                    <rect x={-20} y={-12} width={40} height={24} rx={12} fill="#16A34A" />
+                    <text y={5} textAnchor="middle" fill="white" fontSize="13" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
+                      {rec.guestDelta}
+                    </text>
+                  </g>
+                </g>
+              )
+            })}
+          </svg>,
+          document.body,
+        )
+      })()}
 
       {/* HTML overlay 層（拖桌子或重排動畫時禁用） */}
       <div style={{ pointerEvents: (draggingTableId || isResetting || flyingGuestIds.size > 0) ? 'none' : undefined }}>

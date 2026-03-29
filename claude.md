@@ -897,6 +897,17 @@ interface SeatingSnapshot {
 | 1.1 | 2026-02-05 | Phase 0 schema 更新：side→category、移除 plusOneName 改用 attendeeCount+infantCount、新增 needsMet、Table 改用 positionX/Y+color+note、Tag 新增 category、Event 新增 categories、SeatingSnapshot data 含桌次位置 |
 | 1.2 | 2026-02-05 | Schema 精簡：Contact 移除 dietaryNeeds/specialNeeds/tags、Guest 移除 dietaryNeeds[]/specialNeeds[]/needsMet 改用 dietaryNote/specialNote (String?)、Table 移除 tags、需求分固定 +5 |
 
+## 開發注意事項
+
+### 跨側欄與畫布的視覺元素
+側欄是 HTML（z-10），畫布是 SVG（overflow: visible）。任何需要從側欄賓客 chip 連線到畫布桌子的視覺元素（推薦虛線、動畫等），**必須**用 `createPortal(..., document.body)` 渲染到 `<body>`，不能放在 FloorPlan 的 SVG 或其父容器內，否則會被側欄的 stacking context 擋住。
+
+規則：
+1. 用 `createPortal(..., document.body)` 渲染到 body
+2. 用 `position: fixed` + 高 z-index（9998）
+3. 用螢幕座標（getBoundingClientRect + getScreenCTM）而非 SVG 座標
+4. 設 `pointer-events: none`
+
 ## Design System
 Always read DESIGN.md before making any visual or UI decisions.
 All font choices, colors, spacing, and aesthetic direction are defined there.

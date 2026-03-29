@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid } from 'lucide-react'
+import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid, Trash2, Dices } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
-import { getSatisfactionColor } from '@/lib/satisfaction'
+import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction'
 import { calculateGridLayout, findFreePosition } from '@/lib/viewport'
 import { AvoidPairModal } from './AvoidPairModal'
 
@@ -44,6 +44,8 @@ export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
   const [showArrangeConfirm, setShowArrangeConfirm] = useState(false)
   const [arranging, setArranging] = useState(false)
   const autoArrangeTables = useSeatingStore((s) => s.autoArrangeTables)
+  const removeTable = useSeatingStore((s) => s.removeTable)
+  const isDev = import.meta.env.DEV
 
   const handleRenameEvent = () => {
     const trimmed = renameEventValue.trim()
@@ -501,6 +503,108 @@ export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
+          {/* DEV: 刪空桌 */}
+          {isDev && (() => {
+            const emptyCount = tables.filter((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')).length
+            if (emptyCount === 0) return null
+            return (
+              <button
+                onClick={async () => {
+                  const emptyTables = tables.filter((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed'))
+                  for (const t of emptyTables) await removeTable(t.id)
+                }}
+                className="flex items-center gap-1 whitespace-nowrap px-2.5 py-1.5 text-xs font-medium rounded border cursor-pointer hover:bg-red-50"
+                style={{ color: '#EA580C', borderColor: '#FDBA74', borderRadius: 'var(--radius-sm)' }}
+                title="刪除所有空桌（DEV）"
+              >
+                <Trash2 size={12} /> 刪空桌 {emptyCount}
+              </button>
+            )
+          })()}
+
+          {/* DEV: 隨機打亂 */}
+          {isDev && tables.length > 0 && (
+            <button
+              onClick={() => {
+                const { avoidPairs, undoStack } = useSeatingStore.getState()
+                const allConfirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
+
+                // 打亂賓客順序
+                const shuffled = [...allConfirmed]
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                  const j = Math.floor(Math.random() * (i + 1));
+                  [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+                }
+
+                // 建立每桌的剩餘容量 & 下一個可用 seatIndex
+                const remaining = new Map<string, number>()
+                const nextSeat = new Map<string, number>()
+                for (const t of tables) {
+                  remaining.set(t.id, t.capacity)
+                  nextSeat.set(t.id, 0)
+                }
+
+                // 依序塞入，分配連續 seatIndex（眷屬連位）
+                const assignments = new Map<string, { tableId: string; seatIndex: number }>()
+                for (const g of shuffled) {
+                  const availableTable = tables.find((t) => (remaining.get(t.id) || 0) >= g.attendeeCount)
+                  if (availableTable) {
+                    const seat = nextSeat.get(availableTable.id) || 0
+                    assignments.set(g.id, { tableId: availableTable.id, seatIndex: seat })
+                    remaining.set(availableTable.id, (remaining.get(availableTable.id) || 0) - g.attendeeCount)
+                    nextSeat.set(availableTable.id, seat + g.attendeeCount)
+                  }
+                }
+
+                // 一次更新 store
+                const updatedGuests = guests.map((g) => {
+                  const a = assignments.get(g.id)
+                  if (a) return { ...g, assignedTableId: a.tableId, seatIndex: a.seatIndex }
+                  if (g.rsvpStatus === 'confirmed') return { ...g, assignedTableId: null as string | null | undefined, seatIndex: null }
+                  return g
+                })
+
+                const result = recalculateAll(updatedGuests, tables, avoidPairs)
+                const finalGuests = updatedGuests.map((g) => {
+                  const score = result.guests.find((gs) => gs.id === g.id)
+                  return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
+                })
+                const finalTables = tables.map((t) => {
+                  const score = result.tables.find((ts) => ts.id === t.id)
+                  return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
+                })
+
+                useSeatingStore.setState({
+                  guests: finalGuests,
+                  tables: finalTables,
+                  undoStack: [...undoStack, { type: 'auto-assign' as const, assignments: allConfirmed.map((g) => ({ guestId: g.id, fromTableId: g.assignedTableId || null })), createdTableIds: [] }],
+                })
+
+                // 存 DB
+                const { eventId } = useSeatingStore.getState()
+                if (eventId) {
+                  Promise.all(
+                    finalGuests
+                      .filter((g) => g.rsvpStatus === 'confirmed')
+                      .map((g) =>
+                        fetch(`/api/events/${eventId}/guests/${g.id}/table`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({ tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null }),
+                        }).catch(console.error),
+                      ),
+                  )
+                }
+              }}
+              className="flex items-center gap-1 whitespace-nowrap px-2.5 py-1.5 text-xs font-medium rounded border cursor-pointer hover:bg-purple-50"
+              style={{ color: '#7C3AED', borderColor: '#C4B5FD', borderRadius: 'var(--radius-sm)' }}
+              title="隨機打亂座位（DEV）"
+            >
+              <Dices size={12} /> 隨機
+            </button>
+          )}
+
           {/* Auto-arrange */}
           <div className="relative">
             <button

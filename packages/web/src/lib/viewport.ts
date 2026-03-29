@@ -100,7 +100,7 @@ export function findFreePosition(
   existingTables: Table[],
   spacing = 300,
 ): { x: number; y: number } {
-  if (existingTables.length === 0) return { x: 200, y: 200 }
+  if (existingTables.length === 0) return { x: spacing, y: spacing }
 
   // 以現有桌子群的中心為基準
   const centerX = existingTables.reduce((s, t) => s + t.positionX, 0) / existingTables.length
