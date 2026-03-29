@@ -81,9 +81,13 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
       }
     }
 
-    // Step 2: 預先隱藏這些賓客（避免分配後閃現在桌上）
+    // Step 2: 預先隱藏賓客 + 抑制所有 hover 互動（避免動畫期間觸發推薦線和滿意度預覽）
     const assignedIds = new Set(chipPositions.keys())
-    useSeatingStore.setState({ flyingGuestIds: assignedIds })
+    useSeatingStore.setState({
+      flyingGuestIds: assignedIds,
+      hoverSuppressedUntil: Date.now() + 2000, // 動畫期間禁止 hover
+      hoveredGuestId: null, // 清除已有的 hover
+    })
 
     // Step 3: 執行分配
     try {
