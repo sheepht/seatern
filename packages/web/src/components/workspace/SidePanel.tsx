@@ -62,6 +62,132 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
   const [search, setSearch] = useState('')
   const [assigning, setAssigning] = useState(false)
 
+  const CATEGORY_BG: Record<string, string> = { '男方': '#DBEAFE', '女方': '#FEE2E2', '共同': '#F3F4F6' }
+  const CATEGORY_CLR: Record<string, string> = { '男方': '#1E40AF', '女方': '#991B1B', '共同': '#374151' }
+
+  const animateAutoAssign = async () => {
+    setAssigning(true)
+    const svgEl = document.getElementById('floorplan-svg') as SVGSVGElement | null
+    const ctm = svgEl?.getScreenCTM()
+
+    // Step 1: 記錄每位待排賓客在側欄的螢幕位置
+    const unassigned = getUnassignedGuests()
+    const chipPositions = new Map<string, { x: number; y: number }>()
+    for (const g of unassigned) {
+      const el = document.querySelector(`[data-guest-id="${g.id}"]`)
+      if (el) {
+        const rect = el.getBoundingClientRect()
+        chipPositions.set(g.id, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+      }
+    }
+
+    // Step 2: 執行分配
+    try {
+      await autoAssignGuests()
+    } catch (err: any) {
+      alert(err.message || '自動分配失敗')
+      setAssigning(false)
+      return
+    }
+
+    // Step 3: 計算每位賓客在桌上的目標螢幕位置
+    if (!svgEl || !ctm || chipPositions.size === 0) {
+      setAssigning(false)
+      return
+    }
+
+    const latestGuests = useSeatingStore.getState().guests
+    const latestTables = useSeatingStore.getState().tables
+    const newCtm = svgEl.getScreenCTM()
+    if (!newCtm) { setAssigning(false); return }
+
+    const vb = svgEl.viewBox.baseVal
+    const svgRect = svgEl.getBoundingClientRect()
+    const svgScale = svgRect.width / vb.width
+    const circleSize = 40 * svgScale
+    const fontSize = Math.max(10, Math.round(16 * svgScale))
+
+    // 隱藏剛被分配的賓客（讓浮動圓圈取代）
+    const assignedIds = new Set(chipPositions.keys())
+    useSeatingStore.setState({ flyingGuestIds: assignedIds })
+
+    // 建立浮動 overlay
+    const overlay = document.createElement('div')
+    overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999'
+    document.body.appendChild(overlay)
+
+    const chips: HTMLDivElement[] = []
+    const targets: Array<{ x: number; y: number }> = []
+
+    for (const [guestId, fromPos] of chipPositions) {
+      const guest = latestGuests.find((g) => g.id === guestId)
+      if (!guest?.assignedTableId) continue
+
+      const table = latestTables.find((t) => t.id === guest.assignedTableId)
+      if (!table) continue
+
+      // 計算目標座位的螢幕位置
+      const radius = Math.max(58 + Math.min(table.capacity, 12) * 7, 88)
+      const seatRadius = radius - 34
+      const seatIndex = guest.seatIndex ?? 0
+      const angle = ((2 * Math.PI) / table.capacity) * seatIndex - Math.PI / 2
+      const seatSvgX = table.positionX + Math.cos(angle) * seatRadius
+      const seatSvgY = table.positionY + Math.sin(angle) * seatRadius
+
+      const pt = svgEl.createSVGPoint()
+      pt.x = seatSvgX
+      pt.y = seatSvgY
+      const screenPt = pt.matrixTransform(newCtm)
+
+      const displayName = guest.name.length <= 2 ? guest.name : guest.name.slice(-2)
+      const chip = document.createElement('div')
+      chip.textContent = displayName
+      chip.style.cssText = `
+        position:fixed;
+        left:${fromPos.x}px;
+        top:${fromPos.y}px;
+        transform:translate(-50%,-50%);
+        width:${circleSize}px;
+        height:${circleSize}px;
+        border-radius:50%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:${fontSize}px;
+        font-weight:500;
+        font-family:'Noto Sans TC',sans-serif;
+        background:${CATEGORY_BG[guest.category] || '#F3F4F6'};
+        color:${CATEGORY_CLR[guest.category] || '#374151'};
+        border:1.5px solid white;
+        box-shadow:0 2px 8px rgba(0,0,0,0.15);
+        pointer-events:none;
+        transition:all 500ms cubic-bezier(0.4, 0, 0.2, 1);
+        z-index:9999;
+      `
+      overlay.appendChild(chip)
+      chips.push(chip)
+      targets.push({ x: screenPt.x, y: screenPt.y })
+    }
+
+    // Step 4: 觸發飛行動畫
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        chips.forEach((chip, i) => {
+          chip.style.left = `${targets[i].x}px`
+          chip.style.top = `${targets[i].y}px`
+          chip.style.transitionDelay = `${i * 20}ms`
+        })
+      })
+    })
+
+    // 動畫結束後清理
+    setTimeout(() => {
+      useSeatingStore.setState({ flyingGuestIds: new Set() })
+      setTimeout(() => overlay.remove(), 200)
+      setAssigning(false)
+    }, 550)
+  }
+
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
 
   const unassignedGuests = getUnassignedGuests()
@@ -140,16 +266,7 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
             <div className="flex items-center gap-1">
               {unassignedGuests.length > 0 && tables.length > 0 && (
                 <button
-                  onClick={async () => {
-                    setAssigning(true)
-                    try {
-                      await autoAssignGuests()
-                    } catch (err: any) {
-                      alert(err.message || '自動分配失敗')
-                    } finally {
-                      setAssigning(false)
-                    }
-                  }}
+                  onClick={animateAutoAssign}
                   disabled={assigning}
                   className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded cursor-pointer disabled:opacity-50 hover:brightness-90"
                   style={{ background: 'var(--accent)', color: 'white', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-display)' }}
