@@ -575,7 +575,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
       {allSeats.filter((s) => s.type === 'guest' && s.guest).map((seat) => {
         const guestR = 20 * counterScale
         const hasViolation = violatingGuestIds.has(seat.guest!.id)
-        const hasRecommendation = guestsWithRecommendations.has(seat.guest!.id) && !hasViolation
+        const hasRecommendation = guestsWithRecommendations.has(seat.guest!.id)
 
         if (!hasViolation && !hasRecommendation) return null
 
