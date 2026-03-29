@@ -2,6 +2,7 @@ import { useRef, useLayoutEffect, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useSeatingStore, type Table, type Guest } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
+import { dampedCounterScale, labelOpacity, satisfactionBlend, blendColors } from '@/lib/viewport'
 import type { Slot } from '@/lib/seat-shift'
 
 /**
@@ -137,7 +138,10 @@ function TableScoreRing({ score, originalScore, hasGuests }: { score: number; or
 }
 
 export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMouseDown }: Props) {
-  const counterScale = 1 / zoom // 讓內容維持固定螢幕大小
+  const counterScale = 1 / zoom // 桌名等維持固定螢幕大小
+  const rawGuestScale = dampedCounterScale(zoom) // 賓客元素：阻尼縮小
+  const nameAlpha = labelOpacity(zoom)         // 名字漸進淡出
+  const satBlend = satisfactionBlend(zoom)     // 填色從分類色→滿意度色
   const getTableGuests = useSeatingStore((s) => s.getTableGuests)
   const getTableSeatCount = useSeatingStore((s) => s.getTableSeatCount)
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
@@ -194,6 +198,13 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
   // 桌次大小依容量固定（要放得下所有座位圈圈）
   const baseRadius = 58 + Math.min(table.capacity, 12) * 7
   const radius = Math.max(baseRadius, 88)
+
+  // 賓客圈圈大小上限：不超出桌子、不互相擠壓
+  const seatRadius = radius - 34
+  const maxByTable = 34 - 2 // 不超出桌緣（34 = radius - seatRadius，留 2px padding）
+  const maxBySeat = seatRadius * Math.sin(Math.PI / table.capacity) - 2 // 相鄰不重疊
+  const maxGuestR = Math.min(maxByTable, maxBySeat)
+  const guestScale = Math.min(rawGuestScale, maxGuestR / 20) // cap: 20 * guestScale <= maxGuestR
 
   // 拖曳 hover 但無法放置（滿桌）
   const isRejectTable = dragRejectTableId === table.id
@@ -430,8 +441,8 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
         </textPath>
       </text>
 
-      {/* 滿意度圓環進度條 + 中央數字 — counter-scale 維持固定螢幕大小 */}
-      <g transform={`scale(${counterScale})`} style={{ opacity: isResetting ? 0 : 1 }}>
+      {/* 滿意度圓環進度條 + 中央數字 — 阻尼縮放 */}
+      <g transform={`scale(${guestScale})`} style={{ opacity: isResetting ? 0 : 1 }}>
         <TableScoreRing
           score={guests.length > 0 ? (previewTableScore ?? recommendationTableScores.get(table.id) ?? table.averageSatisfaction) : 0}
           originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
@@ -446,7 +457,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
           d={arc.path}
           fill="none"
           stroke={CATEGORY_COLORS[arc.category] || '#F3F4F6'}
-          strokeWidth={40 * counterScale}
+          strokeWidth={40 * guestScale}
           strokeLinecap="round"
           opacity={0.5}
         />
@@ -458,11 +469,11 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
           key={`empty-${seat.seatIndex}`}
           cx={seat.x}
           cy={seat.y}
-          r={20 * counterScale}
+          r={20 * guestScale}
           fill="none"
           stroke="#D6D3D1"
-          strokeWidth={1.5 * counterScale}
-          strokeDasharray={`${4 * counterScale} ${3 * counterScale}`}
+          strokeWidth={1.5 * guestScale}
+          strokeDasharray={`${4 * guestScale} ${3 * guestScale}`}
         />
       ))}
 
@@ -489,21 +500,21 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
           return (
             <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)`, opacity: isFlying ? 0 : undefined }}>
               <circle
-                r={20 * counterScale}
+                r={20 * guestScale}
                 fill={bgColor}
                 stroke="white"
-                strokeWidth={1.5 * counterScale}
+                strokeWidth={1.5 * guestScale}
                 opacity={0.6}
               />
-              {isLast && (
+              {isLast && nameAlpha > 0 && (
                 <text
-                  y={6 * counterScale}
+                  y={6 * guestScale}
                   textAnchor="middle"
                   fill={textColor}
-                  fontSize={14 * counterScale}
+                  fontSize={14 * guestScale}
                   fontWeight="600"
                   fontFamily="'Plus Jakarta Sans', sans-serif"
-                  opacity={0.7}
+                  opacity={0.7 * nameAlpha}
                 >
                   +{totalCompanions}
                 </text>
@@ -519,59 +530,70 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
         const recGuestScore = recommendationGuestScore?.guestId === seat.guest!.id ? recommendationGuestScore.score : undefined
         const guestScore = previewScores?.get(seat.guest!.id) ?? recGuestScore ?? seat.guest!.satisfactionScore
         const guestSatColor = getSatisfactionColor(guestScore)
-        const guestR = 20 * counterScale
-        const guestRingR = guestR + 3 * counterScale
+        const guestR = 20 * guestScale
+        const guestRingR = guestR + 3 * guestScale
         const guestCircum = 2 * Math.PI * guestRingR
         const guestProgress = Math.min(guestScore / 100, 1)
+        // 縮小時填色從分類色漸變到滿意度色
+        const fillColor = blendColors(bgColor, guestSatColor, satBlend)
 
         return (
           <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)`, opacity: isFlying ? 0 : undefined }}>
-            {/* 滿意度進度圈（帶動畫，永遠顯示） */}
-            <circle
-              r={guestRingR}
-              fill="none"
-              stroke="#E7E5E4"
-              strokeWidth={2 * counterScale}
-            />
-            {guestScore > 0 && (
-              <circle
-                r={guestRingR}
-                fill="none"
-                strokeWidth={2 * counterScale}
-                strokeLinecap="round"
-                strokeDashoffset={guestCircum * 0.25}
-                transform="rotate(-90)"
-                style={{
-                  stroke: guestSatColor,
-                  strokeDasharray: `${guestCircum * guestProgress} ${guestCircum * (1 - guestProgress)}`,
-                  transition: 'stroke-dasharray 400ms ease-out, stroke 400ms ease-out',
-                }}
-              />
+            {/* 滿意度進度圈 — 縮小時漸進淡出 */}
+            {nameAlpha > 0 && (
+              <>
+                <circle
+                  r={guestRingR}
+                  fill="none"
+                  stroke="#E7E5E4"
+                  strokeWidth={2 * guestScale}
+                  opacity={nameAlpha}
+                />
+                {guestScore > 0 && (
+                  <circle
+                    r={guestRingR}
+                    fill="none"
+                    strokeWidth={2 * guestScale}
+                    strokeLinecap="round"
+                    strokeDashoffset={guestCircum * 0.25}
+                    transform="rotate(-90)"
+                    opacity={nameAlpha}
+                    style={{
+                      stroke: guestSatColor,
+                      strokeDasharray: `${guestCircum * guestProgress} ${guestCircum * (1 - guestProgress)}`,
+                      transition: 'stroke-dasharray 400ms ease-out, stroke 400ms ease-out',
+                    }}
+                  />
+                )}
+              </>
             )}
             {/* 賓客圓形 */}
             <circle
               r={guestR}
-              fill={bgColor}
+              fill={fillColor}
               stroke="white"
-              strokeWidth={1.5 * counterScale}
+              strokeWidth={1.5 * guestScale}
             />
-            <text
-              y={6 * counterScale}
-              textAnchor="middle"
-              fill={textColor}
-              fontSize={16 * counterScale}
-              fontWeight="500"
-              fontFamily="'Noto Sans TC', sans-serif"
-            >
-              {displayName}
-            </text>
+            {nameAlpha > 0 && (
+              <text
+                y={6 * guestScale}
+                textAnchor="middle"
+                fill={textColor}
+                fontSize={16 * guestScale}
+                fontWeight="500"
+                fontFamily="'Noto Sans TC', sans-serif"
+                opacity={nameAlpha}
+              >
+                {displayName}
+              </text>
+            )}
           </g>
         )
       })}
 
-      {/* 圖示層：怒氣 + 推薦（在所有賓客之上） */}
-      {allSeats.filter((s) => s.type === 'guest' && s.guest).map((seat) => {
-        const guestR = 20 * counterScale
+      {/* 圖示層：怒氣 + 推薦（在所有賓客之上）— 縮小時跟名字一起淡出 */}
+      {nameAlpha > 0 && allSeats.filter((s) => s.type === 'guest' && s.guest).map((seat) => {
+        const guestR = 20 * guestScale
         const hasViolation = violatingGuestIds.has(seat.guest!.id)
         const hasRecommendation = guestsWithRecommendations.has(seat.guest!.id)
 

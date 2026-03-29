@@ -753,7 +753,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           ]
 
           /* 智慧推薦虛線放在桌子下層，讓桌子蓋住穿過的部分 */
-          const recLines = recommendations.length > 0 && hoveredGuestId && (() => {
+          /* zoom < 0.7 時名字已淡出，無法辨識賓客，關閉推薦線 */
+          const recLines = recommendations.length > 0 && hoveredGuestId && zoom >= 0.7 && (() => {
           const guest = guests.find((g) => g.id === hoveredGuestId)
           if (!guest) return null
 
@@ -887,7 +888,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       </svg>
 
       {/* 待排賓客的推薦虛線 — 用 HTML overlay 渲染，讓線從側欄賓客 chip 出發 */}
-      {recommendations.length > 0 && hoveredGuestId && (() => {
+      {/* zoom < 0.7 時名字已淡出，關閉推薦線 */}
+      {recommendations.length > 0 && hoveredGuestId && zoom >= 0.7 && (() => {
         const guest = guests.find((g) => g.id === hoveredGuestId)
         if (!guest || guest.assignedTableId) return null // 只處理待排賓客
 
@@ -957,12 +959,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
               const ax2 = endScreenX - ux * arrowSize + uy * arrowSize * 0.5
               const ay2 = endScreenY - uy * arrowSize - ux * arrowSize * 0.5
 
-              // badge 位置：貝茲曲線上箭頭前 ~50px
-              const chordLen = Math.sqrt((endScreenX - startScreenX) ** 2 + (endScreenY - startScreenY) ** 2) || 1
-              const bt = Math.max(0.5, 1 - 50 / chordLen)
-              const badgeX = (1-bt)*(1-bt)*startScreenX + 2*(1-bt)*bt*cx + bt*bt*endScreenX
-              const badgeY = (1-bt)*(1-bt)*startScreenY + 2*(1-bt)*bt*cy + bt*bt*endScreenY
-
               const delta = rec.guestDelta
               // 只有1條 → 綠色；多條且分數都一樣 → 都黃色；多條不同分 → 最高綠色其餘黃色
               const onlyOne = recommendations.length === 1
@@ -983,12 +979,21 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                     points={`${endScreenX},${endScreenY} ${ax1},${ay1} ${ax2},${ay2}`}
                     fill={lineColor}
                   />
-                  <g transform={`translate(${badgeX}, ${badgeY})`}>
-                    <rect x={-20} y={-12} width={40} height={24} rx={12} fill={badgeColor} />
-                    <text y={5} textAnchor="middle" fill="white" fontSize="13" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
-                      +{delta}
-                    </text>
-                  </g>
+                  {(() => {
+                    // badge 位置：貝茲曲線上箭頭前 ~50px
+                    const chordLen = Math.sqrt((endScreenX - startScreenX) ** 2 + (endScreenY - startScreenY) ** 2) || 1
+                    const bt = Math.max(0.5, 1 - 50 / chordLen)
+                    const badgeX = (1-bt)*(1-bt)*startScreenX + 2*(1-bt)*bt*cx + bt*bt*endScreenX
+                    const badgeY = (1-bt)*(1-bt)*startScreenY + 2*(1-bt)*bt*cy + bt*bt*endScreenY
+                    return (
+                      <g transform={`translate(${badgeX}, ${badgeY})`}>
+                        <rect x={-20} y={-12} width={40} height={24} rx={12} fill={badgeColor} />
+                        <text y={5} textAnchor="middle" fill="white" fontSize="13" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
+                          +{delta}
+                        </text>
+                      </g>
+                    )
+                  })()}
                 </g>
               )
             })}
@@ -1013,7 +1018,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         ))}
 
         {/* 賓客座位 draggable overlay（主人 + 眷屬都可拖，拖眷屬 = 拖整組） */}
-        {screenSeats
+        {/* zoom < 0.7 時名字已淡出，賓客無法辨識，隱藏互動 overlay */}
+        {zoom >= 0.7 && screenSeats
           .filter((ss) => ss.guest !== null)
           .map((ss) => (
             <GuestSeatOverlay

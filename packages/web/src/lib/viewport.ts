@@ -161,3 +161,38 @@ export function calculateGridLayout(
     y: startOffset + Math.floor(i / cols) * spacing,
   }))
 }
+
+// ─── 語意縮放 helpers ──────────────────────────────
+
+/** 阻尼反向縮放：元素會縮小但速度比 1/zoom 慢 */
+export function dampedCounterScale(zoom: number): number {
+  return Math.pow(zoom, -0.08)
+}
+
+/** 名字透明度：zoom 0.7 開始淡出，0.4 完全隱藏 */
+export function labelOpacity(zoom: number): number {
+  if (zoom >= 0.7) return 1
+  if (zoom <= 0.4) return 0
+  return (zoom - 0.4) / 0.3
+}
+
+/** 填色混合比例：zoom 0.7 全分類色，0.4 全滿意度色 */
+export function satisfactionBlend(zoom: number): number {
+  if (zoom >= 0.7) return 0
+  if (zoom <= 0.4) return 1
+  return 1 - (zoom - 0.4) / 0.3
+}
+
+/** 將 hex 色碼混合：t=0 返回 colorA，t=1 返回 colorB */
+export function blendColors(colorA: string, colorB: string, t: number): string {
+  if (t <= 0) return colorA
+  if (t >= 1) return colorB
+  const parseHex = (hex: string) => {
+    const h = hex.replace('#', '')
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
+  }
+  const [r1, g1, b1] = parseHex(colorA)
+  const [r2, g2, b2] = parseHex(colorB)
+  const lerp = (a: number, b: number) => Math.round(a + (b - a) * t)
+  return `#${lerp(r1, r2).toString(16).padStart(2, '0')}${lerp(g1, g2).toString(16).padStart(2, '0')}${lerp(b1, b2).toString(16).padStart(2, '0')}`
+}
