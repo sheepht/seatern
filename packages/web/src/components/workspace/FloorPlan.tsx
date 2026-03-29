@@ -752,115 +752,109 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
             ...tables.filter((t) => t.id === selectedTableId),
           ]
 
-          /* 智慧推薦虛線放在桌子下層，讓桌子蓋住穿過的部分 */
+          /* 智慧推薦虛線：線+箭頭在桌子下層，badge 在桌子上層 */
           /* zoom < 0.7 時名字已淡出，無法辨識賓客，關閉推薦線 */
-          const recLines = recommendations.length > 0 && hoveredGuestId && zoom >= 0.7 && (() => {
-          const guest = guests.find((g) => g.id === hoveredGuestId)
-          if (!guest) return null
+          const recData: Array<{ pathD: string; endX: number; endY: number; ax1: number; ay1: number; ax2: number; ay2: number; midpoint: { x: number; y: number }; badgeColor: string; lineColor: string; opacity: number; delta: number; animIdx: number }> = []
+          if (recommendations.length > 0 && hoveredGuestId && zoom >= 0.7) {
+            const guest = guests.find((g) => g.id === hoveredGuestId)
+            if (guest && guest.assignedTableId && guest.seatIndex !== null) {
+              const srcTable = tables.find((t) => t.id === guest.assignedTableId)
+              if (srcTable) {
+                const srcRadius = Math.max(58 + Math.min(srcTable.capacity, 12) * 7, 88)
+                const seatRadius = srcRadius - 34
+                const totalSlots = srcTable.capacity
+                const angle = ((2 * Math.PI) / totalSlots) * guest.seatIndex - Math.PI / 2
+                const guestX = srcTable.positionX + Math.cos(angle) * seatRadius
+                const guestY = srcTable.positionY + Math.sin(angle) * seatRadius
 
-          const isUnassigned = !guest.assignedTableId
+                const seatedDeltas = recommendations.map((r) => r.guestDelta)
+                const seatedMaxDelta = Math.max(...seatedDeltas)
+                const seatedAllSame = new Set(seatedDeltas).size === 1
+                const seatedOnlyOne = recommendations.length === 1
 
-          // 待排賓客的推薦線改用 HTML overlay 渲染（見下方 unassignedRecOverlay）
-          if (isUnassigned) return null
+                recommendations.forEach((rec, i) => {
+                  const targetTable = tables.find((t) => t.id === rec.tableId)
+                  if (!targetTable) return
 
-          if (guest.seatIndex === null) return null
-          const srcTable = tables.find((t) => t.id === guest.assignedTableId)
-          if (!srcTable) return null
-          const srcRadius = Math.max(58 + Math.min(srcTable.capacity, 12) * 7, 88)
-          const seatRadius = srcRadius - 34
-          const totalSlots = srcTable.capacity
-          const angle = ((2 * Math.PI) / totalSlots) * guest.seatIndex - Math.PI / 2
-          const guestX = srcTable.positionX + Math.cos(angle) * seatRadius
-          const guestY = srcTable.positionY + Math.sin(angle) * seatRadius
+                  const tx = targetTable.positionX
+                  const ty = targetTable.positionY
+                  const targetRadius = Math.max(58 + Math.min(targetTable.capacity, 12) * 7, 88)
 
-          // badge 顏色邏輯：1條綠、多條同分都黃、多條不同分最高綠其餘黃
-          const seatedDeltas = recommendations.map((r) => r.guestDelta)
-          const seatedMaxDelta = Math.max(...seatedDeltas)
-          const seatedAllSame = new Set(seatedDeltas).size === 1
-          const seatedOnlyOne = recommendations.length === 1
+                  const dx0 = tx - guestX
+                  const dy0 = ty - guestY
+                  const dist0 = Math.sqrt(dx0 * dx0 + dy0 * dy0) || 1
+                  const ux0 = dx0 / dist0
+                  const uy0 = dy0 / dist0
 
-          return (
+                  const startX = guestX + ux0 * 27
+                  const startY = guestY + uy0 * 27
+                  const endX = tx - ux0 * (targetRadius + 4)
+                  const endY = ty - uy0 * (targetRadius + 4)
+
+                  const obstacles = tables
+                    .filter((t) => t.id !== rec.tableId)
+                    .map((t) => ({
+                      cx: t.positionX,
+                      cy: t.positionY,
+                      r: Math.max(58 + Math.min(t.capacity, 12) * 7, 88),
+                    }))
+
+                  const srcObstacle = { cx: srcTable.positionX, cy: srcTable.positionY, r: srcRadius }
+
+                  const { d: pathD, midpoint } = computeAvoidancePath(
+                    { x: startX, y: startY },
+                    { x: endX, y: endY },
+                    obstacles,
+                    srcObstacle,
+                    Math.max(CANVAS_WIDTH, ...tables.map((t) => t.positionX + 200)),
+                    Math.max(CANVAS_HEIGHT, ...tables.map((t) => t.positionY + 200)),
+                  )
+
+                  const { ux, uy } = getPathEndDirection(pathD)
+                  const arrowSize = 16
+                  const ax1 = endX - ux * arrowSize - uy * arrowSize * 0.5
+                  const ay1 = endY - uy * arrowSize + ux * arrowSize * 0.5
+                  const ax2 = endX - ux * arrowSize + uy * arrowSize * 0.5
+                  const ay2 = endY - uy * arrowSize - ux * arrowSize * 0.5
+
+                  const badgeColor = seatedOnlyOne ? '#16A34A' : (seatedAllSame ? '#CA8A04' : (rec.guestDelta === seatedMaxDelta ? '#16A34A' : '#CA8A04'))
+                  const lineColor = badgeColor === '#16A34A' ? '#16A34A' : '#B08D57'
+
+                  recData.push({ pathD, endX, endY, ax1, ay1, ax2, ay2, midpoint, badgeColor, lineColor, opacity: 0.9 - i * 0.15, delta: rec.guestDelta, animIdx: i })
+                })
+              }
+            }
+          }
+
+          const recLines = recData.length > 0 ? (
             <g style={{ pointerEvents: 'none' }}>
-              {recommendations.map((rec, i) => {
-                const targetTable = tables.find((t) => t.id === rec.tableId)
-                if (!targetTable) return null
-
-                const tx = targetTable.positionX
-                const ty = targetTable.positionY
-                const targetRadius = Math.max(58 + Math.min(targetTable.capacity, 12) * 7, 88)
-
-                const dx0 = tx - guestX
-                const dy0 = ty - guestY
-                const dist0 = Math.sqrt(dx0 * dx0 + dy0 * dy0) || 1
-                const ux0 = dx0 / dist0
-                const uy0 = dy0 / dist0
-
-                const startX = guestX + ux0 * 27
-                const startY = guestY + uy0 * 27
-                const endX = tx - ux0 * (targetRadius + 4)
-                const endY = ty - uy0 * (targetRadius + 4)
-
-                const obstacles = tables
-                  .filter((t) => t.id !== rec.tableId)
-                  .map((t) => ({
-                    cx: t.positionX,
-                    cy: t.positionY,
-                    r: Math.max(58 + Math.min(t.capacity, 12) * 7, 88),
-                  }))
-
-                const srcObstacle = { cx: srcTable.positionX, cy: srcTable.positionY, r: srcRadius }
-
-                const { d: pathD, midpoint } = computeAvoidancePath(
-                  { x: startX, y: startY },
-                  { x: endX, y: endY },
-                  obstacles,
-                  srcObstacle,
-                  Math.max(CANVAS_WIDTH, ...tables.map((t) => t.positionX + 200)),
-                  Math.max(CANVAS_HEIGHT, ...tables.map((t) => t.positionY + 200)),
-                )
-
-                const { ux, uy } = getPathEndDirection(pathD)
-                const arrowSize = 16
-                const ax1 = endX - ux * arrowSize - uy * arrowSize * 0.5
-                const ay1 = endY - uy * arrowSize + ux * arrowSize * 0.5
-                const ax2 = endX - ux * arrowSize + uy * arrowSize * 0.5
-                const ay2 = endY - uy * arrowSize - ux * arrowSize * 0.5
-
-                const badgeColor = seatedOnlyOne ? '#16A34A' : (seatedAllSame ? '#CA8A04' : (rec.guestDelta === seatedMaxDelta ? '#16A34A' : '#CA8A04'))
-                const lineColor = badgeColor === '#16A34A' ? '#16A34A' : '#B08D57'
-
-                return (
-                  <g key={`rec-${i}`} opacity={0.9 - i * 0.15}>
-                    <style>{`
-                      @keyframes rec-flow-${i} {
-                        from { stroke-dashoffset: 0; }
-                        to { stroke-dashoffset: -16; }
-                      }
-                    `}</style>
-                    <path
-                      d={pathD}
-                      fill="none"
-                      stroke={lineColor}
-                      strokeWidth="2.5"
-                      strokeDasharray="10 6"
-                      style={{ animation: `rec-flow-${i} 0.6s linear infinite` }}
-                    />
-                    <polygon
-                      points={`${endX},${endY} ${ax1},${ay1} ${ax2},${ay2}`}
-                      fill={lineColor}
-                    />
-                    <g transform={`translate(${midpoint.x}, ${midpoint.y})`}>
-                      <rect x={-20} y={-12} width={40} height={24} rx={12} fill={badgeColor} />
-                      <text y={5} textAnchor="middle" fill="white" fontSize="14" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
-                        +{rec.guestDelta}
-                      </text>
-                    </g>
-                  </g>
-                )
-              })}
+              {recData.map((r) => (
+                <g key={`rec-line-${r.animIdx}`} opacity={r.opacity}>
+                  <style>{`
+                    @keyframes rec-flow-${r.animIdx} {
+                      from { stroke-dashoffset: 0; }
+                      to { stroke-dashoffset: -16; }
+                    }
+                  `}</style>
+                  <path d={r.pathD} fill="none" stroke={r.lineColor} strokeWidth="2.5" strokeDasharray="10 6" style={{ animation: `rec-flow-${r.animIdx} 0.6s linear infinite` }} />
+                  <polygon points={`${r.endX},${r.endY} ${r.ax1},${r.ay1} ${r.ax2},${r.ay2}`} fill={r.lineColor} />
+                </g>
+              ))}
             </g>
-          )
-        })()
+          ) : null
+
+          const recBadges = recData.length > 0 ? (
+            <g style={{ pointerEvents: 'none' }}>
+              {recData.map((r) => (
+                <g key={`rec-badge-${r.animIdx}`} opacity={r.opacity} transform={`translate(${r.midpoint.x}, ${r.midpoint.y})`}>
+                  <rect x={-20} y={-12} width={40} height={24} rx={12} fill={r.badgeColor} />
+                  <text y={5} textAnchor="middle" fill="white" fontSize="14" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
+                    +{r.delta}
+                  </text>
+                </g>
+              ))}
+            </g>
+          ) : null
 
           return (
             <>
@@ -876,6 +870,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                   onMouseDown={(e) => handleMouseDown(table.id, e)}
                 />
               ))}
+              {recBadges}
             </>
           )
         })()}

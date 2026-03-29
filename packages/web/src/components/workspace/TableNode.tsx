@@ -441,8 +441,8 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
         </textPath>
       </text>
 
-      {/* 滿意度圓環進度條 + 中央數字 — 阻尼縮放 */}
-      <g transform={`scale(${guestScale})`} style={{ opacity: isResetting ? 0 : 1 }}>
+      {/* 滿意度圓環進度條 + 中央數字 — 比賓客更強的阻尼，縮小時相對變大 */}
+      <g transform={`scale(${Math.pow(zoom, -0.45)})`} style={{ opacity: isResetting ? 0 : 1 }}>
         <TableScoreRing
           score={guests.length > 0 ? (previewTableScore ?? recommendationTableScores.get(table.id) ?? table.averageSatisfaction) : 0}
           originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
@@ -595,7 +595,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
       {nameAlpha > 0 && allSeats.filter((s) => s.type === 'guest' && s.guest).map((seat) => {
         const guestR = 20 * guestScale
         const hasViolation = violatingGuestIds.has(seat.guest!.id)
-        const hasRecommendation = guestsWithRecommendations.has(seat.guest!.id)
+        const hasRecommendation = zoom >= 0.7 && guestsWithRecommendations.has(seat.guest!.id)
 
         if (!hasViolation && !hasRecommendation) return null
 

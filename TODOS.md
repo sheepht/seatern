@@ -6,12 +6,13 @@
 - 已由 `/design-consultation` 完成。暖金色 `#B08D57` 強調色 + Plus Jakarta Sans + Noto Sans TC。
 - 下一步：用 `ui-ux-pro-max` 將設計系統套用到實際元件。
 
-## ~~畫布 Zoom/Pan~~ ✅ Done (2026-03-28)
+## ~~畫布 Zoom/Pan~~ ✅ Done (2026-03-28, 語意縮放微調 2026-03-29)
 - 滾輪/trackpad 縮放（以游標為中心）、Space+drag/中鍵平移、grid snap
 - ZoomControls 面板、Minimap、雙擊 zoom、鍵盤快捷鍵
 - 語義縮放（<80% 自動切換 overview 模式）
 - Auto-arrange 桌子（簡單版 + undo + 確認）
 - vitest + 27 tests
+- 語意縮放微調：滿意度填色延後（0.5→0.25）、中央分數阻尼加大（zoom^-0.45）、推薦 badge z-index 高於桌子
 
 ## 畫布功能（未來）
 

@@ -176,11 +176,11 @@ export function labelOpacity(zoom: number): number {
   return (zoom - 0.4) / 0.3
 }
 
-/** 填色混合比例：zoom 0.7 全分類色，0.4 全滿意度色 */
+/** 填色混合比例：zoom 0.5 全分類色，0.25 全滿意度色 */
 export function satisfactionBlend(zoom: number): number {
-  if (zoom >= 0.7) return 0
-  if (zoom <= 0.4) return 1
-  return 1 - (zoom - 0.4) / 0.3
+  if (zoom >= 0.5) return 0
+  if (zoom <= 0.25) return 1
+  return 1 - (zoom - 0.25) / 0.25
 }
 
 /** 將 hex 色碼混合：t=0 返回 colorA，t=1 返回 colorB */
