@@ -129,9 +129,10 @@ export function autoAssignGuests(
 
   // 放不下的賓客不硬塞（caller 應確保桌子容量足夠）
 
-  // ─── Step 2: 局部搜尋 ──────────────────────────────
+  // ─── Step 2: 確定性局部搜尋 ─────────────────────────
+  // 掃描所有可能的兩人交換，每輪找到最大改善的交換並執行，
+  // 直到沒有任何交換能改善為止。完全確定性，同輸入同結果。
 
-  // 建立模擬用的 guest 陣列（套用 step 1 的分配）
   const simGuests = guests.map((g) => {
     const tableId = assigned.get(g.id)
     return tableId ? { ...g, assignedTableId: tableId } : g
@@ -140,51 +141,64 @@ export function autoAssignGuests(
   let currentScore = recalculateAll(simGuests, tables, avoidPairs).overallAverage
   const assignedIds = [...assigned.keys()]
 
-  // 最多 500 輪，或連續 50 輪沒改善就停
-  const MAX_ITERATIONS = 500
-  let noImprovementCount = 0
-
-  for (let iter = 0; iter < MAX_ITERATIONS && noImprovementCount < 50; iter++) {
-    // 隨機選兩位不同桌的已分配賓客嘗試交換
-    const idxA = Math.floor(Math.random() * assignedIds.length)
-    let idxB = Math.floor(Math.random() * assignedIds.length)
-    if (idxA === idxB) continue
-
-    const guestA = simGuests.find((g) => g.id === assignedIds[idxA])!
-    const guestB = simGuests.find((g) => g.id === assignedIds[idxB])!
-    if (guestA.assignedTableId === guestB.assignedTableId) { noImprovementCount++; continue }
-
-    // 檢查容量（交換後兩桌都不能超額）
-    const tableA = tables.find((t) => t.id === guestA.assignedTableId)!
-    const tableB = tables.find((t) => t.id === guestB.assignedTableId)!
-    const seatsA = simGuests.filter((g) => g.assignedTableId === tableA.id).reduce((s, g) => s + g.attendeeCount, 0)
-    const seatsB = simGuests.filter((g) => g.assignedTableId === tableB.id).reduce((s, g) => s + g.attendeeCount, 0)
-    const newSeatsA = seatsA - guestA.attendeeCount + guestB.attendeeCount
-    const newSeatsB = seatsB - guestB.attendeeCount + guestA.attendeeCount
-    if (newSeatsA > tableA.capacity || newSeatsB > tableB.capacity) { noImprovementCount++; continue }
-
-    // 試交換
-    const swapped = simGuests.map((g) => {
-      if (g.id === guestA.id) return { ...g, assignedTableId: guestB.assignedTableId }
-      if (g.id === guestB.id) return { ...g, assignedTableId: guestA.assignedTableId }
-      return g
-    })
-
-    const newScore = recalculateAll(swapped, tables, avoidPairs).overallAverage
-    if (newScore > currentScore + 0.01) {
-      // 接受交換
-      const ga = simGuests.find((g) => g.id === guestA.id)!
-      const gb = simGuests.find((g) => g.id === guestB.id)!
-      const tmpTable = ga.assignedTableId
-      ga.assignedTableId = gb.assignedTableId
-      gb.assignedTableId = tmpTable
-      assigned.set(guestA.id, ga.assignedTableId!)
-      assigned.set(guestB.id, gb.assignedTableId!)
-      currentScore = newScore
-      noImprovementCount = 0
-    } else {
-      noImprovementCount++
+  // 預算每桌座位數（避免重複計算）
+  const tableSeatCounts = new Map<string, number>()
+  const refreshSeatCounts = () => {
+    tableSeatCounts.clear()
+    for (const t of tables) {
+      const count = simGuests.filter((g) => g.assignedTableId === t.id).reduce((s, g) => s + g.attendeeCount, 0)
+      tableSeatCounts.set(t.id, count)
     }
+  }
+
+  const MAX_ROUNDS = 20 // 最多改善 20 輪（每輪掃描所有配對）
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    refreshSeatCounts()
+    let bestImprovement = 0.01 // 最小改善門檻
+    let bestSwap: [string, string] | null = null
+    let bestScore = currentScore
+
+    for (let i = 0; i < assignedIds.length; i++) {
+      for (let j = i + 1; j < assignedIds.length; j++) {
+        const gA = simGuests.find((g) => g.id === assignedIds[i])!
+        const gB = simGuests.find((g) => g.id === assignedIds[j])!
+        if (gA.assignedTableId === gB.assignedTableId) continue
+
+        // 容量檢查
+        const seatsA = tableSeatCounts.get(gA.assignedTableId!) || 0
+        const seatsB = tableSeatCounts.get(gB.assignedTableId!) || 0
+        const capA = tables.find((t) => t.id === gA.assignedTableId)!.capacity
+        const capB = tables.find((t) => t.id === gB.assignedTableId)!.capacity
+        if (seatsA - gA.attendeeCount + gB.attendeeCount > capA) continue
+        if (seatsB - gB.attendeeCount + gA.attendeeCount > capB) continue
+
+        // 試交換
+        const swapped = simGuests.map((g) => {
+          if (g.id === gA.id) return { ...g, assignedTableId: gB.assignedTableId }
+          if (g.id === gB.id) return { ...g, assignedTableId: gA.assignedTableId }
+          return g
+        })
+        const newScore = recalculateAll(swapped, tables, avoidPairs).overallAverage
+        const improvement = newScore - currentScore
+        if (improvement > bestImprovement) {
+          bestImprovement = improvement
+          bestSwap = [assignedIds[i], assignedIds[j]]
+          bestScore = newScore
+        }
+      }
+    }
+
+    if (!bestSwap) break // 沒有任何改善，結束
+
+    // 執行最佳交換
+    const gA = simGuests.find((g) => g.id === bestSwap[0])!
+    const gB = simGuests.find((g) => g.id === bestSwap[1])!
+    const tmpTable = gA.assignedTableId
+    gA.assignedTableId = gB.assignedTableId
+    gB.assignedTableId = tmpTable
+    assigned.set(bestSwap[0], gA.assignedTableId!)
+    assigned.set(bestSwap[1], gB.assignedTableId!)
+    currentScore = bestScore
   }
 
   return [...assigned.entries()].map(([guestId, tableId]) => ({ guestId, tableId }))
