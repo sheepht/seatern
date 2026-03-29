@@ -43,11 +43,10 @@ const CATEGORY_TEXT: Record<string, string> = {
   '共同': '#374151',
 }
 
-type ZoomLevel = 'detail' | 'normal' | 'overview'
+type ZoomLevel = 'normal'
 
-function getZoomLevel(zoom: number): ZoomLevel {
-  if (zoom >= 0.8) return 'normal'
-  return 'overview'
+function getZoomLevel(_zoom: number): ZoomLevel {
+  return 'normal'
 }
 
 interface Props {
