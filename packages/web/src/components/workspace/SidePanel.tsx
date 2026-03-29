@@ -272,7 +272,7 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
               )}
             </div>
             <div className="flex items-center gap-1">
-              {unassignedGuests.length > 0 && tables.length > 0 && (
+              {unassignedGuests.length > 0 && (
                 <button
                   onClick={animateAutoAssign}
                   disabled={assigning}
