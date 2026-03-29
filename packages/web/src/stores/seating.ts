@@ -133,6 +133,7 @@ interface SeatingState {
     | {
         type: 'auto-assign'
         assignments: Array<{ guestId: string; fromTableId: string | null }>
+        createdTableIds: string[] // 自動新增的桌子，undo 時要刪除
       }
   >
 
@@ -590,18 +591,21 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       return
     }
 
-    // ─── 還原「自動分配」：所有賓客回到原始桌次 ───
+    // ─── 還原「自動分配」：賓客回到原始桌次 + 刪除自動新增的桌子 ───
     if (last.type === 'auto-assign') {
+      // 還原賓客分配
       const updatedGuests = guests.map((g) => {
         const orig = last.assignments.find((a) => a.guestId === g.id)
         return orig ? { ...g, assignedTableId: orig.fromTableId, seatIndex: null } : g
       })
-      const result = recalculateAll(updatedGuests, tables, avoidPairs)
+      // 刪除自動新增的桌子
+      const remainingTables = tables.filter((t) => !last.createdTableIds.includes(t.id))
+      const result = recalculateAll(updatedGuests, remainingTables, avoidPairs)
       const finalGuests = updatedGuests.map((g) => {
         const score = result.guests.find((gs) => gs.id === g.id)
         return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
       })
-      const finalTables = tables.map((t) => {
+      const finalTables = remainingTables.map((t) => {
         const score = result.tables.find((ts) => ts.id === t.id)
         return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
       })
@@ -613,6 +617,13 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ tableId: a.fromTableId, seatIndex: null }),
+          }).catch(console.error)
+        }
+        // 刪除自動新增的桌子
+        for (const tableId of last.createdTableIds) {
+          fetch(`/api/events/${eventId}/tables/${tableId}`, {
+            method: 'DELETE',
+            credentials: 'include',
           }).catch(console.error)
         }
       }
@@ -1018,10 +1029,15 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
     })
 
+    // 移除 addTable 推入的個別 undo entries（合併到 auto-assign 的 compound undo）
+    const currentStack = get().undoStack.filter(
+      (entry) => !(entry.type === 'add-table' && newTableIds.includes(entry.tableId))
+    )
+
     set({
       guests: finalGuests,
       tables: finalTables,
-      undoStack: [...get().undoStack, { type: 'auto-assign' as const, assignments: undoData }],
+      undoStack: [...currentStack, { type: 'auto-assign' as const, assignments: undoData, createdTableIds: newTableIds }],
     })
 
     // 存 DB
