@@ -6,6 +6,7 @@ import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction'
 import { calculateGridLayout, findFreePosition } from '@/lib/viewport'
 import { AvoidPairModal } from './AvoidPairModal'
+import { computeSnapshotStats, computeCurrentStats } from '@/lib/snapshot-stats'
 
 interface ToolbarProps {
   onFitAll?: () => void
@@ -815,44 +816,123 @@ export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
         document.body
       )}
 
-      {showRestoreConfirm && snapshots.length > 0 && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowRestoreConfirm(false)}>
-          <div
-            className="bg-white w-full max-w-sm p-6"
-            style={{ borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-bold mb-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
-              讀取
-            </h2>
-            <p className="text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>
-              還原到：<span className="font-medium" style={{ color: 'var(--text-primary)' }}>{snapshots[0].name}</span>
-            </p>
-            <p className="text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>
-              當時全場平均滿意度：<span className="font-data font-bold">{snapshots[0].averageSatisfaction}</span>
-            </p>
-            <p className="text-sm mb-5" style={{ color: 'var(--warning)' }}>
-              目前的排位將被覆蓋，還原記錄會清空。
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowRestoreConfirm(false)}
-                className="flex-1 py-2 text-sm font-medium rounded border cursor-pointer hover:bg-[var(--bg-primary)]"
-                style={{ borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)' }}
-              >
-                取消
-              </button>
-              <button
-                onClick={confirmRestore}
-                className="flex-1 py-2 text-sm font-semibold text-white rounded cursor-pointer hover:brightness-90"
-                style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-display)' }}
-              >
-                還原
-              </button>
+      {showRestoreConfirm && snapshots.length > 0 && (() => {
+        const snap = snapshots[0]
+        const snapStats = computeSnapshotStats(snap.data, snap.averageSatisfaction)
+        const currStats = computeCurrentStats(guests, tables)
+        const satItems = [
+          { key: 'green' as const, color: '#16A34A', label: '滿意' },
+          { key: 'yellow' as const, color: '#CA8A04', label: '尚可' },
+          { key: 'orange' as const, color: '#EA580C', label: '不滿' },
+          { key: 'red' as const, color: '#DC2626', label: '糟糕' },
+        ]
+
+        const StatColumn = ({ label, stats }: { label: string; stats: typeof snapStats }) => {
+          const seatedTotal = stats.green + stats.yellow + stats.orange + stats.red
+          const assignPct = stats.total > 0 ? Math.round((stats.assigned / stats.total) * 100) : 0
+          // 進度條顏色依安排百分比，用滿意度色彩邏輯
+          const assignBarColor = getSatisfactionColor(assignPct)
+          // 分佈條：只收集有值的 segment
+          const segments = satItems.filter(({ key }) => stats[key] > 0)
+          return (
+            <div className="flex-1 min-w-0">
+              <div className="mb-3" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em', fontFamily: 'var(--font-display)' }}>
+                {label}
+              </div>
+              {/* 已安排進度 */}
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-data font-semibold" style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
+                  {stats.assigned}/{stats.total} 人
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>已安排</span>
+              </div>
+              <div className="flex mb-3" style={{ height: '6px', borderRadius: '3px', overflow: 'hidden', background: 'var(--border)' }}>
+                {assignPct > 0 && (
+                  <div style={{ width: `${assignPct}%`, background: assignBarColor, transition: 'width 0.3s' }} />
+                )}
+              </div>
+              {/* 滿意度分佈條（色塊之間 1px 間距） */}
+              <div className="flex mb-2" style={{ height: '6px', borderRadius: '3px', overflow: 'hidden', background: 'var(--border)', gap: segments.length > 1 ? '1px' : 0 }}>
+                {seatedTotal > 0 && segments.map(({ key, color }) => (
+                  <div key={key} style={{ width: `${(stats[key] / seatedTotal) * 100}%`, background: color }} />
+                ))}
+              </div>
+              {/* 分佈標籤 */}
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5" style={{ fontSize: '11px' }}>
+                {satItems.map(({ key, color, label: satLabel }) =>
+                  stats[key] > 0 ? (
+                    <span key={key} className="font-data" style={{ color }}>
+                      {satLabel} {stats[key]}人
+                    </span>
+                  ) : null
+                )}
+              </div>
+              {/* 桌數 + 溢出 */}
+              <div className="flex gap-3 mt-2" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                <span>{stats.tableCount} 桌</span>
+                {stats.overflowCount > 0 && (
+                  <span style={{ color: 'var(--warning)' }}>溢出 {stats.overflowCount}人</span>
+                )}
+              </div>
+            </div>
+          )
+        }
+
+        return (
+          <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowRestoreConfirm(false)}>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="restore-modal-title"
+              className="bg-white w-full max-w-md p-6 mx-4"
+              style={{ borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="restore-modal-title" className="text-lg font-bold mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+                讀取快照
+              </h2>
+              <p className="mb-4" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                還原到：<span className="font-medium" style={{ color: 'var(--text-primary)' }}>{snap.name}</span>
+              </p>
+              {/* 對比區域 */}
+              <div className="flex gap-3 pb-4 mb-4 flex-col min-[480px]:flex-row min-[480px]:items-stretch" style={{ borderBottom: '1px solid var(--border)' }}>
+                <StatColumn label="目前" stats={currStats} />
+                {/* 箭頭分隔 */}
+                <div className="hidden min-[480px]:flex items-center justify-center" style={{ width: '24px', flexShrink: 0 }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 8h10M9 4l4 4-4 4" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <div className="flex min-[480px]:hidden items-center justify-center py-1">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 3v10M4 9l4 4 4-4" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <StatColumn label="快照" stats={snapStats} />
+              </div>
+              <p className="text-sm mb-4" style={{ color: 'var(--warning)' }}>
+                目前的排位將被覆蓋，還原記錄會清空。
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowRestoreConfirm(false)}
+                  className="flex-1 py-2 text-sm font-medium rounded border cursor-pointer hover:bg-[var(--bg-primary)]"
+                  style={{ borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)' }}
+                >
+                  取消
+                </button>
+                <button
+                  onClick={confirmRestore}
+                  className="flex-1 py-2 text-sm font-semibold text-white rounded cursor-pointer hover:brightness-90"
+                  style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-display)' }}
+                >
+                  還原
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </>
   )
 }
