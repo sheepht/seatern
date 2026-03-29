@@ -94,11 +94,11 @@ export function centerOnPoint(
 
 // ─── 找不重疊的空位 ─────────────────────────────────
 
-const MIN_TABLE_DISTANCE = 250 // 兩桌中心最小距離（不重疊）
+const MIN_TABLE_DISTANCE = 220 // 兩桌中心最小距離（含間距）
 
 export function findFreePosition(
   existingTables: Table[],
-  spacing = 250,
+  spacing = 300,
 ): { x: number; y: number } {
   if (existingTables.length === 0) return { x: 200, y: 200 }
 
