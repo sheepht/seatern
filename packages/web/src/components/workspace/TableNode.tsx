@@ -428,7 +428,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
       </text>
 
       {/* 滿意度圓環進度條 + 中央數字 — counter-scale 維持固定螢幕大小 */}
-      <g transform={`scale(${counterScale})`}>
+      <g transform={`scale(${counterScale})`} style={{ opacity: isResetting ? 0 : 1, transition: 'opacity 200ms' }}>
         <TableScoreRing
           score={guests.length > 0 ? (previewTableScore ?? recommendationTableScores.get(table.id) ?? table.averageSatisfaction) : 0}
           originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
@@ -436,8 +436,8 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
         />
       </g>
 
-      {/* 眷屬群組：圓頭筆刷弧線 */}
-      {groupArcs.map((arc, i) => (
+      {/* 眷屬群組：圓頭筆刷弧線 — isResetting 時隱藏 */}
+      {!isResetting && groupArcs.map((arc, i) => (
         <path
           key={`arc-${i}`}
           d={arc.path}
@@ -449,8 +449,8 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
         />
       ))}
 
-      {/* 空位（靜態） */}
-      {allSeats.filter((s) => s.type === 'empty').map((seat) => (
+      {/* 空位（靜態）— isResetting 時隱藏 */}
+      {!isResetting && allSeats.filter((s) => s.type === 'empty').map((seat) => (
         <circle
           key={`empty-${seat.seatIndex}`}
           cx={seat.x}

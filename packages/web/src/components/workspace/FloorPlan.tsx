@@ -50,6 +50,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const hoveredGuestScreenY = useSeatingStore((s) => s.hoveredGuestScreenY)
   const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
   const flyingGuestIds = useSeatingStore((s) => s.flyingGuestIds)
+  const isResetting = useSeatingStore((s) => s.isResetting)
   const selectedTableId = useSeatingStore((s) => s.selectedTableId)
   const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
   const updateTablePosition = useSeatingStore((s) => s.updateTablePosition)
@@ -915,8 +916,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         )}
       </svg>
 
-      {/* HTML overlay 層（拖桌子或飛行動畫時禁用） */}
-      <div style={{ pointerEvents: (draggingTableId || flyingGuestIds.size > 0) ? 'none' : undefined }}>
+      {/* HTML overlay 層（拖桌子或重排動畫時禁用） */}
+      <div style={{ pointerEvents: (draggingTableId || isResetting || flyingGuestIds.size > 0) ? 'none' : undefined }}>
         {/* 每個座位的 drop zone（含空位） */}
         {screenSeats.map((ss) => (
           <SeatDropZone

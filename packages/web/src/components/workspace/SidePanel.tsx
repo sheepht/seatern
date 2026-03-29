@@ -81,19 +81,19 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
       }
     }
 
-    // Step 2: 預先隱藏賓客 + 抑制所有 hover 互動（避免動畫期間觸發推薦線和滿意度預覽）
-    const assignedIds = new Set(chipPositions.keys())
+    // Step 2: 預先隱藏整個賓客圖層 + 抑制所有互動
+    // isResetting 隱藏整個賓客 <g> 層（含 arcs、icons、空位）
     useSeatingStore.setState({
-      flyingGuestIds: assignedIds,
-      hoverSuppressedUntil: Date.now() + 2000, // 動畫期間禁止 hover
-      hoveredGuestId: null, // 清除已有的 hover
+      isResetting: true,
+      hoverSuppressedUntil: Date.now() + 2000,
+      hoveredGuestId: null,
     })
 
     // Step 3: 執行分配
     try {
       await autoAssignGuests()
     } catch (err: any) {
-      useSeatingStore.setState({ flyingGuestIds: new Set() })
+      useSeatingStore.setState({ isResetting: false })
       alert(err.message || '自動分配失敗')
       setAssigning(false)
       return
@@ -101,7 +101,7 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
 
     // Step 4: 計算每位賓客在桌上的目標螢幕位置
     if (!svgEl || !ctm || chipPositions.size === 0) {
-      useSeatingStore.setState({ flyingGuestIds: new Set() })
+      useSeatingStore.setState({ isResetting: false })
       setAssigning(false)
       return
     }
@@ -186,12 +186,12 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
       })
     })
 
-    // 動畫結束後清理
+    // 動畫結束後清理：顯示賓客圖層
     setTimeout(() => {
-      useSeatingStore.setState({ flyingGuestIds: new Set() })
+      useSeatingStore.setState({ isResetting: false })
       setTimeout(() => overlay.remove(), 200)
       setAssigning(false)
-    }, 550)
+    }, 650)
   }
 
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
