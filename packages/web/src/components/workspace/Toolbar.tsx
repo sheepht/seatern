@@ -80,6 +80,8 @@ export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
   const confirmRestore = () => {
     restoreSnapshot(snapshots[0].id)
     setShowRestoreConfirm(false)
+    // 還原後顯示全部桌子
+    setTimeout(() => onFitAll?.(), 50)
   }
 
   const handleAutoArrange = async () => {

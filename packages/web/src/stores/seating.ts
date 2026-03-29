@@ -1127,14 +1127,37 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       return g
     })
 
-    // 還原桌次位置：只保留快照裡有的桌（快照後新增的桌一律刪除）
+    // 還原桌次：保留快照裡有的桌、重建被刪除的桌、刪除快照後新增的桌
     const snapshotTableIds = new Set(snapData.tables.map((st) => st.tableId))
-    const restoredTables = tables
+    const currentTableIds = new Set(tables.map((t) => t.id))
+
+    // 目前存在且快照裡也有 → 還原位置和名稱
+    const keptTables = tables
       .filter((t) => snapshotTableIds.has(t.id))
       .map((t) => {
         const st = snapData.tables.find((st) => st.tableId === t.id)!
         return { ...t, positionX: st.positionX, positionY: st.positionY, ...(st.name ? { name: st.name } : {}) }
       })
+
+    // 快照裡有但目前不存在 → 需要重建
+    const missingSnapTables = snapData.tables.filter((st) => !currentTableIds.has(st.tableId))
+
+    // 快照後新增、需要刪除的桌
+    const extraTableIds = tables.filter((t) => !snapshotTableIds.has(t.id)).map((t) => t.id)
+
+    // 先用快照資料建立 placeholder（後端會重建真正的桌）
+    const placeholderTables: typeof tables = missingSnapTables.map((st) => ({
+      id: st.tableId,
+      name: st.name || '桌',
+      capacity: 10,
+      positionX: st.positionX,
+      positionY: st.positionY,
+      averageSatisfaction: 0,
+      color: null,
+      note: null,
+    }))
+
+    const restoredTables = [...keptTables, ...placeholderTables]
 
     // 重算滿意度（確保一致）
     const result = recalculateAll(restoredGuests, restoredTables, avoidPairs)
@@ -1147,14 +1170,20 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
     })
 
-    // 快照後新增、需要刪除的桌
-    const extraTableIds = tables.filter((t) => !snapshotTableIds.has(t.id)).map((t) => t.id)
-
     set({ guests: finalGuests, tables: finalTables, undoStack: [] })
 
     // 後端同步
     const { eventId } = get()
     if (eventId) {
+      // 重建被刪除的桌
+      for (const st of missingSnapTables) {
+        fetch(`/api/events/${eventId}/tables`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ id: st.tableId, name: st.name || '桌', positionX: st.positionX, positionY: st.positionY }),
+        }).catch(console.error)
+      }
       // 還原賓客座位
       for (const sg of snapData.guests) {
         fetch(`/api/events/${eventId}/guests/${sg.guestId}/table`, {

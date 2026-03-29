@@ -438,13 +438,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     }
   }, [tables.length, cw, ch])
 
-  const zoomToTable = useCallback((tableId: string) => {
-    const table = tables.find((t) => t.id === tableId)
-    if (!table) return
-    const { panX: px, panY: py } = centerOnPoint(table.positionX, table.positionY, 1, cw, ch)
-    animateViewport(1, px, py, 400)
-  }, [tables, cw, ch, animateViewport])
-
   // 螢幕座標的座位位置（給 HTML drop zone + draggable overlay 用）
   const [screenSeats, setScreenSeats] = useState<ScreenSeat[]>([])
 
@@ -871,7 +864,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                   isDimmed={shouldDim && !highlightedIds.has(table.id)}
                   zoom={zoom}
                   onMouseDown={(e) => handleMouseDown(table.id, e)}
-                  onDoubleClick={() => zoomToTable(table.id)}
                 />
               ))}
             </>
