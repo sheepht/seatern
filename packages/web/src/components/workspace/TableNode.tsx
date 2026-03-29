@@ -43,11 +43,7 @@ const CATEGORY_TEXT: Record<string, string> = {
   '共同': '#374151',
 }
 
-type ZoomLevel = 'normal'
-
-function getZoomLevel(_zoom: number): ZoomLevel {
-  return 'normal'
-}
+// zoom level 目前只有 normal（overview 模式已停用）
 
 interface Props {
   table: Table
@@ -142,7 +138,6 @@ function TableScoreRing({ score, originalScore, hasGuests }: { score: number; or
 }
 
 export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMouseDown, onDoubleClick }: Props) {
-  const zoomLevel = getZoomLevel(zoom)
   const counterScale = 1 / zoom // 讓內容維持固定螢幕大小
   const getTableGuests = useSeatingStore((s) => s.getTableGuests)
   const getTableSeatCount = useSeatingStore((s) => s.getTableSeatCount)
@@ -434,28 +429,15 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
 
       {/* 滿意度圓環進度條 + 中央數字 — counter-scale 維持固定螢幕大小 */}
       <g transform={`scale(${counterScale})`}>
-        {zoomLevel === 'overview' ? (
-          /* Overview 模式：只顯示數字 + 人數 */
-          <>
-            <text y={-2} textAnchor="middle" fontSize="22" fontWeight="800" fontFamily="'Plus Jakarta Sans', sans-serif"
-              style={{ fill: guests.length > 0 ? getSatisfactionColor(table.averageSatisfaction) : '#A8A29E' }}>
-              {guests.length > 0 ? Math.round(table.averageSatisfaction) : '空'}
-            </text>
-            <text y={18} textAnchor="middle" fontSize="12" fontWeight="500" fontFamily="'Plus Jakarta Sans', sans-serif" fill="#78716C">
-              {seatCount}/{table.capacity}人
-            </text>
-          </>
-        ) : (
-          <TableScoreRing
-            score={guests.length > 0 ? (previewTableScore ?? recommendationTableScores.get(table.id) ?? table.averageSatisfaction) : 0}
-            originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
-            hasGuests={guests.length > 0}
-          />
-        )}
+        <TableScoreRing
+          score={guests.length > 0 ? (previewTableScore ?? recommendationTableScores.get(table.id) ?? table.averageSatisfaction) : 0}
+          originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
+          hasGuests={guests.length > 0}
+        />
       </g>
 
-      {/* 眷屬群組：圓頭筆刷弧線 — overview 模式隱藏 */}
-      {zoomLevel !== 'overview' && groupArcs.map((arc, i) => (
+      {/* 眷屬群組：圓頭筆刷弧線 */}
+      {groupArcs.map((arc, i) => (
         <path
           key={`arc-${i}`}
           d={arc.path}
@@ -467,37 +449,8 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
         />
       ))}
 
-      {/* Overview 模式：分類顏色條（取代個別賓客圓） */}
-      {zoomLevel === 'overview' && guests.length > 0 && (() => {
-        const counts: Record<string, number> = {}
-        for (const g of guests) {
-          const cat = g.category || '共同'
-          counts[cat] = (counts[cat] || 0) + 1
-        }
-        const total = guests.length
-        const barW = radius * 1.2
-        const barH = 8 * counterScale
-        const barY = 24 * counterScale // 在分數下方
-        let offsetX = -barW / 2
-        const segments: Array<{ x: number; w: number; color: string }> = []
-        for (const cat of ['男方', '女方', '共同']) {
-          const count = counts[cat] || 0
-          if (count === 0) continue
-          const w = (count / total) * barW
-          segments.push({ x: offsetX, w, color: CATEGORY_COLORS[cat] || '#F3F4F6' })
-          offsetX += w
-        }
-        return (
-          <g transform={`translate(0, ${barY})`}>
-            {segments.map((seg, i) => (
-              <rect key={i} x={seg.x} y={0} width={seg.w} height={barH} rx={barH / 2} fill={seg.color} />
-            ))}
-          </g>
-        )
-      })()}
-
-      {/* 空位（靜態）— overview 模式隱藏 */}
-      {zoomLevel !== 'overview' && allSeats.filter((s) => s.type === 'empty').map((seat) => (
+      {/* 空位（靜態） */}
+      {allSeats.filter((s) => s.type === 'empty').map((seat) => (
         <circle
           key={`empty-${seat.seatIndex}`}
           cx={seat.x}
@@ -510,9 +463,9 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
         />
       ))}
 
-      {/* 賓客圖層 — overview 模式隱藏，重排時立刻隱藏 */}
+      {/* 賓客圖層 — 重排時立刻隱藏（浮動圓圈取代） */}
       <g style={{
-        opacity: isResetting ? 0 : zoomLevel === 'overview' ? 0 : 1,
+        opacity: isResetting ? 0 : 1,
       }}>
 
       {/* 有人的座位（賓客 + 眷屬），用 guest ID 作為穩定 key + FLIP 動畫 */}
@@ -613,8 +566,8 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
         )
       })}
 
-      {/* 圖示層：怒氣 + 推薦（在所有賓客之上）— overview 模式隱藏 */}
-      {zoomLevel !== 'overview' && allSeats.filter((s) => s.type === 'guest' && s.guest).map((seat) => {
+      {/* 圖示層：怒氣 + 推薦（在所有賓客之上） */}
+      {allSeats.filter((s) => s.type === 'guest' && s.guest).map((seat) => {
         const guestR = 20 * counterScale
         const hasViolation = violatingGuestIds.has(seat.guest!.id)
         const hasRecommendation = guestsWithRecommendations.has(seat.guest!.id) && !hasViolation
