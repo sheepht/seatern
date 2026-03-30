@@ -759,11 +759,13 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
         const origScore = guests.length > 0 ? table.averageSatisfaction : 0
         const d = formatScoreDelta(ringScore - origScore)
         if (d === 0) return null
-        const scoreScale = Math.pow(zoom, -0.45)
-        const ringR = 28
+        const badgeScale = 1 / zoom // badge 維持固定螢幕大小
+        // 中央分數圈用 zoom^(-0.45) 縮放，半徑 28，換算成 badge 座標系的偏移
+        const ringScreenR = 28 * Math.pow(zoom, -0.45)
+        const offsetInBadgeSpace = ringScreenR * zoom + 16 // 轉到 badgeScale 座標系
         return (
-          <g transform={`scale(${scoreScale})`}>
-            <g transform={`translate(0, ${ringR + 16})`}>
+          <g transform={`scale(${badgeScale})`}>
+            <g transform={`translate(0, ${offsetInBadgeSpace})`}>
               <rect x={-22} y={-13} width={44} height={26} rx={13} fill={d > 0 ? '#16A34A' : '#DC2626'} />
               <text y={5} textAnchor="middle" fill="white" fontSize="14" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
                 {d > 0 ? '+' : ''}{d}

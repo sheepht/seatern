@@ -969,9 +969,9 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                     fill={lineColor}
                   />
                   {(() => {
-                    // badge 位置：貝茲曲線上箭頭前 ~50px
+                    // badge 位置：貝茲曲線上靠近出發點（待排區賓客）~50px 處
                     const chordLen = Math.sqrt((endScreenX - startScreenX) ** 2 + (endScreenY - startScreenY) ** 2) || 1
-                    const bt = Math.max(0.5, 1 - 50 / chordLen)
+                    const bt = Math.min(0.4, 200 / chordLen)
                     const badgeX = (1-bt)*(1-bt)*startScreenX + 2*(1-bt)*bt*cx + bt*bt*endScreenX
                     const badgeY = (1-bt)*(1-bt)*startScreenY + 2*(1-bt)*bt*cy + bt*bt*endScreenY
                     return (
