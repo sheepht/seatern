@@ -1023,7 +1023,32 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
               tableCenterX={tcx}
               tableCenterY={tcy}
               onEmptyClick={(tableId, seatIndex, seatX, seatY, cx, cy) => {
-                setSeatPopover({ tableId, seatIndex, x: seatX, y: seatY, tableCenterX: cx, tableCenterY: cy })
+                // 桌子右邊緣 + popover 寬度（280 + 32 gap + 16 margin）
+                const tableScreenRadius = Math.abs(seatX - cx) > Math.abs(seatY - cy)
+                  ? Math.abs(seatX - cx) : Math.abs(seatY - cy)
+                const popoverRight = cx + tableScreenRadius + 32 + 280 + 16
+                const overflow = popoverRight - cw
+                if (overflow > 0) {
+                  // 平移畫布讓 popover 不超出右邊
+                  animateViewport(zoomRef.current, panXRef.current - overflow - 20, panYRef.current, 200)
+                  // 延遲打開 popover，等平移完成後座標才正確
+                  setTimeout(() => {
+                    // 重新計算平移後的螢幕座標
+                    const svg = svgRef.current
+                    const container = containerRef.current
+                    if (!svg || !container) return
+                    const ctm = svg.getScreenCTM()
+                    if (!ctm) return
+                    const t = tables.find((tb) => tb.id === tableId)
+                    if (!t) return
+                    const cRect = container.getBoundingClientRect()
+                    const newCx = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - cRect.left
+                    const newCy = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - cRect.top
+                    setSeatPopover({ tableId, seatIndex, x: seatX - overflow - 20, y: seatY, tableCenterX: newCx + cRect.left, tableCenterY: newCy + cRect.top })
+                  }, 220)
+                } else {
+                  setSeatPopover({ tableId, seatIndex, x: seatX, y: seatY, tableCenterX: cx, tableCenterY: cy })
+                }
               }}
             />
           )
