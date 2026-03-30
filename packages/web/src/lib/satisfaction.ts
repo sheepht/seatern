@@ -192,6 +192,14 @@ export function recalculateAll(
   return { guests: guestScores, tables: tableScores, overallAverage }
 }
 
+// ─── 滿意度 delta 顯示值（> 0.1 至少 ±1）─────────────
+
+export function formatScoreDelta(rawDelta: number): number {
+  if (rawDelta > 0.1) return Math.max(1, Math.round(rawDelta))
+  if (rawDelta < -0.1) return Math.min(-1, Math.round(rawDelta))
+  return 0
+}
+
 // ─── 滿意度顏色 ──────────────────────────────────────
 // >= 75 綠、>= 50 黃、>= 25 橘、< 25 紅
 

@@ -89,6 +89,8 @@ interface SeatingState {
   recommendationOverallScore: number | null
   /** 智慧推薦：最佳推薦的每位賓客預覽滿意度 */
   recommendationPreviewScores: Map<string, number>
+  /** 空位 popover hover 預覽：顯示賓客預覽在指定空位 */
+  seatPreviewGuest: { tableId: string; seatIndex: number; guestId: string; predictedScore: number; category?: string; name: string } | null
   /** 有更好位置的賓客 ID 集合（顯示💡圖示） */
   guestsWithRecommendations: Set<string>
   /** 上次重排的時間戳，用於觸發入場動畫 */
@@ -189,6 +191,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   recommendationGuestScore: null,
   recommendationOverallScore: null,
   recommendationPreviewScores: new Map(),
+  seatPreviewGuest: null,
   guestsWithRecommendations: new Set(),
   undoStack: [],
   lastResetAt: 0,

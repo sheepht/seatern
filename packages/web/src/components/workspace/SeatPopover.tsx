@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useSeatingStore } from '@/stores/seating'
-import { recalculateAll, getSatisfactionColor } from '@/lib/satisfaction'
+import { recalculateAll, getSatisfactionColor, formatScoreDelta } from '@/lib/satisfaction'
 
 const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   '男方': { bg: '#DBEAFE', text: '#1E40AF', border: '#BFDBFE' },
@@ -12,8 +12,10 @@ const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string
 interface Props {
   tableId: string
   seatIndex: number
-  anchorX: number
-  anchorY: number
+  seatX: number
+  seatY: number
+  tableCenterX: number
+  tableCenterY: number
   onClose: () => void
 }
 
@@ -21,9 +23,10 @@ interface Prediction {
   guest: ReturnType<typeof useSeatingStore.getState>['guests'][0]
   predictedScore: number
   tableDelta: number
+  newTableAvg: number
 }
 
-export function SeatPopover({ tableId, seatIndex, anchorX, anchorY, onClose }: Props) {
+export function SeatPopover({ tableId, seatIndex, seatX, seatY, tableCenterX, tableCenterY, onClose }: Props) {
   const [search, setSearch] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
@@ -76,10 +79,12 @@ export function SeatPopover({ tableId, seatIndex, anchorX, anchorY, onClose }: P
       const simResult = recalculateAll(simGuests, tables, avoidPairs)
       const newScore = simResult.guests.find((gs) => gs.id === g.id)?.satisfactionScore ?? 55
       const newTableAvg = simResult.tables.find((ts) => ts.id === tableId)?.averageSatisfaction ?? 0
+      const tableDelta = formatScoreDelta(newTableAvg - currentTableAvg)
       results.push({
         guest: g,
         predictedScore: Math.round(newScore),
-        tableDelta: Math.round(newTableAvg - currentTableAvg),
+        tableDelta,
+        newTableAvg,
       })
     }
     results.sort((a, b) => b.predictedScore - a.predictedScore)
@@ -101,15 +106,24 @@ export function SeatPopover({ tableId, seatIndex, anchorX, anchorY, onClose }: P
   const top3 = predictions.slice(0, 3)
 
   const handleSelect = (guestId: string) => {
+    useSeatingStore.setState({ recommendationTableScores: new Map(), seatPreviewGuest: null })
     moveGuestToSeat(guestId, tableId, seatIndex)
     onClose()
   }
 
-  // Popover 位置：anchor 旁邊，避免超出螢幕
+  // popover 關閉時清除預覽
+  useEffect(() => {
+    return () => { useSeatingStore.setState({ recommendationTableScores: new Map(), seatPreviewGuest: null }) }
+  }, [])
+
+  // Popover 位置：固定在桌子正右方，不蓋桌子
   const popW = 280
   const popH = 360
-  const left = Math.min(anchorX + 12, window.innerWidth - popW - 16)
-  const top = Math.min(anchorY - popH / 2, window.innerHeight - popH - 16)
+
+  // 桌子最右側座位 x + 間距 → popover 左邊緣
+  const tableRadius = Math.sqrt((seatX - tableCenterX) ** 2 + (seatY - tableCenterY) ** 2) || 40
+  const left = Math.max(8, Math.min(tableCenterX + tableRadius + 32, window.innerWidth - popW - 8))
+  const top = Math.max(8, Math.min(tableCenterY - popH / 2, window.innerHeight - popH - 8))
 
   return createPortal(
     <div
@@ -161,7 +175,7 @@ export function SeatPopover({ tableId, seatIndex, anchorX, anchorY, onClose }: P
             推薦入座
           </div>
           {top3.map((p) => (
-            <GuestRow key={p.guest.id} prediction={p} onClick={() => handleSelect(p.guest.id)} highlight />
+            <GuestRow key={p.guest.id} prediction={p} onClick={() => handleSelect(p.guest.id)} highlight tableId={tableId} seatIndex={seatIndex} />
           ))}
         </div>
       )}
@@ -179,7 +193,7 @@ export function SeatPopover({ tableId, seatIndex, anchorX, anchorY, onClose }: P
           </div>
         )}
         {(search.trim() ? filtered : filtered.slice(top3.length)).map((p) => (
-          <GuestRow key={p.guest.id} prediction={p} onClick={() => handleSelect(p.guest.id)} />
+          <GuestRow key={p.guest.id} prediction={p} onClick={() => handleSelect(p.guest.id)} tableId={tableId} seatIndex={seatIndex} />
         ))}
         {filtered.length === 0 && (
           <div style={{ padding: '16px 0', textAlign: 'center', color: '#A8A29E', fontSize: '13px' }}>
@@ -192,12 +206,14 @@ export function SeatPopover({ tableId, seatIndex, anchorX, anchorY, onClose }: P
   )
 }
 
-function GuestRow({ prediction, onClick, highlight }: {
+function GuestRow({ prediction, onClick, highlight, tableId, seatIndex }: {
   prediction: Prediction
   onClick: () => void
   highlight?: boolean
+  tableId: string
+  seatIndex: number
 }) {
-  const { guest, predictedScore, tableDelta } = prediction
+  const { guest, predictedScore, tableDelta, newTableAvg } = prediction
   // 用分類決定顏色（男方藍、女方紅），badge 文字顯示標籤名
   const catStyle = CATEGORY_STYLES[guest.category ?? ''] || { bg: '#F3F4F6', text: '#374151', border: '#D1D5DB' }
   const tagLabel = guest.guestTags.length > 0 ? guest.guestTags[0].tag.name : (guest.category ?? '其他')
@@ -217,8 +233,17 @@ function GuestRow({ prediction, onClick, highlight }: {
         background: highlight ? '#FFFBEB' : 'transparent',
         transition: 'background 100ms',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = highlight ? '#FEF3C7' : '#F5F5F4' }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = highlight ? '#FFFBEB' : 'transparent' }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = highlight ? '#FEF3C7' : '#F5F5F4'
+        useSeatingStore.setState({
+          recommendationTableScores: new Map([[tableId, newTableAvg]]),
+          seatPreviewGuest: { tableId, seatIndex, guestId: guest.id, predictedScore, category: guest.category, name: guest.name },
+        })
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = highlight ? '#FFFBEB' : 'transparent'
+        useSeatingStore.setState({ recommendationTableScores: new Map(), seatPreviewGuest: null })
+      }}
     >
       {/* 標籤 badge（顏色跟分類走） */}
       <span style={{

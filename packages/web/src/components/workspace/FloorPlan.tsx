@@ -259,7 +259,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
   // 桌次拖曳狀態
   const [draggingTableId, setDraggingTableId] = useState<string | null>(null)
-  const [seatPopover, setSeatPopover] = useState<{ tableId: string; seatIndex: number; x: number; y: number } | null>(null)
+  const [seatPopover, setSeatPopover] = useState<{ tableId: string; seatIndex: number; x: number; y: number; tableCenterX: number; tableCenterY: number } | null>(null)
   const dragOffsetRef = useRef({ x: 0, y: 0 })
   const dragStartPosRef = useRef({ x: 0, y: 0 })
   const didDragRef = useRef(false)
@@ -1005,20 +1005,29 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       {/* HTML overlay 層（拖桌子或重排動畫時禁用） */}
       <div style={{ pointerEvents: (draggingTableId || isResetting || flyingGuestIds.size > 0) ? 'none' : undefined }}>
         {/* 每個座位的 drop zone（含空位） */}
-        {screenSeats.map((ss) => (
-          <SeatDropZone
-            key={`drop-${ss.tableId}-${ss.seatIndex}`}
-            tableId={ss.tableId}
-            seatIndex={ss.seatIndex}
-            x={ss.x}
-            y={ss.y}
-            radius={ss.radius}
-            isEmpty={ss.guest === null && !ss.isCompanion}
-            onEmptyClick={(tableId, seatIndex, e) => {
-              setSeatPopover({ tableId, seatIndex, x: e.clientX, y: e.clientY })
-            }}
-          />
-        ))}
+        {screenSeats.map((ss) => {
+          // 計算桌子中心螢幕座標（從同桌所有座位的幾何中心推算）
+          const tableSiblings = screenSeats.filter((s) => s.tableId === ss.tableId)
+          const tcx = tableSiblings.reduce((s, s2) => s + s2.x, 0) / tableSiblings.length
+          const tcy = tableSiblings.reduce((s, s2) => s + s2.y, 0) / tableSiblings.length
+          return (
+            <SeatDropZone
+              key={`drop-${ss.tableId}-${ss.seatIndex}`}
+              tableId={ss.tableId}
+              seatIndex={ss.seatIndex}
+              x={ss.x}
+              y={ss.y}
+              radius={ss.radius}
+              isEmpty={ss.guest === null && !ss.isCompanion}
+              isActive={seatPopover?.tableId === ss.tableId && seatPopover?.seatIndex === ss.seatIndex}
+              tableCenterX={tcx}
+              tableCenterY={tcy}
+              onEmptyClick={(tableId, seatIndex, seatX, seatY, cx, cy) => {
+                setSeatPopover({ tableId, seatIndex, x: seatX, y: seatY, tableCenterX: cx, tableCenterY: cy })
+              }}
+            />
+          )
+        })}
 
         {/* 賓客座位 draggable overlay（主人 + 眷屬都可拖，拖眷屬 = 拖整組） */}
         {/* zoom < 0.7 時名字已淡出，賓客無法辨識，隱藏互動 overlay */}
@@ -1077,8 +1086,10 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         <SeatPopover
           tableId={seatPopover.tableId}
           seatIndex={seatPopover.seatIndex}
-          anchorX={seatPopover.x}
-          anchorY={seatPopover.y}
+          seatX={seatPopover.x}
+          seatY={seatPopover.y}
+          tableCenterX={seatPopover.tableCenterX}
+          tableCenterY={seatPopover.tableCenterY}
           onClose={() => setSeatPopover(null)}
         />
       )}

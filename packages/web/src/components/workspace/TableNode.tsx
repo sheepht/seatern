@@ -1,7 +1,7 @@
 import { useRef, useLayoutEffect, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useSeatingStore, type Table, type Guest } from '@/stores/seating'
-import { getSatisfactionColor } from '@/lib/satisfaction'
+import { getSatisfactionColor, formatScoreDelta } from '@/lib/satisfaction'
 import { dampedCounterScale, labelOpacity, satisfactionBlend, blendColors } from '@/lib/viewport'
 import type { Slot } from '@/lib/seat-shift'
 
@@ -75,9 +75,8 @@ function TableScoreRing({ score, originalScore, hasGuests }: { score: number; or
   const progress = Math.min(animatedScore / 100, 1)
   const color = getSatisfactionColor(animatedScore)
 
-  // 用未四捨五入的值算差異，有意義的變化至少顯示 ±1
   const rawDelta = score - originalScore
-  const delta = rawDelta > 0.1 ? Math.max(1, Math.round(rawDelta)) : rawDelta < -0.1 ? Math.min(-1, Math.round(rawDelta)) : 0
+  const delta = formatScoreDelta(rawDelta)
   const scale = rawDelta > 0.1 ? 1.25 : rawDelta < -0.1 ? 0.8 : 1
 
   return (
@@ -152,6 +151,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
   const recommendationTableScores = useSeatingStore((s) => s.recommendationTableScores)
   const recommendationGuestScore = useSeatingStore((s) => s.recommendationGuestScore)
   const guestsWithRecommendations = useSeatingStore((s) => s.guestsWithRecommendations)
+  const seatPreviewGuest = useSeatingStore((s) => s.seatPreviewGuest)
   const allGuests = useSeatingStore((s) => s.guests)
   const isResetting = useSeatingStore((s) => s.isResetting)
   const flyingGuestIds = useSeatingStore((s) => s.flyingGuestIds)
@@ -445,9 +445,9 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
       {/* 滿意度圓環進度條 + 中央數字 — 比賓客更強的阻尼，縮小時相對變大 */}
       <g transform={`scale(${Math.pow(zoom, -0.45)})`} style={{ opacity: isResetting ? 0 : 1 }}>
         <TableScoreRing
-          score={guests.length > 0 ? (previewTableScore ?? recommendationTableScores.get(table.id) ?? table.averageSatisfaction) : 0}
+          score={previewTableScore ?? recommendationTableScores.get(table.id) ?? (guests.length > 0 ? table.averageSatisfaction : 0)}
           originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
-          hasGuests={guests.length > 0}
+          hasGuests={guests.length > 0 || recommendationTableScores.has(table.id)}
         />
       </g>
 
@@ -465,40 +465,95 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
       ))}
 
       {/* 空位（靜態）— isResetting 時隱藏，含 "+" 可點擊 */}
-      {!isResetting && allSeats.filter((s) => s.type === 'empty').map((seat) => (
-        <g
-          key={`empty-${seat.seatIndex}`}
-          style={{ cursor: nameAlpha > 0 ? 'pointer' : 'default' }}
-          onClick={(e) => {
-            if (nameAlpha <= 0) return
-            e.stopPropagation()
-            onEmptySeatClick?.(table.id, seat.seatIndex, e)
-          }}
-        >
-          <circle
-            cx={seat.x}
-            cy={seat.y}
-            r={20 * guestScale}
-            fill="none"
-            stroke="#D6D3D1"
-            strokeWidth={1.5 * guestScale}
-            strokeDasharray={`${4 * guestScale} ${3 * guestScale}`}
-          />
-          {nameAlpha > 0 && (
-            <text
-              x={seat.x}
-              y={seat.y + 6 * guestScale}
-              textAnchor="middle"
-              fontSize={18 * guestScale}
-              fontWeight="300"
-              fontFamily="'Plus Jakarta Sans', sans-serif"
-              style={{ fill: `rgba(168,162,158,${nameAlpha})`, pointerEvents: 'none' }}
-            >
-              +
-            </text>
-          )}
-        </g>
-      ))}
+      {!isResetting && allSeats.filter((s) => s.type === 'empty').map((seat) => {
+        const isPreview = seatPreviewGuest?.tableId === table.id && seatPreviewGuest?.seatIndex === seat.seatIndex
+        const previewScore = isPreview ? seatPreviewGuest.predictedScore : 0
+        const previewCategory = isPreview ? seatPreviewGuest.category : undefined
+        const previewBgColor = isPreview ? (CATEGORY_COLORS[previewCategory ?? ''] || '#F3F4F6') : undefined
+        const previewSatColor = isPreview ? getSatisfactionColor(previewScore) : undefined
+        const guestR = 20 * guestScale
+        const guestRingR = guestR + 3 * guestScale
+        const guestCircum = 2 * Math.PI * guestRingR
+        const guestProgress = previewScore / 100
+
+        return (
+          <g
+            key={`empty-${seat.seatIndex}`}
+            style={{ cursor: nameAlpha > 0 ? 'pointer' : 'default' }}
+            onClick={(e) => {
+              if (nameAlpha <= 0) return
+              e.stopPropagation()
+              onEmptySeatClick?.(table.id, seat.seatIndex, e)
+            }}
+          >
+            {isPreview ? (
+              /* 預覽賓客：帶滿意度進度圈的賓客圓形 */
+              <g style={{ transform: `translate(${seat.x}px, ${seat.y}px)`, opacity: 0.75 }}>
+                {nameAlpha > 0 && (
+                  <>
+                    <circle r={guestRingR} fill="none" stroke="#E7E5E4" strokeWidth={2 * guestScale} opacity={nameAlpha} />
+                    {previewScore > 0 && (
+                      <circle
+                        r={guestRingR}
+                        fill="none"
+                        strokeWidth={2 * guestScale}
+                        strokeLinecap="round"
+                        strokeDashoffset={guestCircum * 0.25}
+                        transform="rotate(-90)"
+                        opacity={nameAlpha}
+                        style={{
+                          stroke: previewSatColor,
+                          strokeDasharray: `${guestCircum * guestProgress} ${guestCircum * (1 - guestProgress)}`,
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+                <circle r={guestR} fill={blendColors(previewBgColor!, previewSatColor!, satBlend)} stroke="white" strokeWidth={1.5 * guestScale} />
+                {nameAlpha > 0 && (
+                  <text
+                    y={6 * guestScale}
+                    textAnchor="middle"
+                    fill={CATEGORY_TEXT[previewCategory ?? ''] || '#374151'}
+                    fontSize={16 * guestScale}
+                    fontWeight="500"
+                    fontFamily="'Noto Sans TC', sans-serif"
+                    opacity={nameAlpha}
+                  >
+                    {getDisplayName(seatPreviewGuest.name)}
+                  </text>
+                )}
+              </g>
+            ) : (
+              /* 普通空位：虛線圈圈 + "+" */
+              <>
+                <circle
+                  cx={seat.x}
+                  cy={seat.y}
+                  r={guestR}
+                  fill="none"
+                  stroke="#D6D3D1"
+                  strokeWidth={1.5 * guestScale}
+                  strokeDasharray={`${4 * guestScale} ${3 * guestScale}`}
+                />
+                {nameAlpha > 0 && (
+                  <text
+                    x={seat.x}
+                    y={seat.y + 6 * guestScale}
+                    textAnchor="middle"
+                    fontSize={18 * guestScale}
+                    fontWeight="300"
+                    fontFamily="'Plus Jakarta Sans', sans-serif"
+                    style={{ fill: `rgba(168,162,158,${nameAlpha})`, pointerEvents: 'none' }}
+                  >
+                    +
+                  </text>
+                )}
+              </>
+            )}
+          </g>
+        )
+      })}
 
       {/* 賓客圖層 — 重排時立刻隱藏（浮動圓圈取代） */}
       <g style={{
