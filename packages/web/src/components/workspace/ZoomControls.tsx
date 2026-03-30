@@ -170,6 +170,7 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }:
                 ['0', '顯示全部'],
                 ['1', '100%'],
                 ['Q', '收合/展開待排區'],
+                ['雙擊賓客', '退回待排區'],
                 ['?', '快捷鍵提示'],
               ].map(([key, action]) => (
                 <div key={key} className="flex justify-between gap-3">

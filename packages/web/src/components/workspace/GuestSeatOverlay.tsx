@@ -1,4 +1,5 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useDraggable } from '@dnd-kit/core'
 import { useSeatingStore, type Guest } from '@/stores/seating'
 
@@ -30,11 +31,17 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
   const hoverSuppressedUntil = useSeatingStore((s) => s.hoverSuppressedUntil)
   const moveGuest = useSeatingStore((s) => s.moveGuest)
   const delayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null)
+  const tooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const elRef = useRef<HTMLDivElement | null>(null)
 
   const size = radius * 2
+  const displayName = guest.aliases?.length > 0 ? guest.aliases[0] : guest.name
+
   return (
+    <>
     <div
-      ref={setNodeRef}
+      ref={(el) => { setNodeRef(el); elRef.current = el }}
       {...listeners}
       {...attributes}
       className="absolute rounded-full cursor-grab"
@@ -58,7 +65,6 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         const el = e.currentTarget
         const remaining = hoverSuppressedUntil - Date.now()
         if (remaining > 0) {
-          // 動畫播放中 — 延遲到動畫結束才顯示 hover
           delayRef.current = setTimeout(() => {
             el.style.borderColor = '#B08D57'
             setHoveredGuest(guest.id)
@@ -67,12 +73,42 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
           el.style.borderColor = '#B08D57'
           setHoveredGuest(guest.id)
         }
+        // 800ms 後顯示 tooltip
+        tooltipTimer.current = setTimeout(() => {
+          const rect = el.getBoundingClientRect()
+          setTooltip({ x: rect.left + rect.width / 2, y: rect.top - 4 })
+        }, 800)
       }}
       onMouseLeave={(e) => {
         if (delayRef.current) { clearTimeout(delayRef.current); delayRef.current = null }
+        if (tooltipTimer.current) { clearTimeout(tooltipTimer.current); tooltipTimer.current = null }
         e.currentTarget.style.borderColor = 'transparent'
         setHoveredGuest(null)
+        setTooltip(null)
       }}
     />
+    {tooltip && createPortal(
+      <div style={{
+        position: 'fixed',
+        left: tooltip.x,
+        top: tooltip.y,
+        transform: 'translate(-50%, -100%)',
+        background: 'var(--bg-surface, #fff)',
+        color: 'var(--text-secondary, #78716C)',
+        border: '1px solid var(--border, #E7E5E4)',
+        padding: '4px 10px',
+        borderRadius: 6,
+        fontSize: 12,
+        whiteSpace: 'nowrap',
+        pointerEvents: 'none',
+        zIndex: 9999,
+        fontFamily: 'var(--font-body)',
+        boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
+      }}>
+        {displayName} · 雙擊退回待排區
+      </div>,
+      document.body,
+    )}
+    </>
   )
 }
