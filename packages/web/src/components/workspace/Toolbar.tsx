@@ -88,10 +88,27 @@ export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
     setArranging(true)
     setShowArrangeConfirm(false)
     try {
-      const positions = calculateGridLayout(tables)
+      // 讀取當前可見的 viewBox，在可見區域內均勻排列
+      const svg = document.getElementById('floorplan-svg') as SVGSVGElement | null
+      const vb = svg?.viewBox.baseVal
+      let positions: ReturnType<typeof calculateGridLayout>
+      if (vb && vb.width > 0) {
+        const padding = 100 // 邊距
+        const areaW = vb.width - padding * 2
+        const areaH = vb.height - padding * 2
+        const cols = Math.ceil(Math.sqrt(tables.length))
+        const rows = Math.ceil(tables.length / cols)
+        const spacingX = cols > 1 ? areaW / (cols - 1) : 0
+        const spacingY = rows > 1 ? areaH / (rows - 1) : 0
+        positions = tables.map((t, i) => ({
+          tableId: t.id,
+          x: vb.x + padding + (i % cols) * spacingX,
+          y: vb.y + padding + Math.floor(i / cols) * spacingY,
+        }))
+      } else {
+        positions = calculateGridLayout(tables)
+      }
       await autoArrangeTables(positions)
-      // 排完後自動 fit-all
-      onFitAll?.()
     } catch (err: any) {
       alert(err.message || '保存失敗，已恢復原排列')
     } finally {
@@ -532,12 +549,14 @@ export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
                 const { avoidPairs, undoStack } = useSeatingStore.getState()
                 const allConfirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
 
-                // 打亂賓客順序
+                // 打亂賓客順序，只排 3/4 的人
                 const shuffled = [...allConfirmed]
                 for (let i = shuffled.length - 1; i > 0; i--) {
                   const j = Math.floor(Math.random() * (i + 1));
                   [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
                 }
+                const count = Math.ceil(shuffled.length * 0.75)
+                shuffled.length = count
 
                 // 建立每桌的剩餘容量 & 下一個可用 seatIndex
                 const remaining = new Map<string, number>()
