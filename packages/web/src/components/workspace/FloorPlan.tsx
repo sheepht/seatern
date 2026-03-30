@@ -973,15 +973,18 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
               const badgeColor = onlyOne ? '#16A34A' : (allSame ? '#CA8A04' : (delta === maxDelta ? '#16A34A' : '#CA8A04'))
               const lineColor = badgeColor === '#16A34A' ? '#16A34A' : '#B08D57'
 
+              const isSwapTarget = longPressActive && rec.tableId === bestSwapTableId
+              const strokeW = isSwapTarget ? 5 : 2.5
+
               return (
-                <g key={`rec-overlay-${i}`} opacity={0.9 - i * 0.15}>
+                <g key={`rec-overlay-${i}`} opacity={isSwapTarget ? 1 : 0.9 - i * 0.15}>
                   <path
                     d={pathD}
                     fill="none"
                     stroke={lineColor}
-                    strokeWidth="2.5"
+                    strokeWidth={strokeW}
                     strokeDasharray="10 6"
-                    style={{ animation: `rec-overlay-flow 0.6s linear infinite` }}
+                    style={{ animation: `rec-overlay-flow 0.6s linear infinite`, transition: 'stroke-width 200ms' }}
                   />
                   <polygon
                     points={`${endScreenX},${endScreenY} ${ax1},${ay1} ${ax2},${ay2}`}
