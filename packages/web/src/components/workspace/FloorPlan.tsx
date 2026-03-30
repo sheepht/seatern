@@ -306,7 +306,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   // Pan 狀態追蹤
   const isPanningRef = useRef(false)
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
-  const spaceHeldRef = useRef(false)
 
   // Wheel zoom — 用 native listener 確保 non-passive（trackpad pinch 需要 preventDefault）
   const wheelRafRef = useRef<number | null>(null)
@@ -353,32 +352,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     return () => el.removeEventListener('wheel', handleWheelNative)
   }, [handleWheelNative])
 
-  // Space 鍵追蹤（pan 模式）
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat) {
-        const tag = (document.activeElement?.tagName || '').toLowerCase()
-        if (tag === 'input' || tag === 'textarea' || tag === 'select') return
-        if (document.activeElement?.hasAttribute('contenteditable')) return
-        if (document.activeElement?.closest('[role="dialog"]')) return
-        e.preventDefault()
-        spaceHeldRef.current = true
-        setSpaceHeld(true)
-      }
-    }
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        spaceHeldRef.current = false
-        setSpaceHeld(false)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('keyup', onKeyUp)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('keyup', onKeyUp)
-    }
-  }, [])
 
   // ─── Viewport 動畫 ──────────────────────────────────
   const animRef = useRef<number | null>(null)
@@ -546,8 +519,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
   const handleMouseDown = useCallback(
     (tableId: string, e: React.MouseEvent) => {
-      // Space 按住或中鍵 → pan 模式，不拖桌子
-      if (spaceHeldRef.current || e.button === 1) {
+      // 中鍵 → pan 模式，不拖桌子
+      if (e.button === 1) {
         startPan(e)
         return
       }
@@ -566,10 +539,10 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     [tables, getSvgPoint, setSelectedTable, startPan],
   )
 
-  // SVG 上的 mousedown（畫布背景拖曳 → pan，或 Space/中鍵）
+  // SVG 上的 mousedown（畫布背景拖曳 → pan，或中鍵）
   const handleSvgMouseDown = useCallback((e: React.MouseEvent) => {
-    // Space 或中鍵 → 永遠 pan
-    if (spaceHeldRef.current || e.button === 1) {
+    // 中鍵 → 永遠 pan
+    if (e.button === 1) {
       startPan(e)
       return
     }
@@ -711,10 +684,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
   // Pan 游標狀態（用 state 而非 ref，確保 re-render 更新游標）
   const [isPanning, setIsPanning] = useState(false)
-  const [spaceHeld, setSpaceHeld] = useState(false)
 
   const cursorStyle = isPanning ? 'grabbing'
-    : spaceHeld ? 'grab'
     : draggingTableId ? 'default'
     : undefined
 
