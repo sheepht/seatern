@@ -153,7 +153,8 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }:
                 ['Space + 拖曳', '平移'],
                 ['方向鍵', '平移'],
                 ['0', '顯示全部'],
-                ['雙擊桌子', '放大到該桌'],
+                ['1', '100%'],
+                ['Q', '收合/展開待排區'],
               ].map(([key, action]) => (
                 <div key={key} className="flex justify-between gap-3">
                   <span className="font-mono text-xs" style={{ color: 'var(--text-primary, #1C1917)' }}>{key}</span>
