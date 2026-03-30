@@ -451,9 +451,9 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
       {/* 滿意度圓環進度條 + 中央數字 — 比賓客更強的阻尼，縮小時相對變大 */}
       <g transform={`scale(${Math.pow(zoom, -0.45)})`} style={{ opacity: isResetting ? 0 : 1 }}>
         <TableScoreRing
-          score={previewTableScore ?? recommendationTableScores.get(table.id) ?? (guests.length > 0 ? table.averageSatisfaction : 0)}
+          score={previewTableScore ?? (zoom >= 0.7 ? recommendationTableScores.get(table.id) : undefined) ?? (guests.length > 0 ? table.averageSatisfaction : 0)}
           originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
-          hasGuests={guests.length > 0 || recommendationTableScores.has(table.id)}
+          hasGuests={guests.length > 0 || (zoom >= 0.7 && recommendationTableScores.has(table.id))}
         />
       </g>
 

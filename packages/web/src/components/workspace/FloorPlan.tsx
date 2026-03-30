@@ -139,6 +139,30 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     return () => clearTimeout(timer)
   }, [dataVersion, guests, tables])
 
+  // 桌次拖曳狀態
+  const [draggingTableId, setDraggingTableId] = useState<string | null>(null)
+  const [seatPopover, setSeatPopover] = useState<{ tableId: string; seatIndex: number; x: number; y: number; tableCenterX: number; tableCenterY: number } | null>(null)
+  const dragOffsetRef = useRef({ x: 0, y: 0 })
+  const dragStartPosRef = useRef({ x: 0, y: 0 })
+  const didDragRef = useRef(false)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // ─── Zoom / Pan 狀態 ──────────────────────────────────
+  const [zoom, setZoom] = useState(1)
+  const [panX, setPanX] = useState(0)
+  const [panY, setPanY] = useState(0)
+  const [containerSize, setContainerSize] = useState({ w: CANVAS_WIDTH, h: CANVAS_HEIGHT })
+
+  // Ref mirrors：讓 wheel handler 能在 useCallback([]) 中讀取最新值
+  const zoomRef = useRef(zoom)
+  const panXRef = useRef(panX)
+  const panYRef = useRef(panY)
+  zoomRef.current = zoom
+  panXRef.current = panX
+  panYRef.current = panY
+
+  // ─── 智慧推薦計算（需要 zoom 定義後）──────────────────
   useEffect(() => {
     const syncRecToStore = (recs: Recommendation[], guestId: string) => {
       const scores = new Map<string, number>()
@@ -154,9 +178,13 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       })
     }
 
-    if (activeDragGuestId) {
+    if (activeDragGuestId || zoom < 0.7) {
       setRecommendations([])
       syncRecToStore([], '')
+      // zoom < 0.7 時 HTML overlay 隱藏，mouseLeave 不會觸發，主動清除 hoveredGuestId
+      if (zoom < 0.7 && hoveredGuestId) {
+        useSeatingStore.getState().setHoveredGuest(null)
+      }
       return
     }
 
@@ -186,7 +214,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
       const isUnassigned = !guest.assignedTableId
       const currentGuestScore = guest.satisfactionScore
-      // 當前全場平均
       const currentResult = recalculateAll(guests, tables, avoidPairs)
       const currentOverall = currentResult.overallAverage
       const results: Recommendation[] = []
@@ -213,7 +240,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         const rawOverallDelta = simResult.overallAverage - currentOverall
 
         if (isUnassigned) {
-          // 待排賓客：只要該桌能讓賓客得分 > 基礎分就推薦
           if (newGuestScore > 55) {
             const newGuestScores = new Map<string, number>()
             for (const gs of simResult.guests) newGuestScores.set(gs.id, gs.satisfactionScore)
@@ -229,7 +255,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
             })
           }
         } else {
-          // 已入座賓客：滿意度上升 AND（桌滿意度也上升 OR 全場平均上升）
           if (guestDelta > 0 && (rawTableDelta > 0.1 || rawOverallDelta > 0.1)) {
             const newGuestScores = new Map<string, number>()
             for (const gs of simResult.guests) newGuestScores.set(gs.id, gs.satisfactionScore)
@@ -255,30 +280,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     recCacheRef.current.set(hoveredGuestId, result)
     setRecommendations(result)
     syncRecToStore(result, hoveredGuestId)
-  }, [hoveredGuestId, activeDragGuestId, guests, tables])
-
-  // 桌次拖曳狀態
-  const [draggingTableId, setDraggingTableId] = useState<string | null>(null)
-  const [seatPopover, setSeatPopover] = useState<{ tableId: string; seatIndex: number; x: number; y: number; tableCenterX: number; tableCenterY: number } | null>(null)
-  const dragOffsetRef = useRef({ x: 0, y: 0 })
-  const dragStartPosRef = useRef({ x: 0, y: 0 })
-  const didDragRef = useRef(false)
-  const svgRef = useRef<SVGSVGElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  // ─── Zoom / Pan 狀態 ──────────────────────────────────
-  const [zoom, setZoom] = useState(1)
-  const [panX, setPanX] = useState(0)
-  const [panY, setPanY] = useState(0)
-  const [containerSize, setContainerSize] = useState({ w: CANVAS_WIDTH, h: CANVAS_HEIGHT })
-
-  // Ref mirrors：讓 wheel handler 能在 useCallback([]) 中讀取最新值
-  const zoomRef = useRef(zoom)
-  const panXRef = useRef(panX)
-  const panYRef = useRef(panY)
-  zoomRef.current = zoom
-  panXRef.current = panX
-  panYRef.current = panY
+  }, [hoveredGuestId, activeDragGuestId, guests, tables, zoom])
 
   // ResizeObserver 追蹤容器大小
   useEffect(() => {
@@ -753,7 +755,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
             if (g?.assignedTableId) highlightedIds.add(g.assignedTableId)
             for (const rec of recommendations) highlightedIds.add(rec.tableId)
           }
-          const shouldDim = highlightedIds.size > 0
+          const shouldDim = highlightedIds.size > 0 && zoom >= 0.7
 
           // 選中的桌子排到陣列最後，確保 SVG DOM 順序最後 = 圖層最上面
           const orderedTables = [
