@@ -27,6 +27,21 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }:
     return () => document.removeEventListener('mousedown', handler)
   }, [showPresets, showHelp])
 
+  // ? 鍵 toggle 快捷鍵提示
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+      if (e.key === '?') {
+        e.preventDefault()
+        setShowHelp((prev) => !prev)
+        setShowPresets(false)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   const atMin = zoom <= 0.25
   const atMax = zoom >= 1
 
