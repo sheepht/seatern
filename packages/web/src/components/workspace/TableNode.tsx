@@ -53,6 +53,7 @@ interface Props {
   isDimmed?: boolean
   zoom: number
   onMouseDown: (e: React.MouseEvent) => void
+  onEmptySeatClick?: (tableId: string, seatIndex: number, e: React.MouseEvent) => void
 }
 
 /**
@@ -137,7 +138,7 @@ function TableScoreRing({ score, originalScore, hasGuests }: { score: number; or
   )
 }
 
-export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMouseDown }: Props) {
+export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMouseDown, onEmptySeatClick }: Props) {
   const counterScale = 1 / zoom // 桌名等維持固定螢幕大小
   const rawGuestScale = dampedCounterScale(zoom) // 賓客元素：阻尼縮小
   const nameAlpha = labelOpacity(zoom)         // 名字漸進淡出
@@ -463,18 +464,40 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
         />
       ))}
 
-      {/* 空位（靜態）— isResetting 時隱藏 */}
+      {/* 空位（靜態）— isResetting 時隱藏，含 "+" 可點擊 */}
       {!isResetting && allSeats.filter((s) => s.type === 'empty').map((seat) => (
-        <circle
+        <g
           key={`empty-${seat.seatIndex}`}
-          cx={seat.x}
-          cy={seat.y}
-          r={20 * guestScale}
-          fill="none"
-          stroke="#D6D3D1"
-          strokeWidth={1.5 * guestScale}
-          strokeDasharray={`${4 * guestScale} ${3 * guestScale}`}
-        />
+          style={{ cursor: nameAlpha > 0 ? 'pointer' : 'default' }}
+          onClick={(e) => {
+            if (nameAlpha <= 0) return
+            e.stopPropagation()
+            onEmptySeatClick?.(table.id, seat.seatIndex, e)
+          }}
+        >
+          <circle
+            cx={seat.x}
+            cy={seat.y}
+            r={20 * guestScale}
+            fill="none"
+            stroke="#D6D3D1"
+            strokeWidth={1.5 * guestScale}
+            strokeDasharray={`${4 * guestScale} ${3 * guestScale}`}
+          />
+          {nameAlpha > 0 && (
+            <text
+              x={seat.x}
+              y={seat.y + 6 * guestScale}
+              textAnchor="middle"
+              fontSize={18 * guestScale}
+              fontWeight="300"
+              fontFamily="'Plus Jakarta Sans', sans-serif"
+              style={{ fill: `rgba(168,162,158,${nameAlpha})`, pointerEvents: 'none' }}
+            >
+              +
+            </text>
+          )}
+        </g>
       ))}
 
       {/* 賓客圖層 — 重排時立刻隱藏（浮動圓圈取代） */}

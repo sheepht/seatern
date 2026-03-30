@@ -5,6 +5,7 @@ import { recalculateAll } from '@/lib/satisfaction'
 import { computeAvoidancePath, getPathEndDirection } from '@/lib/path-routing'
 import { calculateFitAll, centerOnPoint } from '@/lib/viewport'
 import { TableNode } from './TableNode'
+import { SeatPopover } from './SeatPopover'
 import { SeatDropZone } from './SeatDropZone'
 import { GuestSeatOverlay } from './GuestSeatOverlay'
 import { ZoomControls } from './ZoomControls'
@@ -258,6 +259,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
   // 桌次拖曳狀態
   const [draggingTableId, setDraggingTableId] = useState<string | null>(null)
+  const [seatPopover, setSeatPopover] = useState<{ tableId: string; seatIndex: number; x: number; y: number } | null>(null)
   const dragOffsetRef = useRef({ x: 0, y: 0 })
   const dragStartPosRef = useRef({ x: 0, y: 0 })
   const didDragRef = useRef(false)
@@ -868,6 +870,9 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                   isDimmed={shouldDim && !highlightedIds.has(table.id)}
                   zoom={zoom}
                   onMouseDown={(e) => handleMouseDown(table.id, e)}
+                  onEmptySeatClick={(tableId, seatIndex, e) => {
+                    setSeatPopover({ tableId, seatIndex, x: e.clientX, y: e.clientY })
+                  }}
                 />
               ))}
               {recBadges}
@@ -1009,6 +1014,9 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
             y={ss.y}
             radius={ss.radius}
             isEmpty={ss.guest === null && !ss.isCompanion}
+            onEmptyClick={(tableId, seatIndex, e) => {
+              setSeatPopover({ tableId, seatIndex, x: e.clientX, y: e.clientY })
+            }}
           />
         ))}
 
@@ -1061,6 +1069,17 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
             )
             animateViewport(targetZoom, px, py, 200)
           }}
+        />
+      )}
+
+      {/* 空位點擊 → 選擇賓客 popover */}
+      {seatPopover && (
+        <SeatPopover
+          tableId={seatPopover.tableId}
+          seatIndex={seatPopover.seatIndex}
+          anchorX={seatPopover.x}
+          anchorY={seatPopover.y}
+          onClose={() => setSeatPopover(null)}
         />
       )}
     </div>
