@@ -178,14 +178,24 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       })
     }
 
-    if (activeDragGuestId || zoom < 0.7) {
+    if (activeDragGuestId) {
       setRecommendations([])
       syncRecToStore([], '')
-      // zoom < 0.7 時 HTML overlay 隱藏，mouseLeave 不會觸發，主動清除 hoveredGuestId
-      if (zoom < 0.7 && hoveredGuestId) {
-        useSeatingStore.getState().setHoveredGuest(null)
-      }
       return
+    }
+
+    // zoom < 0.7 時：已入座賓客的桌上 overlay 消失，清除其 hover 狀態
+    // 但待排賓客的側欄 chip 不受 zoom 影響，保留推薦計算
+    if (zoom < 0.7 && hoveredGuestId) {
+      const hovered = guests.find((g) => g.id === hoveredGuestId)
+      if (hovered?.assignedTableId) {
+        // 已入座賓客 → 清除推薦
+        setRecommendations([])
+        syncRecToStore([], '')
+        useSeatingStore.getState().setHoveredGuest(null)
+        return
+      }
+      // 待排賓客 → 繼續計算推薦（不 return）
     }
 
     if (!hoveredGuestId) {
@@ -868,8 +878,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       </svg>
 
       {/* 待排賓客的推薦虛線 — 用 HTML overlay 渲染，讓線從側欄賓客 chip 出發 */}
-      {/* zoom < 0.7 時名字已淡出，關閉推薦線 */}
-      {recommendations.length > 0 && hoveredGuestId && zoom >= 0.7 && (() => {
+      {recommendations.length > 0 && hoveredGuestId && (() => {
         const guest = guests.find((g) => g.id === hoveredGuestId)
         if (!guest || guest.assignedTableId) return null // 只處理待排賓客
 
