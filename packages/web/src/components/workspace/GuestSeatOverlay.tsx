@@ -32,7 +32,6 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
   const moveGuest = useSeatingStore((s) => s.moveGuest)
   const delayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null)
-  const tooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const elRef = useRef<HTMLDivElement | null>(null)
 
   const size = radius * 2
@@ -58,6 +57,8 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
       }}
       onDoubleClick={(e) => {
         e.stopPropagation()
+        setHoveredGuest(null)
+        setTooltip(null)
         moveGuest(guest.id, null)
       }}
       onMouseEnter={(e) => {
@@ -73,15 +74,12 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
           el.style.borderColor = '#B08D57'
           setHoveredGuest(guest.id)
         }
-        // 800ms 後顯示 tooltip
-        tooltipTimer.current = setTimeout(() => {
-          const rect = el.getBoundingClientRect()
-          setTooltip({ x: rect.left + rect.width / 2, y: rect.top - 4 })
-        }, 800)
+        // 立刻顯示 tooltip
+        const rect = el.getBoundingClientRect()
+        setTooltip({ x: rect.left + rect.width / 2, y: rect.top - 4 })
       }}
       onMouseLeave={(e) => {
         if (delayRef.current) { clearTimeout(delayRef.current); delayRef.current = null }
-        if (tooltipTimer.current) { clearTimeout(tooltipTimer.current); tooltipTimer.current = null }
         e.currentTarget.style.borderColor = 'transparent'
         setHoveredGuest(null)
         setTooltip(null)
@@ -105,7 +103,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         fontFamily: 'var(--font-body)',
         boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
       }}>
-        {displayName} · 雙擊退回待排區
+        {displayName} · 雙擊移除
       </div>,
       document.body,
     )}
