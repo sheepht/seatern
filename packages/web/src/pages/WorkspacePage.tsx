@@ -161,6 +161,15 @@ export default function WorkspacePage() {
     const guestId = getGuestId(event)
     const overData = over.data.current
 
+    // 拖到側欄區域內 → 清除桌子預覽
+    if (overData?.type === 'seat' && !sidebarCollapsed) {
+      const activeRect = event.active.rect.current?.translated
+      if (activeRect && activeRect.left < 320) {
+        setDragPreview(null)
+        return
+      }
+    }
+
     if (overData?.type === 'seat') {
       const tableId = overData.tableId as string
       const dropSeatIndex = overData.seatIndex as number
@@ -185,6 +194,15 @@ export default function WorkspacePage() {
 
     const guestId = getGuestId(event)
     const overData = over.data.current
+
+    // 如果放開位置在側欄區域內，強制視為回到待排區
+    if (overData?.type === 'seat' && !sidebarCollapsed) {
+      const activeRect = event.active.rect.current?.translated
+      if (activeRect && activeRect.left < 320) {
+        moveGuest(guestId, null)
+        return
+      }
+    }
 
     if (overData?.type === 'seat') {
       const tableId = overData.tableId as string
