@@ -155,6 +155,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
   const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
   const dragRejectTableId = useSeatingStore((s) => s.dragRejectTableId)
   const recommendationTableScores = useSeatingStore((s) => s.recommendationTableScores)
+  const hoveredGuestId = useSeatingStore((s) => s.hoveredGuestId)
   const recommendationGuestScore = useSeatingStore((s) => s.recommendationGuestScore)
   const guestsWithRecommendations = useSeatingStore((s) => s.guestsWithRecommendations)
   const seatPreviewGuest = useSeatingStore((s) => s.seatPreviewGuest)
@@ -451,9 +452,23 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
       {/* 滿意度圓環進度條 + 中央數字 — 比賓客更強的阻尼，縮小時相對變大 */}
       <g transform={`scale(${Math.pow(zoom, -0.45)})`} style={{ opacity: isResetting ? 0 : 1 }}>
         <TableScoreRing
-          score={previewTableScore ?? (zoom >= 0.7 ? recommendationTableScores.get(table.id) : undefined) ?? (guests.length > 0 ? table.averageSatisfaction : 0)}
+          score={(() => {
+            if (previewTableScore != null) return previewTableScore
+            const recScore = recommendationTableScores.get(table.id)
+            if (recScore != null) {
+              // 已入座賓客的推薦受 zoom 限制，待排賓客的推薦不受限
+              const hoveredGuest = hoveredGuestId ? allGuests.find((g) => g.id === hoveredGuestId) : null
+              if (zoom >= 0.7 || (hoveredGuest && !hoveredGuest.assignedTableId)) return recScore
+            }
+            return guests.length > 0 ? table.averageSatisfaction : 0
+          })()}
           originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
-          hasGuests={guests.length > 0 || (zoom >= 0.7 && recommendationTableScores.has(table.id))}
+          hasGuests={(() => {
+            if (guests.length > 0) return true
+            if (!recommendationTableScores.has(table.id)) return false
+            const hoveredGuest = hoveredGuestId ? allGuests.find((g) => g.id === hoveredGuestId) : null
+            return zoom >= 0.7 || (hoveredGuest != null && !hoveredGuest.assignedTableId)
+          })()}
         />
       </g>
 
