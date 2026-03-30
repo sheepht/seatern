@@ -159,8 +159,28 @@ events.patch('/:eventId/guests/assign-batch', async (c) => {
     assignments: Array<{ guestId: string; tableId: string | null; seatIndex?: number | null }>
   }>()
 
+  // 正規化：空字串視為 null
+  const normalized = body.assignments.map((a) => ({
+    ...a,
+    tableId: a.tableId || null,
+  }))
+
+  // 驗證所有非 null 的 tableId 都存在
+  const tableIds = [...new Set(normalized.filter((a) => a.tableId).map((a) => a.tableId!))]
+  if (tableIds.length > 0) {
+    const existingTables = await prisma.table.findMany({
+      where: { id: { in: tableIds }, eventId },
+      select: { id: true },
+    })
+    const existingIds = new Set(existingTables.map((t) => t.id))
+    const missing = tableIds.filter((id) => !existingIds.has(id))
+    if (missing.length > 0) {
+      return c.json({ error: `Tables not found: ${missing.join(', ')}` }, 400)
+    }
+  }
+
   await prisma.$transaction(
-    body.assignments.map((a) =>
+    normalized.map((a) =>
       prisma.guest.update({
         where: { id: a.guestId },
         data: {
@@ -171,7 +191,7 @@ events.patch('/:eventId/guests/assign-batch', async (c) => {
     )
   )
 
-  return c.json({ count: body.assignments.length })
+  return c.json({ count: normalized.length })
 })
 
 // PATCH /events/:eventId/guests/:guestId/table — 移動賓客到桌次
@@ -207,10 +227,11 @@ events.post('/:id/tables', async (c) => {
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
-  const body = await c.req.json<{ name: string; capacity?: number; positionX?: number; positionY?: number }>()
+  const body = await c.req.json<{ id?: string; name: string; capacity?: number; positionX?: number; positionY?: number }>()
 
   const table = await prisma.table.create({
     data: {
+      ...(body.id && { id: body.id }),
       eventId,
       name: body.name,
       capacity: body.capacity ?? 10,

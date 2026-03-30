@@ -155,7 +155,7 @@ interface SeatingState {
   updateTablePosition: (tableId: string, x: number, y: number) => void
   saveTablePosition: (tableId: string, fromX?: number, fromY?: number) => void
   saveSnapshot: (name: string) => Promise<void>
-  restoreSnapshot: (snapshotId: string) => void
+  restoreSnapshot: (snapshotId: string) => Promise<void>
   addAvoidPair: (guestAId: string, guestBId: string, reason?: string) => Promise<void>
   removeAvoidPair: (pairId: string) => Promise<void>
   checkAvoidViolation: (guestId: string, tableId: string) => AvoidPair | null
@@ -1109,7 +1109,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     set({ snapshots: [snapshot, ...snapshots] })
   },
 
-  restoreSnapshot: (snapshotId) => {
+  restoreSnapshot: async (snapshotId) => {
     const { snapshots, guests, tables, avoidPairs } = get()
     const snapshot = snapshots.find((s) => s.id === snapshotId)
     if (!snapshot) return
@@ -1176,16 +1176,20 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     // 後端同步
     const { eventId } = get()
     if (eventId) {
-      // 重建被刪除的桌
-      for (const st of missingSnapTables) {
-        fetch(`/api/events/${eventId}/tables`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ id: st.tableId, name: st.name || '桌', positionX: st.positionX, positionY: st.positionY }),
-        }).catch(console.error)
+      // 重建被刪除的桌（必須先完成，再還原賓客座位）
+      if (missingSnapTables.length > 0) {
+        await Promise.all(
+          missingSnapTables.map((st) =>
+            fetch(`/api/events/${eventId}/tables`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ id: st.tableId, name: st.name || '桌', positionX: st.positionX, positionY: st.positionY }),
+            }).catch(console.error)
+          )
+        )
       }
-      // 還原賓客座位（批次一次寫入）
+      // 還原賓客座位（批次一次寫入，桌子已確保存在）
       if (snapData.guests.length > 0) {
         fetch(`/api/events/${eventId}/guests/assign-batch`, {
           method: 'PATCH',
