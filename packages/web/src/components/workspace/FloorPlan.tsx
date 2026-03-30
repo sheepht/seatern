@@ -9,7 +9,6 @@ import { SeatPopover } from './SeatPopover'
 import { SeatDropZone } from './SeatDropZone'
 import { GuestSeatOverlay } from './GuestSeatOverlay'
 import { ZoomControls } from './ZoomControls'
-import { Minimap } from './Minimap'
 
 interface Recommendation {
   tableId: string
@@ -682,6 +681,13 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       } else if (e.key === '0') {
         e.preventDefault()
         fitAll(true)
+      } else if (e.key === '1') {
+        e.preventDefault()
+        // 100% zoom，保持當前視圖中心
+        const cx = (-panXRef.current + cw / 2) / zoomRef.current
+        const cy = (-panYRef.current + ch / 2) / zoomRef.current
+        const { panX: px, panY: py } = centerOnPoint(cx, cy, 1, cw, ch)
+        animateViewport(1, px, py, 200)
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault()
         animateViewport(zoomRef.current, panXRef.current + 100, panYRef.current, 150)
@@ -1071,20 +1077,6 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           ))}
       </div>
 
-      {/* Minimap — 畫布右下角 */}
-      <Minimap
-        tables={tables}
-        guests={guests}
-        zoom={zoom}
-        panX={panX}
-        panY={panY}
-        containerWidth={cw}
-        containerHeight={ch}
-        onNavigate={(lx, ly) => {
-          const { panX: px, panY: py } = centerOnPoint(lx, ly, zoom, cw, ch)
-          animateViewport(zoom, px, py, 200)
-        }}
-      />
 
       {/* Zoom Controls — 畫布左下角 */}
       {tables.length > 0 && (

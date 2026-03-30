@@ -105,7 +105,55 @@ export default function ImportPage() {
         if (!prefRes.ok) throw new Error('建立座位偏好失敗')
       }
 
-      // 4. 自動產生桌次（根據確認出席的席位數）
+      // 4. 建立群組標籤（如果有）
+      const tagAssignments: Array<{ guestId: string; tagName: string; category?: string }> = []
+      guestList.forEach((g, i) => {
+        if (g.rawTags.length === 0) return
+        const guestId = createdGuests[i]?.id
+        if (!guestId) return
+        for (const tagName of g.rawTags) {
+          tagAssignments.push({ guestId, tagName, category: g.category || undefined })
+        }
+      })
+      if (tagAssignments.length > 0) {
+        await fetch(`/api/events/${event.id}/tags/batch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ assignments: tagAssignments }),
+        })
+      }
+
+      // 5. 建立避免同桌（如果有）
+      const avoidPairs: Array<{ guestAId: string; guestBId: string }> = []
+      const seenAvoidPairs = new Set<string>()
+      guestList.forEach((g, i) => {
+        if (g.rawAvoids.length === 0) return
+        const guestAId = createdGuests[i]?.id
+        if (!guestAId) return
+        for (const avoidName of g.rawAvoids) {
+          // 用姓名配對
+          const targetIdx = guestList.findIndex((t) => t.name === avoidName)
+          if (targetIdx < 0) continue
+          const guestBId = createdGuests[targetIdx]?.id
+          if (!guestBId) continue
+          // 去重（A-B 和 B-A 只加一次）
+          const key = [guestAId, guestBId].sort().join('-')
+          if (seenAvoidPairs.has(key)) continue
+          seenAvoidPairs.add(key)
+          avoidPairs.push({ guestAId, guestBId })
+        }
+      })
+      if (avoidPairs.length > 0) {
+        await fetch(`/api/events/${event.id}/avoid-pairs/batch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ pairs: avoidPairs }),
+        })
+      }
+
+      // 6. 自動產生桌次（根據確認出席的席位數）
       const confirmedSeats = guestList
         .filter((g) => g.rsvpStatus === 'confirmed')
         .reduce((sum, g) => sum + g.attendeeCount, 0)

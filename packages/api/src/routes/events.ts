@@ -323,7 +323,90 @@ events.post('/:id/preferences/batch', async (c) => {
   return c.json({ count: created.length }, 201)
 })
 
+// ─── 標籤 ─────────────────────────────────────────────
+
+// POST /events/:id/tags/batch — 批次建立標籤並關聯賓客
+events.post('/:id/tags/batch', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const eventId = c.req.param('id')
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  const body = await c.req.json<{
+    assignments: Array<{ guestId: string; tagName: string; category?: string }>
+  }>()
+
+  // 收集所有唯一標籤名
+  const tagNames = [...new Set(body.assignments.map((a) => a.tagName))]
+
+  // upsert 標籤（同名不重複建立）
+  const tagMap = new Map<string, string>()
+  for (const name of tagNames) {
+    const category = body.assignments.find((a) => a.tagName === name)?.category
+    const tag = await prisma.tag.upsert({
+      where: { eventId_name: { eventId, name } },
+      create: { eventId, name, category: category || null },
+      update: {},
+    })
+    tagMap.set(name, tag.id)
+  }
+
+  // 批次建立 guestTag（跳過已存在的）
+  let created = 0
+  for (const a of body.assignments) {
+    const tagId = tagMap.get(a.tagName)
+    if (!tagId) continue
+    try {
+      await prisma.guestTag.create({
+        data: { guestId: a.guestId, tagId },
+      })
+      created++
+    } catch {
+      // unique constraint violation = 已存在，跳過
+    }
+  }
+
+  return c.json({ tags: tagNames.length, guestTags: created }, 201)
+})
+
 // ─── 避免同桌 ────────────────────────────────────────
+
+// POST /events/:id/avoid-pairs/batch — 批次建立避免同桌
+events.post('/:id/avoid-pairs/batch', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const eventId = c.req.param('id')
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  const body = await c.req.json<{
+    pairs: Array<{ guestAId: string; guestBId: string; reason?: string }>
+  }>()
+
+  let created = 0
+  for (const p of body.pairs) {
+    // 確保不重複（A-B 和 B-A 視為同一對）
+    const existing = await prisma.avoidPair.findFirst({
+      where: {
+        eventId,
+        OR: [
+          { guestAId: p.guestAId, guestBId: p.guestBId },
+          { guestAId: p.guestBId, guestBId: p.guestAId },
+        ],
+      },
+    })
+    if (existing) continue
+    await prisma.avoidPair.create({
+      data: { eventId, guestAId: p.guestAId, guestBId: p.guestBId, reason: p.reason },
+    })
+    created++
+  }
+
+  return c.json({ count: created }, 201)
+})
 
 // POST /events/:id/avoid-pairs
 events.post('/:id/avoid-pairs', async (c) => {

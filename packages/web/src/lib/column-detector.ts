@@ -10,10 +10,12 @@ export type SystemField =
   | 'aliases'
   | 'rsvpStatus'
   | 'category'
+  | 'tags'
   | 'attendeeCount'
   | 'dietaryNote'
   | 'specialNote'
   | 'seatPreferences'
+  | 'avoidGuests'
 
 export interface FieldMapping {
   field: SystemField
@@ -27,10 +29,12 @@ export const SYSTEM_FIELDS: FieldMapping[] = [
   { field: 'name', label: '姓名', required: true },
   { field: 'aliases', label: '外號/暱稱', required: false },
   { field: 'category', label: '分類（男方/女方）', required: false },
+  { field: 'tags', label: '群組/標籤', required: false },
   { field: 'attendeeCount', label: '帶眷屬', required: false },
   { field: 'dietaryNote', label: '葷素/飲食', required: false },
   { field: 'specialNote', label: '備註/特殊需求', required: false },
   { field: 'seatPreferences', label: '想同桌人選', required: false },
+  { field: 'avoidGuests', label: '避免同桌', required: false },
 ]
 
 /** 每個系統欄位的關鍵字（用於子字串比對） */
@@ -39,10 +43,12 @@ const FIELD_KEYWORDS: Record<SystemField, string[]> = {
   name: ['姓名', '名字', 'name', '全名'],
   aliases: ['外號', '暱稱', '別名', 'alias', 'nickname'],
   category: ['分類', '男方女方', '類別', 'category', '來賓分類'],
+  tags: ['群組', '標籤', '分組', 'group', 'tag', '圈子'],
   attendeeCount: ['眷屬', '+1', '攜伴', '帶人', 'plus one', 'guest count'],
   dietaryNote: ['葷素', '飲食', 'dietary', '素食', '忌口'],
   specialNote: ['備註', '需求', '特殊', 'note', '其他'],
   seatPreferences: ['同桌', '想跟誰坐', 'preference', '想坐', '同桌人選'],
+  avoidGuests: ['避免', '避桌', '不同桌', 'avoid', '迴避'],
 }
 
 /** 想同桌的多欄位模式（「想同桌 1」「想同桌 2」「想同桌 3」） */
@@ -71,10 +77,12 @@ export function detectColumns(headers: string[]): DetectionResult {
     aliases: null,
     rsvpStatus: null,
     category: null,
+    tags: null,
     attendeeCount: null,
     dietaryNote: null,
     specialNote: null,
     seatPreferences: null,
+    avoidGuests: null,
   }
 
   const multiMapping: MultiColumnMapping = {
@@ -82,10 +90,12 @@ export function detectColumns(headers: string[]): DetectionResult {
     aliases: [],
     rsvpStatus: [],
     category: [],
+    tags: [],
     attendeeCount: [],
     dietaryNote: [],
     specialNote: [],
     seatPreferences: [],
+    avoidGuests: [],
   }
 
   const usedHeaders = new Set<string>()
@@ -143,7 +153,9 @@ export interface RawGuest {
   attendeeCount: number
   dietaryNote: string
   specialNote: string
+  rawTags: string[]        // 群組標籤（大學同學、高中同學等）
   rawPreferences: string[] // 未配對的原始文字
+  rawAvoids: string[]      // 避免同桌的人名
 }
 
 export function normalizeGuest(
@@ -175,10 +187,27 @@ export function normalizeGuest(
     rsvpStatus = 'declined'
   }
 
+  // 解析群組標籤
+  const tagStr = get('tags')
+  const rawTags = tagStr
+    ? tagStr.split(/[,，、\n]/).map((t) => t.trim()).filter(Boolean)
+    : []
+
   // 解析眷屬：Form 填的是額外數（0 或 1），系統 +1
-  const extraRaw = get('attendeeCount')
-  const extra = parseInt(extraRaw, 10)
-  const attendeeCount = isNaN(extra) ? 1 : 1 + Math.max(0, extra)
+  // 支援多種填法：數字（0, 1, 2）、文字（有、是、帶老婆）、混合（1位、帶1人）
+  const extraRaw = get('attendeeCount').toLowerCase()
+  let extra: number
+  const numMatch = extraRaw.match(/\d+/)
+  if (numMatch) {
+    extra = parseInt(numMatch[0], 10)
+  } else if (['有', '是', 'yes', 'y', '帶'].some((k) => extraRaw.includes(k))) {
+    extra = 1
+  } else if (['無', '否', '沒', 'no', 'n'].some((k) => extraRaw.includes(k)) || extraRaw === '') {
+    extra = 0
+  } else {
+    extra = 0
+  }
+  const attendeeCount = 1 + Math.max(0, extra)
 
   // 解析想同桌人選
   let rawPreferences: string[] = []
@@ -191,21 +220,29 @@ export function normalizeGuest(
     const prefStr = get('seatPreferences')
     if (prefStr) {
       rawPreferences = prefStr
-        .split(/[,，\n]/)
+        .split(/[,，、\n\s]+/)
         .map((p) => p.trim())
         .filter(Boolean)
         .slice(0, 3) // 最多 3 位
     }
   }
 
+  // 解析避免同桌
+  const avoidStr = get('avoidGuests')
+  const rawAvoids = avoidStr
+    ? avoidStr.split(/[,，、\n\s]+/).map((p) => p.trim()).filter(Boolean)
+    : []
+
   return {
     name,
     aliases,
     category: get('category') || '',
     rsvpStatus,
+    rawTags,
     attendeeCount,
     dietaryNote: get('dietaryNote'),
     specialNote: get('specialNote'),
     rawPreferences,
+    rawAvoids,
   }
 }
