@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import {
@@ -18,6 +19,52 @@ import { SidePanel } from '@/components/workspace/SidePanel'
 import { DragOverlayContent } from '@/components/workspace/DragOverlayContent'
 import { ViolationModal } from '@/components/workspace/ViolationModal'
 
+function ExpandButton({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
+  const [show, setShow] = useState(false)
+  const btnRef = useRef<HTMLDivElement>(null)
+  const rect = btnRef.current?.getBoundingClientRect()
+  return (
+    <div
+      ref={btnRef}
+      className="shrink-0 flex items-center justify-center cursor-pointer bg-[var(--bg-primary)] hover:bg-[var(--accent-light)] overflow-hidden"
+      style={{
+        width: collapsed ? 28 : 0,
+        borderRight: collapsed ? '1px solid var(--border)' : 'none',
+        transition: 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+        position: 'relative',
+        zIndex: 20,
+      }}
+      onClick={onClick}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      <ChevronRight size={14} className="shrink-0" style={{ color: 'var(--text-muted)' }} />
+      {show && collapsed && rect && createPortal(
+        <div style={{
+          position: 'fixed',
+          left: rect.right + 8,
+          top: rect.top + rect.height / 2,
+          transform: 'translateY(-50%)',
+          background: 'var(--bg-surface, #fff)',
+          color: 'var(--text-secondary, #78716C)',
+          border: '1px solid var(--border, #E7E5E4)',
+          padding: '4px 10px',
+          borderRadius: 6,
+          fontSize: 12,
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          fontFamily: 'var(--font-body)',
+          boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
+        }}>
+          展開待排區 <kbd style={{ background: '#F5F5F4', border: '1px solid var(--border, #E7E5E4)', borderRadius: 3, padding: '1px 4px', fontSize: 10, marginLeft: 4, color: 'var(--text-primary, #1C1917)' }}>Q</kbd>
+        </div>,
+        document.body,
+      )}
+    </div>
+  )
+}
+
 export default function WorkspacePage() {
   const { eventId } = useParams<{ eventId: string }>()
   const loadEvent = useSeatingStore((s) => s.loadEvent)
@@ -32,6 +79,20 @@ export default function WorkspacePage() {
   const [activeGuest, setActiveGuest] = useState<Guest | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const floorPlanRef = useRef<FloorPlanHandle>(null)
+
+  // 快捷鍵 [ 或 ] toggle 待排區
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+      if (e.key === 'q' || e.key === 'Q') {
+        e.preventDefault()
+        setSidebarCollapsed((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   // 違規確認 modal 狀態
   const [pendingMove, setPendingMove] = useState<{
@@ -190,34 +251,21 @@ export default function WorkspacePage() {
 
         <div className="flex-1 flex overflow-hidden">
           {/* 折疊時的展開條（永遠渲染，寬度跟側邊欄同步動畫） */}
-          <div
-            className="shrink-0 flex items-center justify-center cursor-pointer bg-[var(--bg-primary)] hover:bg-[var(--accent-light)] overflow-hidden"
-            style={{
-              width: sidebarCollapsed ? 28 : 0,
-              borderRight: sidebarCollapsed ? '1px solid var(--border)' : 'none',
-              transition: 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-              position: 'relative',
-              zIndex: 20,
-            }}
-            onClick={() => setSidebarCollapsed(false)}
-            title="展開側邊欄"
-          >
-            <ChevronRight size={14} className="shrink-0" style={{ color: 'var(--text-muted)' }} />
-          </div>
+          <ExpandButton collapsed={sidebarCollapsed} onClick={() => setSidebarCollapsed(false)} />
           {/* 側邊欄 — z-index 高於 SVG 溢出的推薦線 */}
           <div
             className="shrink-0 overflow-hidden relative z-10"
             style={{
-              width: sidebarCollapsed ? 0 : 288,
+              width: sidebarCollapsed ? 0 : 320,
               borderRight: sidebarCollapsed ? 'none' : '1px solid var(--border)',
               background: 'var(--bg-primary)',
               transition: 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
             <div style={{
-              width: 288,
+              width: 320,
               height: '100%',
-              transform: sidebarCollapsed ? 'translateX(-288px)' : 'none',
+              transform: sidebarCollapsed ? 'translateX(-320px)' : 'none',
               transition: 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
             }}>
               <SidePanel onCollapse={() => setSidebarCollapsed(true)} />

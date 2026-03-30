@@ -105,7 +105,7 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
       <div>
         <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>資料預覽（共 <span className="font-data">{allGuests.length}</span> 筆）</h3>
         <div className="overflow-x-auto max-h-80 overflow-y-auto" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-          <table className="min-w-full text-sm">
+          <table className="min-w-full text-sm" style={{ whiteSpace: 'nowrap' }}>
             <thead className="sticky top-0" style={{ background: 'var(--bg-primary)' }}>
               <tr>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>#</th>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useDroppable } from '@dnd-kit/core'
 import { ChevronLeft, Wand2, Scale, Star } from 'lucide-react'
@@ -6,6 +6,48 @@ import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
 import { GuestChip } from './GuestChip'
 import type { AutoAssignMode } from '@/lib/auto-assign'
+
+function CollapseButton({ onCollapse }: { onCollapse: () => void }) {
+  const [show, setShow] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const rect = btnRef.current?.getBoundingClientRect()
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={onCollapse}
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        className="flex items-center justify-center w-6 h-6 rounded cursor-pointer hover:bg-[var(--accent-light)]"
+        style={{ color: 'var(--text-muted)', flexShrink: 0 }}
+      >
+        <ChevronLeft size={14} />
+      </button>
+      {show && rect && createPortal(
+        <div style={{
+          position: 'fixed',
+          left: rect.right + 8,
+          top: rect.top + rect.height / 2,
+          transform: 'translateY(-50%)',
+          background: 'var(--bg-surface, #fff)',
+          color: 'var(--text-secondary, #78716C)',
+          border: '1px solid var(--border, #E7E5E4)',
+          padding: '4px 10px',
+          borderRadius: 6,
+          fontSize: 12,
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          fontFamily: 'var(--font-body)',
+          boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
+        }}>
+          收合待排區 <kbd style={{ background: '#F5F5F4', border: '1px solid var(--border, #E7E5E4)', borderRadius: 3, padding: '1px 4px', fontSize: 10, marginLeft: 4, color: 'var(--text-primary, #1C1917)' }}>Q</kbd>
+        </div>,
+        document.body,
+      )}
+    </>
+  )
+}
 
 function TableActions({ tableId, guestCount }: { tableId: string; guestCount: number }) {
   const moveGuest = useSeatingStore((s) => s.moveGuest)
@@ -291,16 +333,7 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
               {isOver && (
                 <span className="text-xs" style={{ color: 'var(--accent-dark)' }}>放開以取消安排</span>
               )}
-              {onCollapse && (
-                <button
-                  onClick={onCollapse}
-                  className="flex items-center justify-center w-6 h-6 rounded cursor-pointer hover:bg-[var(--accent-light)]"
-                  style={{ color: 'var(--text-muted)', flexShrink: 0 }}
-                  title="收合側邊欄"
-                >
-                  <ChevronLeft size={14} />
-                </button>
-              )}
+              {onCollapse && <CollapseButton onCollapse={onCollapse} />}
             </div>
           </div>
           <input

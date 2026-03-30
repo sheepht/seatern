@@ -164,8 +164,8 @@ export default function ImportPage() {
         const cols = Math.ceil(Math.sqrt(tableCount))
         const row = Math.floor(i / cols)
         const col = i % cols
-        const spacingX = 250
-        const spacingY = 250
+        const spacingX = 350
+        const spacingY = 350
         const startX = 200
         const startY = 200
 
