@@ -991,6 +991,90 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         )
       })()}
 
+      {/* 畫布外的推薦目的桌指示器 */}
+      {recommendations.length > 0 && hoveredGuestId && (() => {
+        const svg = svgRef.current
+        const container = containerRef.current
+        if (!svg || !container) return null
+        const ctm = svg.getScreenCTM()
+        if (!ctm) return null
+        const cRect = container.getBoundingClientRect()
+        const margin = 12 // 邊緣內縮
+
+        const indicators: Array<{ x: number; y: number; name: string; delta: number; color: string }> = []
+
+        for (const rec of recommendations) {
+          const t = tables.find((tb) => tb.id === rec.tableId)
+          if (!t) continue
+
+          // 桌子的螢幕座標（相對於容器）
+          const screenX = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - cRect.left
+          const screenY = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - cRect.top
+          const tableRadius = Math.max(58 + Math.min(t.capacity, 12) * 7, 88) * ctm.a
+
+          // 檢查桌子是否在可見範圍內（含半徑）
+          if (screenX + tableRadius > 0 && screenX - tableRadius < cw &&
+              screenY + tableRadius > 0 && screenY - tableRadius < ch) continue
+
+          // 桌子在畫布外 — 計算指示器位置（容器邊緣）
+          const cx = cw / 2
+          const cy = ch / 2
+          const dx = screenX - cx
+          const dy = screenY - cy
+          const absDx = Math.abs(dx)
+          const absDy = Math.abs(dy)
+
+          let edgeX: number, edgeY: number
+          // 用斜率判斷碰到哪個邊
+          if (absDx / (cw / 2) > absDy / (ch / 2)) {
+            // 碰左右邊
+            edgeX = dx > 0 ? cw - margin : margin
+            edgeY = cy + dy * ((edgeX - cx) / dx)
+          } else {
+            // 碰上下邊
+            edgeY = dy > 0 ? ch - margin : margin
+            edgeX = cx + dx * ((edgeY - cy) / dy)
+          }
+          edgeX = Math.max(margin, Math.min(cw - margin, edgeX))
+          edgeY = Math.max(margin + 10, Math.min(ch - margin - 10, edgeY))
+
+          const onlyOne = recommendations.length === 1
+          const deltas = recommendations.map((r) => r.guestDelta)
+          const maxDelta = Math.max(...deltas)
+          const allSame = new Set(deltas).size === 1
+          const badgeColor = onlyOne ? '#16A34A' : (allSame ? '#CA8A04' : (rec.guestDelta === maxDelta ? '#16A34A' : '#CA8A04'))
+
+          indicators.push({ x: edgeX, y: edgeY, name: t.name, delta: rec.guestDelta, color: badgeColor })
+        }
+
+        if (indicators.length === 0) return null
+
+        return indicators.map((ind, i) => (
+          <div
+            key={`offscreen-${i}`}
+            style={{
+              position: 'absolute',
+              left: ind.x,
+              top: ind.y,
+              transform: 'translate(-50%, -50%)',
+              background: ind.color,
+              color: 'white',
+              padding: '3px 10px',
+              borderRadius: 12,
+              fontSize: 12,
+              fontWeight: 700,
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              zIndex: 30,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            }}
+          >
+            {ind.name} +{ind.delta}
+          </div>
+        ))
+      })()}
+
       {/* HTML overlay 層（拖桌子或重排動畫時禁用） */}
       <div style={{ pointerEvents: (draggingTableId || isResetting || flyingGuestIds.size > 0) ? 'none' : undefined }}>
         {/* 每個座位的 drop zone（含空位） */}
