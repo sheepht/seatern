@@ -1,7 +1,7 @@
 import { useCallback, useState, useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useSeatingStore, type Guest } from '@/stores/seating'
-import { recalculateAll } from '@/lib/satisfaction'
+import { recalculateAll, getSatisfactionColor } from '@/lib/satisfaction'
 import { computeAvoidancePath, getPathEndDirection } from '@/lib/path-routing'
 import { calculateFitAll, centerOnPoint } from '@/lib/viewport'
 import { TableNode } from './TableNode'
@@ -52,6 +52,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
   const flyingGuestIds = useSeatingStore((s) => s.flyingGuestIds)
   const isResetting = useSeatingStore((s) => s.isResetting)
+  const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress)
   const selectedTableId = useSeatingStore((s) => s.selectedTableId)
   const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
   const updateTablePosition = useSeatingStore((s) => s.updateTablePosition)
@@ -1099,6 +1100,79 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       )}
 
       {/* 空位點擊 → 選擇賓客 popover */}
+      {/* 自動分配進度 overlay — 全畫布遮罩 + 中央進度卡 */}
+      {autoAssignProgress && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(250,250,250,0.6)',
+          zIndex: 50,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: 'var(--bg-surface, #fff)',
+            border: '1px solid var(--border, #E7E5E4)',
+            borderRadius: 'var(--radius-lg, 12px)',
+            boxShadow: '0 8px 30px rgba(28,25,23,0.12)',
+            padding: '28px 36px',
+            fontFamily: 'var(--font-body)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 14,
+            minWidth: 280,
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary, #1C1917)' }}>
+              {autoAssignProgress.label}
+            </div>
+            {/* 進度條 — 顏色依進度百分比 */}
+            <div style={{ width: '100%', height: 8, background: '#E7E5E4', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                background: getSatisfactionColor(autoAssignProgress.progress * 100),
+                borderRadius: 4,
+                width: `${Math.max(3, autoAssignProgress.progress * 100)}%`,
+                transition: 'width 200ms ease-out, background 400ms ease-out',
+              }} />
+            </div>
+            {autoAssignProgress.detail && (() => {
+              const parts = autoAssignProgress.detail.split(' · ')
+              return (
+                <div style={{ textAlign: 'center' }}>
+                  {parts.map((p, i) => (
+                    <div key={i} style={{ fontSize: 14, color: 'var(--text-secondary, #78716C)', lineHeight: 1.6 }}>{p}</div>
+                  ))}
+                </div>
+              )
+            })()}
+            <div style={{ fontSize: 14, color: 'var(--text-muted, #A8A29E)' }}>
+              {autoAssignProgress.remainingSeconds !== null && autoAssignProgress.remainingSeconds > 0 ? (
+                autoAssignProgress.remainingSeconds < 60
+                  ? `預計剩餘 ${autoAssignProgress.remainingSeconds} 秒`
+                  : `預計剩餘約 ${Math.ceil(autoAssignProgress.remainingSeconds / 60)} 分鐘`
+              ) : '計算中...'}
+            </div>
+            <button
+              onClick={() => useSeatingStore.getState().cancelAutoAssign()}
+              className="cursor-pointer hover:bg-black/5"
+              style={{
+                padding: '6px 20px',
+                borderRadius: 6,
+                fontSize: 13,
+                border: '1px solid var(--border)',
+                background: 'transparent',
+                color: 'var(--text-secondary)',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
+
       {seatPopover && (
         <SeatPopover
           tableId={seatPopover.tableId}

@@ -1,9 +1,10 @@
 /**
- * 自動最佳化排桌演算法
+ * 自動最佳化排桌演算法（非同步版本，不阻塞主線程）
  *
  * 策略：貪婪分群 + 局部搜尋
  * Step 1: 按群組和偏好分群，填入桌子
  * Step 2: 嘗試單人移動和兩人交換，依模式選擇接受條件
+ * Step 3: 消除「想換桌」標記
  *
  * 兩種模式：
  * - balanced: 最大化全場平均滿意度（皆大歡喜）
@@ -12,7 +13,7 @@
  * 只排「未分配」的賓客，保留已排的不動。
  */
 
-import type { Guest, Table, AvoidPair } from '@/stores/seating'
+import type { Guest, Table, AvoidPair } from './types'
 import { recalculateAll } from './satisfaction'
 
 export type AutoAssignMode = 'balanced' | 'maximize-happy'
@@ -22,16 +23,69 @@ interface Assignment {
   tableId: string
 }
 
+export interface AutoAssignProgress {
+  /** 使用者看得懂的描述 */
+  label: string
+  /** 具體的嘗試進度（如「已嘗試 1,200 / 9,000 種組合」） */
+  detail: string
+  /** 0-1 整體進度 */
+  progress: number
+  /** 全場平均滿意度 */
+  currentAvg: number
+  /** 預估剩餘秒數（null = 尚未估算或資料不足） */
+  remainingSeconds: number | null
+}
+
 /**
- * 自動分配未入座的賓客到桌子
+ * 預估自動分配所需時間（秒）
+ * 跑一輪 recalculateAll 測量耗時，乘以預估的迭代次數
+ */
+export function estimateAutoAssignTime(
+  guests: Guest[],
+  tables: Table[],
+  avoidPairs: AvoidPair[],
+): number {
+  const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
+  const unassigned = confirmed.filter((g) => !g.assignedTableId)
+  if (unassigned.length === 0) return 0
+
+  // 測量單次 recalculateAll 耗時
+  const t0 = performance.now()
+  recalculateAll(guests, tables, avoidPairs)
+  const singleCallMs = performance.now() - t0
+
+  // Step 2 每輪：N_assigned * N_tables (moves) + N_assigned^2/2 (swaps)
+  const nAssigned = unassigned.length
+  const nTables = tables.length
+  const step2CallsPerRound = nAssigned * nTables + (nAssigned * (nAssigned - 1)) / 2
+  const step2Rounds = 10 // 平均約跑一半的 MAX_ROUNDS
+  const step2Calls = step2CallsPerRound * step2Rounds
+
+  // Step 3 每輪：N_all_seated * N_tables
+  const nAllSeated = confirmed.length
+  const step3CallsPerRound = nAllSeated * nTables
+  const step3Rounds = 5 // 平均約 5 輪
+  const step3Calls = step3CallsPerRound * step3Rounds
+
+  const totalMs = (step2Calls + step3Calls) * singleCallMs
+  return Math.ceil(totalMs / 1000)
+}
+
+/** yield 回主線程，讓 UI 有機會更新 */
+const yieldToMain = () => new Promise<void>((r) => setTimeout(r, 0))
+
+/**
+ * 自動分配未入座的賓客到桌子（非同步，不阻塞 UI）
+ * @param onProgress 進度回呼（每輪呼叫一次）
  * @returns 每位賓客的桌次分配
  */
-export function autoAssignGuests(
+export async function autoAssignGuests(
   guests: Guest[],
   tables: Table[],
   avoidPairs: AvoidPair[],
   mode: AutoAssignMode = 'balanced',
-): Assignment[] {
+  onProgress?: (progress: AutoAssignProgress) => void,
+): Promise<Assignment[]> {
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
   const unassigned = confirmed.filter((g) => !g.assignedTableId)
   if (unassigned.length === 0) return []
@@ -45,6 +99,20 @@ export function autoAssignGuests(
   }
 
   // ─── Step 1: 貪婪分群 ──────────────────────────────
+
+  const startTime = performance.now()
+
+  const reportProgress = (label: string, detail: string, progress: number, avg: number) => {
+    const elapsed = (performance.now() - startTime) / 1000
+    // 跑超過 3 秒且進度 > 5% 才顯示預估，避免一開始就出現不準的數字
+    let remainingSeconds: number | null = null
+    if (elapsed > 3 && progress > 0.05 && progress < 1) {
+      remainingSeconds = Math.ceil((elapsed / progress) * (1 - progress))
+    }
+    onProgress?.({ label, detail, progress, currentAvg: avg, remainingSeconds })
+  }
+
+  reportProgress('正在分組...', `${unassigned.length} 位賓客待分配`, 0.02, 0)
 
   // 建立賓客間的親和度矩陣（用於分群）
   const affinityMap = new Map<string, Map<string, number>>()
@@ -146,6 +214,7 @@ export function autoAssignGuests(
   })
 
   const baseResult = recalculateAll(simGuests, tables, avoidPairs)
+  // 不在 Step 1 結束時顯示分佈（此時很多人分數低，會誤導使用者）
   let currentAvg = baseResult.overallAverage
   let currentHappyCount = countHappy(baseResult)
   const assignedIds = [...assigned.keys()]
@@ -174,13 +243,29 @@ export function autoAssignGuests(
   }
 
   const MAX_ROUNDS = 20 // 最多改善 20 輪
+  const nTables = tables.length
+  const step2CombosPerRound = assignedIds.length * nTables + (assignedIds.length * (assignedIds.length - 1)) / 2
+  const step2TotalCombos = step2CombosPerRound * MAX_ROUNDS
+
   for (let round = 0; round < MAX_ROUNDS; round++) {
+    // Step 2 佔整體 10%~80%
+    const step2Progress = 0.1 + (round / MAX_ROUNDS) * 0.7
+    const triedSoFar = Math.round(round * step2CombosPerRound)
+    reportProgress(
+      '尋找更好的座位組合...',
+      `第 ${round + 1}/${MAX_ROUNDS} 輪 · 已嘗試 ${triedSoFar.toLocaleString()} / ${Math.round(step2TotalCombos).toLocaleString()} 種組合`,
+      step2Progress,
+      currentAvg,
+    )
+    await yieldToMain()
+
     refreshSeatCounts()
     let bestImprovement = 0.01 // 最小改善門檻
     let bestMove: { type: 'move'; guestId: string; tableId: string } | { type: 'swap'; a: string; b: string } | null = null
     let bestResult: ReturnType<typeof recalculateAll> | null = null
 
     // 2a: 嘗試單人移動（把一個人移到另一桌）
+    let calcCount = 0
     for (const guestId of assignedIds) {
       const guest = simGuests.find((g) => g.id === guestId)!
       for (const t of tables) {
@@ -196,6 +281,7 @@ export function autoAssignGuests(
           bestMove = { type: 'move', guestId, tableId: t.id }
           bestResult = result
         }
+        if (++calcCount % 200 === 0) await yieldToMain()
       }
     }
 
@@ -227,6 +313,7 @@ export function autoAssignGuests(
           bestMove = { type: 'swap', a: assignedIds[i], b: assignedIds[j] }
           bestResult = result
         }
+        if (++calcCount % 200 === 0) await yieldToMain()
       }
     }
 
@@ -259,6 +346,16 @@ export function autoAssignGuests(
 
   const MAX_ELIM_ROUNDS = 50
   for (let round = 0; round < MAX_ELIM_ROUNDS; round++) {
+    // Step 3 佔整體 80%~100%
+    const step3Progress = 0.8 + (round / MAX_ELIM_ROUNDS) * 0.2
+    reportProgress(
+      '最後微調中...',
+      `檢查每位賓客是否有更好的位置（第 ${round + 1} 輪）`,
+      step3Progress,
+      currentAvg,
+    )
+    await yieldToMain()
+
     refreshSeatCounts()
     // 每輪重算所有人的滿意度（Step 1/2 只更新 assignedTableId，分數是舊的）
     const baseResult = recalculateAll(simGuests, tables, avoidPairs)
@@ -273,6 +370,7 @@ export function autoAssignGuests(
     // 找出所有會被標記「想換桌」的賓客，選改善最大的執行
     let bestCandidate: { guestId: string; tableId: string; guestDelta: number } | null = null
 
+    let step3CalcCount = 0
     for (const guestId of allSeatedIds) {
       const guest = simGuests.find((g) => g.id === guestId)!
       if (!guest.assignedTableId) continue
@@ -285,6 +383,7 @@ export function autoAssignGuests(
 
         const moved = simGuests.map((g) => g.id === guestId ? { ...g, assignedTableId: t.id } : g)
         const simResult = recalculateAll(moved, tables, avoidPairs)
+        if (++step3CalcCount % 200 === 0) await yieldToMain()
         const newGuestScore = simResult.guests.find((g) => g.id === guestId)?.satisfactionScore ?? 0
         const guestDelta = newGuestScore - guestCurrentScore
         const rawTableDelta = (simResult.tables.find((ts) => ts.id === t.id)?.averageSatisfaction ?? 0)

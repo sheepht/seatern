@@ -59,7 +59,13 @@ interface Props {
 /**
  * 取得姓名的後 2 個字
  */
-function getDisplayName(name: string): string {
+function getDisplayName(name: string, aliases?: string[]): string {
+  // 優先用暱稱（第一個），沒有再用名字後兩字
+  if (aliases && aliases.length > 0) {
+    const nick = aliases[0]
+    if (nick.length <= 3) return nick
+    return nick.slice(0, 3)
+  }
   if (name.length <= 2) return name
   return name.slice(-2)
 }
@@ -520,7 +526,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
                     fontFamily="'Noto Sans TC', sans-serif"
                     opacity={nameAlpha}
                   >
-                    {getDisplayName(seatPreviewGuest.name)}
+                    {getDisplayName(seatPreviewGuest.name, seatPreviewGuest.aliases)}
                   </text>
                 )}
               </g>
@@ -604,7 +610,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
         // 賓客本人
         const bgColor = CATEGORY_COLORS[seat.guest!.category] || '#F3F4F6'
         const textColor = CATEGORY_TEXT[seat.guest!.category] || '#374151'
-        const displayName = getDisplayName(seat.guest!.name)
+        const displayName = getDisplayName(seat.guest!.name, seat.guest!.aliases)
         const recGuestScore = recommendationGuestScore?.guestId === seat.guest!.id ? recommendationGuestScore.score : undefined
         const guestScore = previewScores?.get(seat.guest!.id) ?? recGuestScore ?? seat.guest!.satisfactionScore
         const guestSatColor = getSatisfactionColor(guestScore)

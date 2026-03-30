@@ -5,7 +5,7 @@
  * 權威來源：PRD（CLAUDE.md）§3.4
  */
 
-import type { Guest, Table, AvoidPair } from '@/stores/seating'
+import type { Guest, Table, AvoidPair } from './types'
 
 // ─── 群組分（0-20）──────────────────────────────────
 // 同桌有同群組的人佔比

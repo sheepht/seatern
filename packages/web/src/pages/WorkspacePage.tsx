@@ -75,6 +75,7 @@ export default function WorkspacePage() {
   const setActiveDragGuest = useSeatingStore((s) => s.setActiveDragGuest)
   const setDragPreview = useSeatingStore((s) => s.setDragPreview)
   const checkAvoidViolation = useSeatingStore((s) => s.checkAvoidViolation)
+  const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress)
 
   const [activeGuest, setActiveGuest] = useState<Guest | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -266,7 +267,9 @@ export default function WorkspacePage() {
               width: 320,
               height: '100%',
               transform: sidebarCollapsed ? 'translateX(-320px)' : 'none',
-              transition: 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+              transition: 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms',
+              opacity: autoAssignProgress ? 0.4 : 1,
+              pointerEvents: autoAssignProgress ? 'none' : undefined,
             }}>
               <SidePanel onCollapse={() => setSidebarCollapsed(true)} />
             </div>

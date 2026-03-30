@@ -237,7 +237,7 @@ function GuestRow({ prediction, onClick, highlight, tableId, seatIndex }: {
         e.currentTarget.style.background = highlight ? '#FEF3C7' : '#F5F5F4'
         useSeatingStore.setState({
           recommendationTableScores: new Map([[tableId, newTableAvg]]),
-          seatPreviewGuest: { tableId, seatIndex, guestId: guest.id, predictedScore, category: guest.category, name: guest.name },
+          seatPreviewGuest: { tableId, seatIndex, guestId: guest.id, predictedScore, category: guest.category, name: guest.name, aliases: guest.aliases },
         })
       }}
       onMouseLeave={(e) => {

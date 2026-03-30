@@ -50,9 +50,9 @@ export function GuestChip({ guest, animIndex }: Props) {
         setHoveredGuest(guest.id, rect.top + rect.height / 2)
       }}
       onMouseLeave={() => setHoveredGuest(null)}
-      title={`${guest.name}${guest.attendeeCount > 1 ? ` (+${guest.attendeeCount - 1})` : ''}${guest.dietaryNote ? ` [${guest.dietaryNote}]` : ''}`}
+      title={`${guest.name}${guest.aliases.length > 0 ? ` (${guest.aliases[0]})` : ''}${guest.attendeeCount > 1 ? ` +${guest.attendeeCount - 1}` : ''}${guest.dietaryNote ? ` [${guest.dietaryNote}]` : ''}`}
     >
-      {guest.name}
+      {guest.aliases.length > 0 ? guest.aliases[0] : guest.name}
       {guest.attendeeCount > 1 && (
         <span style={{ color: 'var(--text-muted)' }} className="ml-0.5">+{guest.attendeeCount - 1}</span>
       )}

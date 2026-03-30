@@ -1,47 +1,14 @@
 import { create } from 'zustand'
 import { recalculateAll } from '@/lib/satisfaction'
-import { autoAssignGuests as runAutoAssign, type AutoAssignMode } from '@/lib/auto-assign'
+import { type AutoAssignMode, type AutoAssignProgress } from '@/lib/auto-assign'
+import { runAutoAssignInWorker } from '@/lib/auto-assign-client'
 import { findFreePosition } from '@/lib/viewport'
 import { buildSlotArray, placeGuest, extractSeatIndices, type Slot } from '@/lib/seat-shift'
 
 // ─── Types ──────────────────────────────────────────
 
-export interface Guest {
-  id: string
-  name: string
-  aliases: string[]
-  category: string
-  relationScore: number
-  rsvpStatus: 'pending' | 'confirmed' | 'declined' | 'modified'
-  attendeeCount: number
-  dietaryNote: string
-  specialNote: string
-  satisfactionScore: number
-  assignedTableId: string | null
-  seatIndex: number | null
-  isOverflow: boolean
-  isIsolated: boolean
-  seatPreferences: Array<{ preferredGuestId: string; rank: number }>
-  guestTags: Array<{ tag: { id: string; name: string } }>
-}
-
-export interface Table {
-  id: string
-  name: string
-  capacity: number
-  positionX: number
-  positionY: number
-  averageSatisfaction: number
-  color: string | null
-  note: string | null
-}
-
-export interface AvoidPair {
-  id: string
-  guestAId: string
-  guestBId: string
-  reason: string | null
-}
+export type { Guest, Table, AvoidPair } from '@/lib/types'
+import type { Guest, Table, AvoidPair } from '@/lib/types'
 
 export interface SeatingSnapshot {
   id: string
@@ -90,7 +57,7 @@ interface SeatingState {
   /** 智慧推薦：最佳推薦的每位賓客預覽滿意度 */
   recommendationPreviewScores: Map<string, number>
   /** 空位 popover hover 預覽：顯示賓客預覽在指定空位 */
-  seatPreviewGuest: { tableId: string; seatIndex: number; guestId: string; predictedScore: number; category?: string; name: string } | null
+  seatPreviewGuest: { tableId: string; seatIndex: number; guestId: string; predictedScore: number; category?: string; name: string; aliases: string[] } | null
   /** 有更好位置的賓客 ID 集合（顯示💡圖示） */
   guestsWithRecommendations: Set<string>
   /** 上次重排的時間戳，用於觸發入場動畫 */
@@ -99,6 +66,11 @@ interface SeatingState {
   isResetting: boolean
   /** 正在飛行動畫中的賓客 ID（用於 undo 動畫隱藏個別賓客） */
   flyingGuestIds: Set<string>
+  /** 自動分配進度（null = 未執行） */
+  autoAssignProgress: AutoAssignProgress | null
+  /** 自動分配取消控制器 */
+  autoAssignAbort: AbortController | null
+  cancelAutoAssign: () => void
 
   // Undo stack
   undoStack: Array<
@@ -197,6 +169,12 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   lastResetAt: 0,
   isResetting: false,
   flyingGuestIds: new Set(),
+  autoAssignProgress: null,
+  autoAssignAbort: null,
+  cancelAutoAssign: () => {
+    const ctrl = get().autoAssignAbort
+    if (ctrl) ctrl.abort()
+  },
 
   loadEvent: async (eventId: string) => {
     set({ loading: true })
@@ -977,7 +955,22 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     }
 
     const latestGuests = get().guests
-    const assignments = runAutoAssign(latestGuests, currentTables, avoidPairs, mode)
+    const abortController = new AbortController()
+    set({
+      autoAssignProgress: { label: '正在分組...', detail: '', progress: 0, currentAvg: 0, remainingSeconds: null },
+      autoAssignAbort: abortController,
+    })
+    let assignments: Array<{ guestId: string; tableId: string }>
+    try {
+      assignments = await runAutoAssignInWorker(latestGuests, currentTables, avoidPairs, mode, (progress) => {
+        set({ autoAssignProgress: progress })
+      }, abortController.signal)
+    } catch (e: any) {
+      set({ autoAssignProgress: null, autoAssignAbort: null })
+      if (e?.name === 'AbortError') return // 使用者取消
+      throw e
+    }
+    set({ autoAssignProgress: null, autoAssignAbort: null })
     if (assignments.length === 0) return
 
     // 記錄原始分配（undo 用）

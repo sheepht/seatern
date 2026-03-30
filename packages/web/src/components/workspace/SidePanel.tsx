@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useDroppable } from '@dnd-kit/core'
 import { ChevronLeft, Wand2, Scale, Star } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
+import { estimateAutoAssignTimeInWorker } from '@/lib/auto-assign-client'
 import { getSatisfactionColor } from '@/lib/satisfaction'
 import { GuestChip } from './GuestChip'
 import type { AutoAssignMode } from '@/lib/auto-assign'
@@ -102,10 +103,13 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
   const tables = useSeatingStore((s) => s.tables)
   const getUnassignedGuests = useSeatingStore((s) => s.getUnassignedGuests)
   const autoAssignGuests = useSeatingStore((s) => s.autoAssignGuests)
+  const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress)
 
   const [search, setSearch] = useState('')
   const [assigning, setAssigning] = useState(false)
   const [showModeModal, setShowModeModal] = useState(false)
+  const [estimatedTime, setEstimatedTime] = useState<number | null>(null)
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs)
 
   const CATEGORY_BG: Record<string, string> = { '男方': '#DBEAFE', '女方': '#FEE2E2', '共同': '#F3F4F6' }
   const CATEGORY_CLR: Record<string, string> = { '男方': '#1E40AF', '女方': '#991B1B', '共同': '#374151' }
@@ -320,14 +324,19 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
             <div className="flex items-center gap-1">
               {unassignedGuests.length > 0 && (
                 <button
-                  onClick={() => setShowModeModal(true)}
+                  onClick={async () => {
+                    setShowModeModal(true)
+                    setEstimatedTime(null)
+                    const t = await estimateAutoAssignTimeInWorker(guests, tables, avoidPairs)
+                    setEstimatedTime(t)
+                  }}
                   disabled={assigning}
                   className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded cursor-pointer disabled:opacity-50 hover:brightness-90"
                   style={{ background: 'var(--accent)', color: 'white', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-display)' }}
                   title="自動分配所有待排賓客"
                 >
                   <Wand2 size={12} />
-                  {assigning ? '分配中...' : '自動分配'}
+                  自動分配
                 </button>
               )}
               {isOver && (
@@ -416,8 +425,16 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
         <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowModeModal(false)} />
           <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '28px', width: '400px', border: '1px solid var(--border)' }}>
-            <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '18px', fontFamily: 'var(--font-display)' }}>
+            <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', fontFamily: 'var(--font-display)' }}>
               選擇分配模式
+            </p>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              {estimatedTime !== null && (
+                estimatedTime < 5 ? '預估幾秒內完成' :
+                estimatedTime < 60 ? `預估約 ${estimatedTime} 秒` :
+                `預估約 ${Math.ceil(estimatedTime / 60)} 分鐘`
+              )}
+              {estimatedTime !== null && ` · ${unassignedGuests.length} 位待排賓客 · ${tables.length} 桌`}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {/* 均衡模式 */}
