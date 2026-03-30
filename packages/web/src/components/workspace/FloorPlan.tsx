@@ -751,7 +751,9 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
             if (g?.assignedTableId) highlightedIds.add(g.assignedTableId)
             for (const rec of recommendations) highlightedIds.add(rec.tableId)
           }
-          const shouldDim = highlightedIds.size > 0 && zoom >= 0.7
+          // 待排賓客的推薦不受 zoom 限制，已入座賓客的推薦 zoom >= 0.7 才 dim
+          const hoveredGuest = hoveredGuestId ? guests.find((gg) => gg.id === hoveredGuestId) : null
+          const shouldDim = highlightedIds.size > 0 && (zoom >= 0.7 || (hoveredGuest && !hoveredGuest.assignedTableId))
 
           // 選中的桌子排到陣列最後，確保 SVG DOM 順序最後 = 圖層最上面
           const orderedTables = [
