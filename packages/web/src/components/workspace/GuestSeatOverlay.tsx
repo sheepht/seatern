@@ -28,6 +28,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
   })
   const setHoveredGuest = useSeatingStore((s) => s.setHoveredGuest)
   const hoverSuppressedUntil = useSeatingStore((s) => s.hoverSuppressedUntil)
+  const moveGuest = useSeatingStore((s) => s.moveGuest)
   const delayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const size = radius * 2
@@ -47,6 +48,10 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         border: '1.5px dashed transparent',
         boxSizing: 'border-box',
         transition: 'border-color 150ms ease-out',
+      }}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        moveGuest(guest.id, null)
       }}
       onMouseEnter={(e) => {
         if (isDragging) return
