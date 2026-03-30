@@ -53,6 +53,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const flyingGuestIds = useSeatingStore((s) => s.flyingGuestIds)
   const isResetting = useSeatingStore((s) => s.isResetting)
   const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress)
+  const longPressActive = useSeatingStore((s) => s.longPressActive)
+  const bestSwapTableId = useSeatingStore((s) => s.bestSwapTableId)
   const selectedTableId = useSeatingStore((s) => s.selectedTableId)
   const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
   const updateTablePosition = useSeatingStore((s) => s.updateTablePosition)
@@ -759,7 +761,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
           /* 智慧推薦虛線：線+箭頭在桌子下層，badge 在桌子上層 */
           /* zoom < 0.7 時名字已淡出，無法辨識賓客，關閉推薦線 */
-          const recData: Array<{ pathD: string; endX: number; endY: number; ax1: number; ay1: number; ax2: number; ay2: number; midpoint: { x: number; y: number }; badgeColor: string; lineColor: string; opacity: number; delta: number; animIdx: number }> = []
+          const recData: Array<{ pathD: string; endX: number; endY: number; ax1: number; ay1: number; ax2: number; ay2: number; midpoint: { x: number; y: number }; badgeColor: string; lineColor: string; opacity: number; delta: number; animIdx: number; tableId: string }> = []
           if (recommendations.length > 0 && hoveredGuestId && zoom >= 0.7) {
             const guest = guests.find((g) => g.id === hoveredGuestId)
             if (guest && guest.assignedTableId && guest.seatIndex !== null) {
@@ -825,7 +827,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                   const badgeColor = seatedOnlyOne ? '#16A34A' : (seatedAllSame ? '#CA8A04' : (rec.guestDelta === seatedMaxDelta ? '#16A34A' : '#CA8A04'))
                   const lineColor = badgeColor === '#16A34A' ? '#16A34A' : '#B08D57'
 
-                  recData.push({ pathD, endX, endY, ax1, ay1, ax2, ay2, midpoint, badgeColor, lineColor, opacity: 0.9 - i * 0.15, delta: rec.guestDelta, animIdx: i })
+                  recData.push({ pathD, endX, endY, ax1, ay1, ax2, ay2, midpoint, badgeColor, lineColor, opacity: 0.9 - i * 0.15, delta: rec.guestDelta, animIdx: i, tableId: rec.tableId })
                 })
               }
             }
@@ -833,18 +835,22 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
           const recLines = recData.length > 0 ? (
             <g style={{ pointerEvents: 'none' }}>
-              {recData.map((r) => (
-                <g key={`rec-line-${r.animIdx}`} opacity={r.opacity}>
-                  <style>{`
-                    @keyframes rec-flow-${r.animIdx} {
-                      from { stroke-dashoffset: 0; }
-                      to { stroke-dashoffset: -16; }
-                    }
-                  `}</style>
-                  <path d={r.pathD} fill="none" stroke={r.lineColor} strokeWidth="2.5" strokeDasharray="10 6" style={{ animation: `rec-flow-${r.animIdx} 0.6s linear infinite` }} />
-                  <polygon points={`${r.endX},${r.endY} ${r.ax1},${r.ay1} ${r.ax2},${r.ay2}`} fill={r.lineColor} />
-                </g>
-              ))}
+              {recData.map((r) => {
+                const isSwapTarget = longPressActive && r.tableId === bestSwapTableId
+                const strokeW = isSwapTarget ? 5 : 2.5
+                return (
+                  <g key={`rec-line-${r.animIdx}`} opacity={isSwapTarget ? 1 : r.opacity}>
+                    <style>{`
+                      @keyframes rec-flow-${r.animIdx} {
+                        from { stroke-dashoffset: 0; }
+                        to { stroke-dashoffset: -16; }
+                      }
+                    `}</style>
+                    <path d={r.pathD} fill="none" stroke={r.lineColor} strokeWidth={strokeW} strokeDasharray="10 6" style={{ animation: `rec-flow-${r.animIdx} 0.6s linear infinite`, transition: 'stroke-width 200ms' }} />
+                    <polygon points={`${r.endX},${r.endY} ${r.ax1},${r.ay1} ${r.ax2},${r.ay2}`} fill={r.lineColor} />
+                  </g>
+                )
+              })}
             </g>
           ) : null
 

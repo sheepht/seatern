@@ -65,8 +65,10 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         // 長按 2 秒換位（與 dnd-kit 共存：不動 = 長按，移動 = 拖曳）
         if (hasSwapRec && bestSwapTableId) {
           setLongPressProgress(true)
+          useSeatingStore.setState({ longPressActive: true })
           longPressRef.current = setTimeout(() => {
             setLongPressProgress(false)
+            useSeatingStore.setState({ longPressActive: false })
             setTooltip(null)
             setHoveredGuest(null)
             // 找目標桌的第一個空位
@@ -85,7 +87,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
             let freeSeat = 0
             while (usedIndices.has(freeSeat)) freeSeat++
             moveGuestToSeat(guest.id, bestSwapTableId, freeSeat)
-          }, 2000)
+          }, 1500)
         }
         // 讓 dnd-kit 的 listener 也處理
         listeners?.onPointerDown?.(e as any)
@@ -93,6 +95,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
       onPointerUp={() => {
         if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null }
         setLongPressProgress(false)
+        useSeatingStore.setState({ longPressActive: false })
       }}
       onDoubleClick={(e) => {
         e.stopPropagation()
@@ -121,6 +124,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         if (delayRef.current) { clearTimeout(delayRef.current); delayRef.current = null }
         if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null }
         setLongPressProgress(false)
+        useSeatingStore.setState({ longPressActive: false })
         e.currentTarget.style.borderColor = 'transparent'
         setHoveredGuest(null)
         setTooltip(null)
@@ -174,7 +178,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
                 inset: 0,
                 background: 'rgba(255,255,255,0.3)',
                 transformOrigin: 'left',
-                animation: 'longpress-fill 2s linear forwards',
+                animation: 'longpress-fill 1.5s linear forwards',
               }} />
             )}
             <span style={{ position: 'relative' }}>長按換位</span>

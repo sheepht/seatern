@@ -62,6 +62,8 @@ interface SeatingState {
   guestsWithRecommendations: Set<string>
   /** 長按換位：hover 中賓客的最佳推薦目標桌 ID */
   bestSwapTableId: string | null
+  /** 長按換位進行中 */
+  longPressActive: boolean
   /** 上次重排的時間戳，用於觸發入場動畫 */
   lastResetAt: number
   /** 重排動畫進行中（桌上賓客淡出） */
@@ -168,6 +170,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   seatPreviewGuest: null,
   guestsWithRecommendations: new Set(),
   bestSwapTableId: null,
+  longPressActive: false,
   undoStack: [],
   lastResetAt: 0,
   isResetting: false,
