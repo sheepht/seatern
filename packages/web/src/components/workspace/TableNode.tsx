@@ -71,7 +71,7 @@ function getDisplayName(name: string, aliases?: string[]): string {
 }
 
 /** 桌次中央滿意度圓環（數字 + 進度弧線帶動畫） */
-function TableScoreRing({ score, originalScore, hasGuests }: { score: number; originalScore: number; hasGuests: boolean }) {
+function TableScoreRing({ score, originalScore, hasGuests, hideDelta }: { score: number; originalScore: number; hasGuests: boolean; hideDelta?: boolean }) {
   const ringRadius = 28
   const strokeW = 5
   const circumference = 2 * Math.PI * ringRadius
@@ -117,7 +117,7 @@ function TableScoreRing({ score, originalScore, hasGuests }: { score: number; or
         </text>
       </g>
       {/* ±N badge（在縮放 group 外面，不受影響） */}
-      {delta !== 0 && (
+      {delta !== 0 && !hideDelta && (
         <g transform={`translate(0, ${ringRadius + 16})`}>
           <rect
             x={-22}
@@ -452,6 +452,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
       {/* 滿意度圓環進度條 + 中央數字 — 比賓客更強的阻尼，縮小時相對變大 */}
       <g transform={`scale(${Math.pow(zoom, -0.45)})`} style={{ opacity: isResetting ? 0 : 1 }}>
         <TableScoreRing
+          hideDelta
           score={(() => {
             if (previewTableScore != null) return previewTableScore
             const recScore = recommendationTableScores.get(table.id)
@@ -743,6 +744,34 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
       })}
 
       </g>{/* 結束賓客圖層 */}
+
+      {/* ±N badge — 渲染在所有賓客之上 */}
+      {(() => {
+        const ringScore = (() => {
+          if (previewTableScore != null) return previewTableScore
+          const recScore = recommendationTableScores.get(table.id)
+          if (recScore != null) {
+            const hg = hoveredGuestId ? allGuests.find((g) => g.id === hoveredGuestId) : null
+            if (zoom >= 0.7 || (hg && !hg.assignedTableId)) return recScore
+          }
+          return guests.length > 0 ? table.averageSatisfaction : 0
+        })()
+        const origScore = guests.length > 0 ? table.averageSatisfaction : 0
+        const d = formatScoreDelta(ringScore - origScore)
+        if (d === 0) return null
+        const scoreScale = Math.pow(zoom, -0.45)
+        const ringR = 28
+        return (
+          <g transform={`scale(${scoreScale})`}>
+            <g transform={`translate(0, ${ringR + 16})`}>
+              <rect x={-22} y={-13} width={44} height={26} rx={13} fill={d > 0 ? '#16A34A' : '#DC2626'} />
+              <text y={5} textAnchor="middle" fill="white" fontSize="14" fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
+                {d > 0 ? '+' : ''}{d}
+              </text>
+            </g>
+          </g>
+        )
+      })()}
 
     </g>
 
