@@ -265,7 +265,7 @@ function GuestRow({ prediction, onClick, highlight, tableId, seatIndex }: {
 
       {/* 姓名 */}
       <span style={{ fontSize: '13px', fontWeight: 500, color: '#1C1917', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {guest.name}
+        {guest.aliases?.length > 0 ? guest.aliases[0] : guest.name}
       </span>
 
       {/* 預測分數 + 桌均 delta */}
