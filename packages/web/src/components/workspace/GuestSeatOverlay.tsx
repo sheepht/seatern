@@ -30,8 +30,14 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
   const setHoveredGuest = useSeatingStore((s) => s.setHoveredGuest)
   const hoverSuppressedUntil = useSeatingStore((s) => s.hoverSuppressedUntil)
   const moveGuest = useSeatingStore((s) => s.moveGuest)
+  const guestsWithRecommendations = useSeatingStore((s) => s.guestsWithRecommendations)
+  const bestSwapTableId = useSeatingStore((s) => s.bestSwapTableId)
+  const moveGuestToSeat = useSeatingStore((s) => s.moveGuestToSeat)
+  const hasSwapRec = guestsWithRecommendations.has(guest.id)
   const delayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null)
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; r: number } | null>(null)
+  const [longPressProgress, setLongPressProgress] = useState(false)
   const elRef = useRef<HTMLDivElement | null>(null)
 
   const size = radius * 2
@@ -41,7 +47,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
     <>
     <div
       ref={(el) => { setNodeRef(el); elRef.current = el }}
-      {...listeners}
+      {...Object.fromEntries(Object.entries(listeners || {}).filter(([k]) => k !== 'onPointerDown'))}
       {...attributes}
       className="absolute rounded-full cursor-grab"
       style={{
@@ -54,6 +60,39 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         border: '1.5px dashed transparent',
         boxSizing: 'border-box',
         transition: 'border-color 150ms ease-out',
+      }}
+      onPointerDown={(e) => {
+        // 長按 2 秒換位（與 dnd-kit 共存：不動 = 長按，移動 = 拖曳）
+        if (hasSwapRec && bestSwapTableId) {
+          setLongPressProgress(true)
+          longPressRef.current = setTimeout(() => {
+            setLongPressProgress(false)
+            setTooltip(null)
+            setHoveredGuest(null)
+            // 找目標桌的第一個空位
+            const targetTable = useSeatingStore.getState().tables.find((t) => t.id === bestSwapTableId)
+            if (!targetTable) return
+            const tableGuests = useSeatingStore.getState().guests.filter(
+              (g) => g.assignedTableId === bestSwapTableId && g.rsvpStatus === 'confirmed',
+            )
+            const usedIndices = new Set<number>()
+            for (const g of tableGuests) {
+              if (g.seatIndex !== null) {
+                usedIndices.add(g.seatIndex)
+                for (let c = 1; c < g.attendeeCount; c++) usedIndices.add((g.seatIndex + c) % targetTable.capacity)
+              }
+            }
+            let freeSeat = 0
+            while (usedIndices.has(freeSeat)) freeSeat++
+            moveGuestToSeat(guest.id, bestSwapTableId, freeSeat)
+          }, 2000)
+        }
+        // 讓 dnd-kit 的 listener 也處理
+        listeners?.onPointerDown?.(e as any)
+      }}
+      onPointerUp={() => {
+        if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null }
+        setLongPressProgress(false)
       }}
       onDoubleClick={(e) => {
         e.stopPropagation()
@@ -76,35 +115,73 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         }
         // 立刻顯示 tooltip
         const rect = el.getBoundingClientRect()
-        setTooltip({ x: rect.left + rect.width / 2, y: rect.top - 4 })
+        setTooltip({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, r: rect.width / 2 })
       }}
       onMouseLeave={(e) => {
         if (delayRef.current) { clearTimeout(delayRef.current); delayRef.current = null }
+        if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null }
+        setLongPressProgress(false)
         e.currentTarget.style.borderColor = 'transparent'
         setHoveredGuest(null)
         setTooltip(null)
       }}
     />
     {tooltip && createPortal(
-      <div style={{
-        position: 'fixed',
-        left: tooltip.x,
-        top: tooltip.y,
-        transform: 'translate(-50%, -100%)',
-        background: 'var(--bg-surface, #fff)',
-        color: 'var(--text-secondary, #78716C)',
-        border: '1px solid var(--border, #E7E5E4)',
-        padding: '4px 10px',
-        borderRadius: 6,
-        fontSize: 12,
-        whiteSpace: 'nowrap',
-        pointerEvents: 'none',
-        zIndex: 9999,
-        fontFamily: 'var(--font-body)',
-        boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
-      }}>
-        {displayName} · 雙擊移除
-      </div>,
+      <>
+        {/* 右側：雙擊移除 */}
+        <div style={{
+          position: 'fixed',
+          left: tooltip.x + tooltip.r + 6,
+          top: tooltip.y,
+          transform: 'translateY(-50%)',
+          background: 'var(--bg-surface, #fff)',
+          color: 'var(--text-secondary, #78716C)',
+          border: '1px solid var(--border, #E7E5E4)',
+          padding: '4px 10px',
+          borderRadius: 6,
+          fontSize: 12,
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          fontFamily: 'var(--font-body)',
+          boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
+        }}>
+          雙擊移除
+        </div>
+        {/* 左側：長按換位（僅有換位推薦時顯示） */}
+        {hasSwapRec && (
+          <div style={{
+            position: 'fixed',
+            left: tooltip.x - tooltip.r - 6,
+            top: tooltip.y,
+            transform: 'translate(-100%, -50%)',
+            background: '#B08D57',
+            color: 'white',
+            padding: '4px 10px',
+            borderRadius: 6,
+            fontSize: 12,
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            zIndex: 9999,
+            fontFamily: 'var(--font-body)',
+            boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
+            overflow: 'hidden',
+          }}>
+            {/* 長按進度條 */}
+            {longPressProgress && (
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(255,255,255,0.3)',
+                transformOrigin: 'left',
+                animation: 'longpress-fill 2s linear forwards',
+              }} />
+            )}
+            <span style={{ position: 'relative' }}>長按換位</span>
+            <style>{`@keyframes longpress-fill { from { transform: scaleX(0) } to { transform: scaleX(1) } }`}</style>
+          </div>
+        )}
+      </>,
       document.body,
     )}
     </>

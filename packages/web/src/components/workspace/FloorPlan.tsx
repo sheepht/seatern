@@ -170,11 +170,24 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       const bestGuest = recs.length > 0 ? { guestId, score: recs[0].newGuestScore } : null
       const bestOverall = recs.length > 0 ? recs[0].newOverallAvg : null
       const bestPreviewScores = recs.length > 0 ? recs[0].newGuestScores : new Map<string, number>()
+
+      // 長按換位：選最佳目標桌（分數最高 → 整體提升最多 → 第一條）
+      let bestSwapTableId: string | null = null
+      if (recs.length > 0) {
+        const sorted = [...recs].sort((a, b) => {
+          if (b.guestDelta !== a.guestDelta) return b.guestDelta - a.guestDelta
+          if (b.overallDelta !== a.overallDelta) return b.overallDelta - a.overallDelta
+          return 0
+        })
+        bestSwapTableId = sorted[0].tableId
+      }
+
       useSeatingStore.setState({
         recommendationTableScores: scores,
         recommendationGuestScore: bestGuest,
         recommendationOverallScore: bestOverall,
         recommendationPreviewScores: bestPreviewScores,
+        bestSwapTableId,
       })
     }
 
@@ -1001,7 +1014,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         const cRect = container.getBoundingClientRect()
         const margin = 12 // 邊緣內縮
 
-        const indicators: Array<{ x: number; y: number; name: string; delta: number; color: string }> = []
+        const indicators: Array<{ x: number; y: number; name: string; delta: number; color: string; edge: 'left' | 'right' | 'top' | 'bottom' }> = []
 
         for (const rec of recommendations) {
           const t = tables.find((tb) => tb.id === rec.tableId)
@@ -1024,14 +1037,16 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           const absDx = Math.abs(dx)
           const absDy = Math.abs(dy)
 
-          let edgeX: number, edgeY: number
+          let edgeX: number, edgeY: number, edge: 'left' | 'right' | 'top' | 'bottom'
           // 用斜率判斷碰到哪個邊
           if (absDx / (cw / 2) > absDy / (ch / 2)) {
             // 碰左右邊
+            edge = dx > 0 ? 'right' : 'left'
             edgeX = dx > 0 ? cw - margin : margin
             edgeY = cy + dy * ((edgeX - cx) / dx)
           } else {
             // 碰上下邊
+            edge = dy > 0 ? 'bottom' : 'top'
             edgeY = dy > 0 ? ch - margin : margin
             edgeX = cx + dx * ((edgeY - cy) / dy)
           }
@@ -1044,7 +1059,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           const allSame = new Set(deltas).size === 1
           const badgeColor = onlyOne ? '#16A34A' : (allSame ? '#CA8A04' : (rec.guestDelta === maxDelta ? '#16A34A' : '#CA8A04'))
 
-          indicators.push({ x: edgeX, y: edgeY, name: t.name, delta: rec.guestDelta, color: badgeColor })
+          indicators.push({ x: edgeX, y: edgeY, name: t.name, delta: rec.guestDelta, color: badgeColor, edge })
         }
 
         if (indicators.length === 0) return null
@@ -1054,9 +1069,11 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
             key={`offscreen-${i}`}
             style={{
               position: 'absolute',
-              left: ind.x,
-              top: ind.y,
-              transform: 'translate(-50%, -50%)',
+              left: ind.edge === 'right' ? undefined : ind.edge === 'left' ? ind.x : ind.x,
+              right: ind.edge === 'right' ? margin : undefined,
+              top: ind.edge === 'bottom' ? undefined : ind.y,
+              bottom: ind.edge === 'bottom' ? margin : undefined,
+              transform: ind.edge === 'left' ? 'translateY(-50%)' : ind.edge === 'right' ? 'translateY(-50%)' : 'translateX(-50%)',
               background: ind.color,
               color: 'white',
               padding: '3px 10px',

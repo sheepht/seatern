@@ -60,6 +60,8 @@ interface SeatingState {
   seatPreviewGuest: { tableId: string; seatIndex: number; guestId: string; predictedScore: number; category?: string; name: string; aliases: string[] } | null
   /** 有更好位置的賓客 ID 集合（顯示💡圖示） */
   guestsWithRecommendations: Set<string>
+  /** 長按換位：hover 中賓客的最佳推薦目標桌 ID */
+  bestSwapTableId: string | null
   /** 上次重排的時間戳，用於觸發入場動畫 */
   lastResetAt: number
   /** 重排動畫進行中（桌上賓客淡出） */
@@ -165,6 +167,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   recommendationPreviewScores: new Map(),
   seatPreviewGuest: null,
   guestsWithRecommendations: new Set(),
+  bestSwapTableId: null,
   undoStack: [],
   lastResetAt: 0,
   isResetting: false,
