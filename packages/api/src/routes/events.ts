@@ -216,6 +216,111 @@ events.patch('/:eventId/guests/:guestId/table', async (c) => {
   return c.json(guest)
 })
 
+// POST /events/:eventId/guests — 新增單筆賓客
+events.post('/:eventId/guests', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const { eventId } = c.req.param()
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  const body = await c.req.json<{
+    name: string
+    aliases?: string[]
+    category?: string
+    relationScore?: number
+    rsvpStatus?: string
+    attendeeCount?: number
+    dietaryNote?: string
+    specialNote?: string
+  }>()
+
+  if (!body.name?.trim()) return c.json({ error: 'Name is required' }, 400)
+
+  const guest = await prisma.guest.create({
+    data: {
+      eventId,
+      name: body.name.trim(),
+      aliases: body.aliases || [],
+      category: body.category,
+      relationScore: body.relationScore ?? 2,
+      rsvpStatus: (body.rsvpStatus as any) || 'pending',
+      attendeeCount: body.attendeeCount ?? 1,
+      dietaryNote: body.dietaryNote,
+      specialNote: body.specialNote,
+    },
+    include: {
+      seatPreferences: true,
+      guestTags: { include: { tag: true } },
+    },
+  })
+
+  return c.json(guest, 201)
+})
+
+// PATCH /events/:eventId/guests/:guestId — 更新單筆賓客（partial update, whitelist）
+const GUEST_UPDATABLE_FIELDS = [
+  'name', 'aliases', 'category', 'relationScore',
+  'rsvpStatus', 'attendeeCount', 'dietaryNote', 'specialNote',
+] as const
+
+events.patch('/:eventId/guests/:guestId', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const { eventId, guestId } = c.req.param()
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  const body = await c.req.json<Record<string, any>>()
+
+  // Whitelist: only allow known fields
+  const data: Record<string, any> = {}
+  for (const field of GUEST_UPDATABLE_FIELDS) {
+    if (field in body) data[field] = body[field]
+  }
+
+  if (Object.keys(data).length === 0) return c.json({ error: 'No updatable fields provided' }, 400)
+
+  // Validate name if provided
+  if ('name' in data && !data.name?.trim()) return c.json({ error: 'Name cannot be empty' }, 400)
+  if ('name' in data) data.name = data.name.trim()
+
+  try {
+    const guest = await prisma.guest.update({
+      where: { id: guestId },
+      data,
+      include: {
+        seatPreferences: true,
+        guestTags: { include: { tag: true } },
+      },
+    })
+    return c.json(guest)
+  } catch (e: any) {
+    if (e.code === 'P2025') return c.json({ error: 'Guest not found' }, 404)
+    throw e
+  }
+})
+
+// DELETE /events/:eventId/guests/:guestId — 刪除賓客（cascade: seatPrefs, guestTags, avoidPairs, edges）
+events.delete('/:eventId/guests/:guestId', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const { eventId, guestId } = c.req.param()
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  try {
+    await prisma.guest.delete({ where: { id: guestId } })
+    return c.json({ ok: true })
+  } catch (e: any) {
+    if (e.code === 'P2025') return c.json({ error: 'Guest not found' }, 404)
+    throw e
+  }
+})
+
 // ─── 桌次 CRUD ──────────────────────────────────────
 
 // POST /events/:id/tables — 建立桌次

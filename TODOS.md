@@ -67,8 +67,20 @@
 - **前提：** 不依賴其他功能
 - **Effort：** S（human）→ S（CC+gstack）
 
-### 賓客資料管理 (P2, after auto-optimize)
-- **什麼：** 在 app 內編輯賓客資料（名字、群組、分類）、修改男方/女方/共同方名稱和顏色
-- **為什麼：** 目前修改資料需要重新匯入 Google Sheet，不方便
-- **前提：** 不依賴其他功能，但優先級最低因為重新匯入是可行的 workaround
-- **Effort：** M（human）→ S（CC+gstack）
+### ~~賓客資料管理~~ ✅ Done (2026-03-31)
+- 新增 /workspace/:eventId/guests 賓客管理頁面：inline 編輯表格、搜尋/篩選/排序、新增/刪除賓客
+- API: PATCH/DELETE/POST guest endpoints（whitelist 保護系統欄位）
+- Store: updateGuest（optimistic + rollback）、deleteGuest、addGuest + 滿意度自動重算
+- 統計摘要卡片（確認/未回覆/婉拒人數、席位、平均滿意度）
+- 桌次欄位 + 滿意度欄位（CEO Review cherry-pick）
+- Design doc: ~/.gstack/projects/seatern/node-main-design-20260331-guest-management.md
+
+### ~~Toolbar 重構為全局資訊列~~ ✅ Done (2026-03-31)
+- Toolbar 不再包含排位按鈕，所有頁面長一樣（活動名稱、席位統計、滿意度分佈、☰ 選單）
+- 排位操作按鈕移到 SidePanel 底部：[儲存|讀取] [還原|重做] [新桌|清桌] [重排]
+- ☰ 選單只有頁面導航（賓客名單/排位畫布）+ 登入
+- DEV 工具（排列、隨機）獨立一列虛線分隔
+
+### 待修正
+- 有些賓客會在移動的過程中消失在桌面上，沒有介面能查詢某個賓客在哪
+- 自動排位只需要針對還沒排的賓客就好

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid, Trash2, Dices } from 'lucide-react'
+import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid, Trash2, Dices, Users } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction'
 import { calculateGridLayout, findFreePosition } from '@/lib/viewport'
@@ -11,9 +11,12 @@ import { computeSnapshotStats, computeCurrentStats } from '@/lib/snapshot-stats'
 interface ToolbarProps {
   onFitAll?: () => void
   onPanToTable?: (x: number, y: number) => void
+  page?: 'workspace' | 'guests'
 }
 
-export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
+export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarProps = {}) {
+  const isWorkspace = page === 'workspace'
+  const eid = useSeatingStore((s) => s.eventId)
   const eventName = useSeatingStore((s) => s.eventName)
   const tables = useSeatingStore((s) => s.tables)
   const addTable = useSeatingStore((s) => s.addTable)
@@ -523,179 +526,6 @@ export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          {/* DEV: 刪空桌 */}
-          {isDev && (() => {
-            const emptyCount = tables.filter((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')).length
-            if (emptyCount === 0) return null
-            return (
-              <button
-                onClick={async () => {
-                  const emptyTables = tables.filter((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed'))
-                  for (const t of emptyTables) await removeTable(t.id)
-                }}
-                className="flex items-center gap-1 whitespace-nowrap px-2.5 py-1.5 text-xs font-medium rounded border cursor-pointer hover:bg-red-50"
-                style={{ color: '#EA580C', borderColor: '#FDBA74', borderRadius: 'var(--radius-sm)' }}
-                title="刪除所有空桌（DEV）"
-              >
-                <Trash2 size={12} /> 刪空桌 {emptyCount}
-              </button>
-            )
-          })()}
-
-          {/* DEV: 隨機打亂 */}
-          {isDev && tables.length > 0 && (
-            <button
-              onClick={() => {
-                const { avoidPairs, undoStack } = useSeatingStore.getState()
-                const allConfirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
-
-                // 打亂賓客順序，只排 3/4 的人
-                const shuffled = [...allConfirmed]
-                for (let i = shuffled.length - 1; i > 0; i--) {
-                  const j = Math.floor(Math.random() * (i + 1));
-                  [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-                }
-                const count = Math.ceil(shuffled.length * 0.75)
-                shuffled.length = count
-
-                // 建立每桌的剩餘容量 & 下一個可用 seatIndex
-                const remaining = new Map<string, number>()
-                const nextSeat = new Map<string, number>()
-                for (const t of tables) {
-                  remaining.set(t.id, t.capacity)
-                  nextSeat.set(t.id, 0)
-                }
-
-                // 依序塞入，分配連續 seatIndex（眷屬連位）
-                const assignments = new Map<string, { tableId: string; seatIndex: number }>()
-                for (const g of shuffled) {
-                  const availableTable = tables.find((t) => (remaining.get(t.id) || 0) >= g.attendeeCount)
-                  if (availableTable) {
-                    const seat = nextSeat.get(availableTable.id) || 0
-                    assignments.set(g.id, { tableId: availableTable.id, seatIndex: seat })
-                    remaining.set(availableTable.id, (remaining.get(availableTable.id) || 0) - g.attendeeCount)
-                    nextSeat.set(availableTable.id, seat + g.attendeeCount)
-                  }
-                }
-
-                // 一次更新 store
-                const updatedGuests = guests.map((g) => {
-                  const a = assignments.get(g.id)
-                  if (a) return { ...g, assignedTableId: a.tableId, seatIndex: a.seatIndex }
-                  if (g.rsvpStatus === 'confirmed') return { ...g, assignedTableId: null as string | null | undefined, seatIndex: null }
-                  return g
-                })
-
-                const result = recalculateAll(updatedGuests, tables, avoidPairs)
-                const finalGuests = updatedGuests.map((g) => {
-                  const score = result.guests.find((gs) => gs.id === g.id)
-                  return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
-                })
-                const finalTables = tables.map((t) => {
-                  const score = result.tables.find((ts) => ts.id === t.id)
-                  return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
-                })
-
-                useSeatingStore.setState({
-                  guests: finalGuests,
-                  tables: finalTables,
-                  undoStack: [...undoStack, { type: 'auto-assign' as const, assignments: allConfirmed.map((g) => ({ guestId: g.id, fromTableId: g.assignedTableId || null, fromSeatIndex: g.seatIndex })), createdTableIds: [] }],
-                })
-
-                // 存 DB（批次一次寫入）
-                const { eventId } = useSeatingStore.getState()
-                if (eventId) {
-                  const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed')
-                  fetch(`/api/events/${eventId}/guests/assign-batch`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                      assignments: confirmed.map((g) => ({
-                        guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null,
-                      })),
-                    }),
-                  }).catch(console.error)
-                }
-              }}
-              className="flex items-center gap-1 whitespace-nowrap px-2.5 py-1.5 text-xs font-medium rounded border cursor-pointer hover:bg-purple-50"
-              style={{ color: '#7C3AED', borderColor: '#C4B5FD', borderRadius: 'var(--radius-sm)' }}
-              title="隨機打亂座位（DEV）"
-            >
-              <Dices size={12} /> 隨機
-            </button>
-          )}
-
-          {/* Auto-arrange */}
-          <div className="relative">
-            <button
-              onClick={() => setShowArrangeConfirm(!showArrangeConfirm)}
-              disabled={tables.length === 0 || arranging}
-              className="flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
-              title="自動排列桌次"
-            >
-              <LayoutGrid size={14} /> {arranging ? '排列中...' : '排列'}
-            </button>
-            {showArrangeConfirm && (
-              <div
-                className="absolute top-full right-0 mt-1.5 rounded-lg border shadow-md p-3 z-50 min-w-[200px]"
-                style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', fontSize: 13 }}
-              >
-                <div className="mb-2" style={{ color: 'var(--text-primary)' }}>
-                  重新排列所有桌次？
-                </div>
-                <div className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-                  可以復原（Ctrl+Z）
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <button
-                    onClick={() => setShowArrangeConfirm(false)}
-                    className="px-3 py-1 text-sm rounded border cursor-pointer hover:bg-black/5"
-                    style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)' }}
-                  >
-                    取消
-                  </button>
-                  <button
-                    onClick={handleAutoArrange}
-                    className="px-3 py-1 text-sm font-semibold text-white rounded cursor-pointer hover:brightness-90"
-                    style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
-                  >
-                    排列
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={handleAddTable}
-            disabled={adding}
-            className="flex items-center gap-1.5 whitespace-nowrap px-3.5 py-1.5 text-sm font-semibold text-white rounded cursor-pointer disabled:opacity-50 hover:brightness-90"
-            style={{ fontFamily: 'var(--font-display)', background: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
-          >
-            <Plus size={14} /> 新桌
-          </button>
-
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
-            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
-          >
-            <Save size={14} /> {saving ? '儲存中...' : '儲存'}
-          </button>
-
-          <button
-            onClick={animateUndo}
-            disabled={undoStack.length === 0}
-            className="flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]"
-            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)' }}
-            title="Ctrl+Z"
-          >
-            <Undo2 size={14} /> 還原
-          </button>
-
           {/* ☰ 選單按鈕 */}
           <div className="relative">
             <button
@@ -705,7 +535,7 @@ export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
               title="更多"
             >
               <Menu size={18} />
-              {avoidPairs.length > 0 && (
+              {isWorkspace && avoidPairs.length > 0 && (
                 <span
                   className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 text-white text-[9px] rounded-full flex items-center justify-center"
                   style={{ background: 'var(--error)' }}
@@ -727,52 +557,14 @@ export function Toolbar({ onFitAll, onPanToTable }: ToolbarProps = {}) {
                     boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
                   }}
                 >
-                  {/* 讀取 */}
+                  {/* 頁面切換 */}
                   <button
-                    onClick={() => { setShowMenu(false); handleRestore() }}
-                    disabled={snapshots.length === 0}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]"
-                    style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-body)' }}
-                  >
-                    <History size={16} className="shrink-0" />
-                    <span>讀取</span>
-                    {snapshots.length > 0 && (
-                      <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>{snapshots[0].name}</span>
-                    )}
-                  </button>
-
-                  {/* 避桌 */}
-                  <button
-                    onClick={() => { setShowMenu(false); setShowAvoidModal(true) }}
+                    onClick={() => { setShowMenu(false); navigate(isWorkspace ? `/workspace/${eid}/guests` : `/workspace/${eid}`) }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
                     style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-body)' }}
                   >
-                    <Ban size={16} className="shrink-0" />
-                    <span>避桌</span>
-                    {avoidPairs.length > 0 && (
-                      <span className="ml-auto text-xs font-data" style={{ color: 'var(--error)' }}>{avoidPairs.length} 組</span>
-                    )}
-                  </button>
-
-                  {/* 重排 */}
-                  <button
-                    onClick={() => { setShowMenu(false); setShowResetConfirm(true) }}
-                    disabled={assigned === 0}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]"
-                    style={{ color: '#EA580C', fontFamily: 'var(--font-body)' }}
-                  >
-                    <Shuffle size={16} className="shrink-0" />
-                    <span>重排</span>
-                  </button>
-
-                  {/* 匯入 */}
-                  <button
-                    onClick={() => { setShowMenu(false); navigate('/import') }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
-                    style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
-                  >
-                    <Download size={16} className="shrink-0" />
-                    <span>匯入</span>
+                    <Users size={16} className="shrink-0" />
+                    <span>{isWorkspace ? '賓客名單' : '排位畫布'}</span>
                   </button>
 
                   {/* 分隔線 */}

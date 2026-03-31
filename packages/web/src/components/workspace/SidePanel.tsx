@@ -1,11 +1,15 @@
 import { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useDroppable } from '@dnd-kit/core'
-import { ChevronLeft, Wand2, Scale, Star } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ChevronLeft, Wand2, Scale, Star, Plus, Save, Undo2, Redo2, Ban, Shuffle, LayoutGrid, Download, Trash2, Dices, History } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { estimateAutoAssignTimeInWorker } from '@/lib/auto-assign-client'
-import { getSatisfactionColor } from '@/lib/satisfaction'
+import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction'
+import { computeSnapshotStats, computeCurrentStats } from '@/lib/snapshot-stats'
+import { findFreePosition, calculateGridLayout } from '@/lib/viewport'
 import { GuestChip } from './GuestChip'
+import { AvoidPairModal } from './AvoidPairModal'
 import type { AutoAssignMode } from '@/lib/auto-assign'
 
 function CollapseButton({ onCollapse }: { onCollapse: () => void }) {
@@ -47,6 +51,40 @@ function CollapseButton({ onCollapse }: { onCollapse: () => void }) {
         document.body,
       )}
     </>
+  )
+}
+
+/** Popover tooltip（顯示在按鈕上方） */
+function Tip({ text, children }: { text: string; children: React.ReactElement }) {
+  const [show, setShow] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const rect = ref.current?.getBoundingClientRect()
+  return (
+    <div ref={ref} onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)} style={{ display: 'inline-flex' }}>
+      {children}
+      {show && rect && createPortal(
+        <div style={{
+          position: 'fixed',
+          left: rect.left + rect.width / 2,
+          top: rect.top - 8,
+          transform: 'translate(-50%, -100%)',
+          background: 'var(--bg-surface, #fff)',
+          color: 'var(--text-secondary, #78716C)',
+          border: '1px solid var(--border, #E7E5E4)',
+          padding: '4px 10px',
+          borderRadius: 6,
+          fontSize: 12,
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          fontFamily: 'var(--font-body)',
+          boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
+        }}>
+          {text}
+        </div>,
+        document.body,
+      )}
+    </div>
   )
 }
 
@@ -98,18 +136,136 @@ const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string
 
 const CATEGORY_ORDER = ['男方', '女方', '共同']
 
-export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
+export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => void; onPanToTable?: (x: number, y: number) => void }) {
   const guests = useSeatingStore((s) => s.guests)
   const tables = useSeatingStore((s) => s.tables)
   const getUnassignedGuests = useSeatingStore((s) => s.getUnassignedGuests)
   const autoAssignGuests = useSeatingStore((s) => s.autoAssignGuests)
   const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress)
+  const addTable = useSeatingStore((s) => s.addTable)
+  const undo = useSeatingStore((s) => s.undo)
+  const undoStack = useSeatingStore((s) => s.undoStack)
+  const saveSnapshot = useSeatingStore((s) => s.saveSnapshot)
+  const snapshots = useSeatingStore((s) => s.snapshots)
+  const resetAllSeats = useSeatingStore((s) => s.resetAllSeats)
+  const removeTable = useSeatingStore((s) => s.removeTable)
+  const autoArrangeTables = useSeatingStore((s) => s.autoArrangeTables)
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs)
+  const restoreSnapshot = useSeatingStore((s) => s.restoreSnapshot)
+
+  const navigate = useNavigate()
 
   const [search, setSearch] = useState('')
   const [assigning, setAssigning] = useState(false)
   const [showModeModal, setShowModeModal] = useState(false)
   const [estimatedTime, setEstimatedTime] = useState<number | null>(null)
-  const avoidPairs = useSeatingStore((s) => s.avoidPairs)
+  const [saving, setSaving] = useState(false)
+  const [showAvoidModal, setShowAvoidModal] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
+  const [showArrangeConfirm, setShowArrangeConfirm] = useState(false)
+  const [arranging, setArranging] = useState(false)
+  const [adding, setAdding] = useState(false)
+
+  const handleAddTable = async () => {
+    setAdding(true)
+    const num = tables.length + 1
+    const pos = findFreePosition(tables)
+    await addTable(`第${num}桌`, pos.x, pos.y)
+    onPanToTable?.(pos.x, pos.y)
+    setAdding(false)
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    const now = new Date()
+    const name = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    await saveSnapshot(name)
+    setSaving(false)
+  }
+
+  const isDev = import.meta.env.DEV
+
+  const handleRandomAssign = () => {
+    const { avoidPairs, undoStack } = useSeatingStore.getState()
+    const allConfirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
+    const shuffled = [...allConfirmed]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    shuffled.length = Math.ceil(shuffled.length * 0.75)
+    const remaining = new Map<string, number>()
+    const nextSeat = new Map<string, number>()
+    for (const t of tables) { remaining.set(t.id, t.capacity); nextSeat.set(t.id, 0) }
+    const assignments = new Map<string, { tableId: string; seatIndex: number }>()
+    for (const g of shuffled) {
+      const avail = tables.find((t) => (remaining.get(t.id) || 0) >= g.attendeeCount)
+      if (avail) {
+        const seat = nextSeat.get(avail.id) || 0
+        assignments.set(g.id, { tableId: avail.id, seatIndex: seat })
+        remaining.set(avail.id, (remaining.get(avail.id) || 0) - g.attendeeCount)
+        nextSeat.set(avail.id, seat + g.attendeeCount)
+      }
+    }
+    const updatedGuests = guests.map((g) => {
+      const a = assignments.get(g.id)
+      if (a) return { ...g, assignedTableId: a.tableId, seatIndex: a.seatIndex }
+      if (g.rsvpStatus === 'confirmed') return { ...g, assignedTableId: null as string | null | undefined, seatIndex: null }
+      return g
+    })
+    const result = recalculateAll(updatedGuests, tables, avoidPairs)
+    const finalGuests = updatedGuests.map((g) => { const s = result.guests.find((gs) => gs.id === g.id); return s ? { ...g, satisfactionScore: s.satisfactionScore } : g })
+    const finalTables = tables.map((t) => { const s = result.tables.find((ts) => ts.id === t.id); return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t })
+    useSeatingStore.setState({
+      guests: finalGuests, tables: finalTables,
+      undoStack: [...undoStack, { type: 'auto-assign' as const, assignments: allConfirmed.map((g) => ({ guestId: g.id, fromTableId: g.assignedTableId || null, fromSeatIndex: g.seatIndex })), createdTableIds: [] }],
+    })
+    const { eventId } = useSeatingStore.getState()
+    if (eventId) {
+      const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed')
+      fetch(`/api/events/${eventId}/guests/assign-batch`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ assignments: confirmed.map((g) => ({ guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null })) }),
+      }).catch(console.error)
+    }
+  }
+
+  const handleDeleteEmptyTables = async () => {
+    const emptyTables = tables.filter((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed'))
+    for (const t of emptyTables) await removeTable(t.id)
+  }
+
+  const handleAutoArrange = async () => {
+    setArranging(true)
+    setShowArrangeConfirm(false)
+    try {
+      const svg = document.getElementById('floorplan-svg') as SVGSVGElement | null
+      const vb = svg?.viewBox.baseVal
+      let positions: ReturnType<typeof calculateGridLayout>
+      if (vb && vb.width > 0) {
+        const padding = 100
+        const areaW = vb.width - padding * 2
+        const areaH = vb.height - padding * 2
+        const cols = Math.ceil(Math.sqrt(tables.length))
+        const rows = Math.ceil(tables.length / cols)
+        const spacingX = cols > 1 ? areaW / (cols - 1) : 0
+        const spacingY = rows > 1 ? areaH / (rows - 1) : 0
+        positions = tables.map((t, i) => ({
+          tableId: t.id,
+          x: vb.x + padding + (i % cols) * spacingX,
+          y: vb.y + padding + Math.floor(i / cols) * spacingY,
+        }))
+      } else {
+        positions = calculateGridLayout(tables)
+      }
+      await autoArrangeTables(positions)
+    } catch (err: any) {
+      alert(err.message || '保存失敗，已恢復原排列')
+    } finally {
+      setArranging(false)
+    }
+  }
 
   const CATEGORY_BG: Record<string, string> = { '男方': '#DBEAFE', '女方': '#FEE2E2', '共同': '#F3F4F6' }
   const CATEGORY_CLR: Record<string, string> = { '男方': '#1E40AF', '女方': '#991B1B', '共同': '#374151' }
@@ -420,6 +576,136 @@ export function SidePanel({ onCollapse }: { onCollapse?: () => void }) {
           )}
         </div>
       </div>
+
+      {/* 操作列 */}
+      <div className="shrink-0 px-4 py-3" style={{ borderTop: '1px solid var(--border)' }}>
+        {/* 第一列：儲存/讀取 + 還原/重做 */}
+        <div className="flex gap-2 mb-2">
+          <div className="flex" style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', borderRight: '1px solid var(--border)', fontSize: 12 }}>
+              <Save size={13} /> {saving ? '儲存中...' : '儲存'}
+            </button>
+            <button onClick={() => setShowRestoreConfirm(true)} disabled={snapshots.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 12 }}>
+              <History size={13} /> 讀取
+            </button>
+          </div>
+          <div className="flex" style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <button onClick={() => undo()} disabled={undoStack.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', borderRight: '1px solid var(--border)', fontSize: 12 }}>
+              <Undo2 size={13} /> 還原
+            </button>
+            <button disabled className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 12 }}>
+              <Redo2 size={13} /> 重做
+            </button>
+          </div>
+        </div>
+        {/* 第二列：新桌/清桌、重排 */}
+        <div className="flex flex-wrap gap-2">
+          {/* 新桌 / 清桌 group */}
+          <div className="flex" style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <Tip text="新增一張空桌">
+              <button onClick={handleAddTable} disabled={adding} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', borderRight: '1px solid var(--border)', fontSize: 12 }}>
+                <Plus size={13} /> 新桌
+              </button>
+            </Tip>
+            <Tip text="刪除所有沒人坐的桌子">
+              <button onClick={handleDeleteEmptyTables} disabled={tables.filter((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')).length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 12 }}>
+                <Trash2 size={13} /> 清桌
+              </button>
+            </Tip>
+          </div>
+          {/* 重排 */}
+          <Tip text="清除所有座位安排，賓客回到待排區">
+            <button onClick={() => resetAllSeats()} disabled={guests.filter(g => g.assignedTableId).length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium rounded border cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-ui)', fontSize: 12 }}>
+              <Shuffle size={13} /> 重排
+            </button>
+          </Tip>
+        </div>
+        {/* DEV 工具列 */}
+        {isDev && (
+          <div className="flex flex-wrap gap-2 mt-2 pt-2" style={{ borderTop: '1px dashed var(--border)' }}>
+            <button onClick={handleAutoArrange} disabled={tables.length === 0 || arranging} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded border cursor-pointer disabled:opacity-50 hover:bg-purple-50" style={{ color: '#7C3AED', borderColor: '#C4B5FD', borderRadius: 'var(--radius-sm)' }}>
+              <LayoutGrid size={12} /> {arranging ? '排列中...' : '排列'}
+            </button>
+            {tables.length > 0 && (
+              <button onClick={handleRandomAssign} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded border cursor-pointer hover:bg-purple-50" style={{ color: '#7C3AED', borderColor: '#C4B5FD', borderRadius: 'var(--radius-sm)' }}>
+                <Dices size={12} /> 隨機
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showAvoidModal && <AvoidPairModal onClose={() => setShowAvoidModal(false)} />}
+
+      {showRestoreConfirm && snapshots.length > 0 && (() => {
+        const snap = snapshots[0]
+        const snapStats = computeSnapshotStats(snap.data, snap.averageSatisfaction)
+        const currStats = computeCurrentStats(guests, tables)
+        const satItems = [
+          { key: 'green' as const, color: '#16A34A', label: '滿意' },
+          { key: 'yellow' as const, color: '#CA8A04', label: '尚可' },
+          { key: 'orange' as const, color: '#EA580C', label: '不滿' },
+          { key: 'red' as const, color: '#DC2626', label: '糟糕' },
+        ]
+        const StatColumn = ({ label, stats }: { label: string; stats: typeof snapStats }) => {
+          const seatedTotal = stats.green + stats.yellow + stats.orange + stats.red
+          const assignPct = stats.total > 0 ? Math.round((stats.assigned / stats.total) * 100) : 0
+          const assignBarColor = getSatisfactionColor(assignPct)
+          const segments = satItems.filter(({ key }) => stats[key] > 0)
+          return (
+            <div className="flex-1 min-w-0">
+              <div className="mb-3" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em', fontFamily: 'var(--font-display)' }}>{label}</div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-data font-semibold" style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{stats.assigned}/{stats.total} 人</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>已安排</span>
+              </div>
+              <div className="flex mb-3" style={{ height: '6px', borderRadius: '3px', overflow: 'hidden', background: 'var(--border)' }}>
+                {assignPct > 0 && <div style={{ width: `${assignPct}%`, background: assignBarColor, transition: 'width 0.3s' }} />}
+              </div>
+              <div className="flex mb-2" style={{ height: '6px', borderRadius: '3px', overflow: 'hidden', background: 'var(--border)', gap: segments.length > 1 ? '1px' : 0 }}>
+                {seatedTotal > 0 && segments.map(({ key, color }) => (
+                  <div key={key} style={{ width: `${(stats[key] / seatedTotal) * 100}%`, background: color }} />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5" style={{ fontSize: '11px' }}>
+                {satItems.map(({ key, color, label: satLabel }) =>
+                  stats[key] > 0 ? <span key={key} className="font-data" style={{ color }}>{satLabel} {stats[key]}人</span> : null
+                )}
+              </div>
+              <div className="flex gap-3 mt-2" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                <span>{stats.tableCount} 桌</span>
+                {stats.overflowCount > 0 && <span style={{ color: 'var(--warning)' }}>溢出 {stats.overflowCount}人</span>}
+              </div>
+            </div>
+          )
+        }
+        return createPortal(
+          <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowRestoreConfirm(false)}>
+            <div role="dialog" aria-modal="true" className="bg-white w-full max-w-md p-6 mx-4" style={{ borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)' }} onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-bold mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>讀取快照</h2>
+              <p className="mb-4" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                還原到：<span className="font-medium" style={{ color: 'var(--text-primary)' }}>{snap.name}</span>
+              </p>
+              <div className="flex gap-3 pb-4 mb-4 flex-col min-[480px]:flex-row min-[480px]:items-stretch" style={{ borderBottom: '1px solid var(--border)' }}>
+                <StatColumn label="目前" stats={currStats} />
+                <div className="hidden min-[480px]:flex items-center justify-center" style={{ width: '24px', flexShrink: 0 }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </div>
+                <div className="flex min-[480px]:hidden items-center justify-center py-1">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M4 9l4 4 4-4" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </div>
+                <StatColumn label="快照" stats={snapStats} />
+              </div>
+              <p className="text-sm mb-4" style={{ color: 'var(--warning)' }}>目前的排位將被覆蓋，還原記錄會清空。</p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowRestoreConfirm(false)} className="flex-1 py-2 text-sm font-medium rounded border cursor-pointer hover:bg-[var(--bg-primary)]" style={{ borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)' }}>取消</button>
+                <button onClick={() => { restoreSnapshot(snap.id); setShowRestoreConfirm(false) }} className="flex-1 py-2 text-sm font-semibold text-white rounded cursor-pointer hover:brightness-90" style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-display)' }}>還原</button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      })()}
 
       {showModeModal && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

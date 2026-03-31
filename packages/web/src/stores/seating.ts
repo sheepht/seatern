@@ -140,6 +140,11 @@ interface SeatingState {
   autoArrangeTables: (positions: Array<{ tableId: string; x: number; y: number }>) => Promise<void>
   autoAssignGuests: (mode?: AutoAssignMode) => Promise<void>
 
+  // Guest CRUD (管理頁面用)
+  updateGuest: (guestId: string, patch: Partial<Guest>) => Promise<boolean>
+  deleteGuest: (guestId: string) => Promise<boolean>
+  addGuest: (data: { name: string; category?: string; relationScore?: number; rsvpStatus?: string; attendeeCount?: number; dietaryNote?: string; specialNote?: string }) => Promise<Guest | null>
+
   // Computed helpers
   getTableGuests: (tableId: string) => Guest[]
   getUnassignedGuests: () => Guest[]
@@ -1248,6 +1253,129 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       (ap.guestAId === guestId && tableGuestIds.includes(ap.guestBId)) ||
       (ap.guestBId === guestId && tableGuestIds.includes(ap.guestAId))
     ) || null
+  },
+
+  // ─── Guest CRUD（管理頁面用）─────────────────────────
+
+  updateGuest: async (guestId, patch) => {
+    const { eventId, guests, tables, avoidPairs } = get()
+    if (!eventId) return false
+
+    // Optimistic update
+    const prevGuests = guests
+    const idx = guests.findIndex((g) => g.id === guestId)
+    if (idx < 0) return false
+    const updated = { ...guests[idx], ...patch }
+    const nextGuests = [...guests]
+    nextGuests[idx] = updated
+    set({ guests: nextGuests })
+
+    // Recalculate if score-affecting fields changed
+    const scoreFields = ['attendeeCount', 'rsvpStatus'] as const
+    const needsRecalc = scoreFields.some((f) => f in patch)
+    if (needsRecalc) {
+      const result = recalculateAll(nextGuests, tables, avoidPairs)
+      const recalcedGuests = nextGuests.map((g) => {
+        const s = result.guests.find((gs) => gs.id === g.id)
+        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
+      })
+      const recalcedTables = tables.map((t) => {
+        const ts = result.tables.find((ts) => ts.id === t.id)
+        return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t
+      })
+      set({ guests: recalcedGuests, tables: recalcedTables })
+    }
+
+    try {
+      const res = await fetch(`/api/events/${eventId}/guests/${guestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(patch),
+      })
+      if (!res.ok) {
+        // Rollback
+        set({ guests: prevGuests })
+        return false
+      }
+      return true
+    } catch {
+      set({ guests: prevGuests })
+      return false
+    }
+  },
+
+  deleteGuest: async (guestId) => {
+    const { eventId, guests, tables, avoidPairs } = get()
+    if (!eventId) return false
+
+    const guest = guests.find((g) => g.id === guestId)
+    if (!guest) return false
+
+    // Remove from local state
+    const nextGuests = guests.filter((g) => g.id !== guestId)
+    const nextAvoidPairs = avoidPairs.filter(
+      (ap) => ap.guestAId !== guestId && ap.guestBId !== guestId,
+    )
+    set({ guests: nextGuests, avoidPairs: nextAvoidPairs })
+
+    // Recalculate satisfaction
+    const result = recalculateAll(nextGuests, tables, nextAvoidPairs)
+    const recalcedGuests = nextGuests.map((g) => {
+      const s = result.guests.find((gs) => gs.id === g.id)
+      return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
+    })
+    const recalcedTables = tables.map((t) => {
+      const ts = result.tables.find((ts) => ts.id === t.id)
+      return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t
+    })
+    set({ guests: recalcedGuests, tables: recalcedTables })
+
+    try {
+      const res = await fetch(`/api/events/${eventId}/guests/${guestId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  addGuest: async (data) => {
+    const { eventId, guests, tables, avoidPairs } = get()
+    if (!eventId) return null
+
+    try {
+      const res = await fetch(`/api/events/${eventId}/guests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      })
+      if (!res.ok) return null
+      const guest = await res.json() as Guest
+      const nextGuests = [...guests, guest]
+      set({ guests: nextGuests })
+
+      // Recalculate if confirmed
+      if (guest.rsvpStatus === 'confirmed') {
+        const result = recalculateAll(nextGuests, tables, avoidPairs)
+        const recalcedGuests = nextGuests.map((g) => {
+          const s = result.guests.find((gs) => gs.id === g.id)
+          return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
+        })
+        const recalcedTables = tables.map((t) => {
+          const ts = result.tables.find((ts) => ts.id === t.id)
+          return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t
+        })
+        set({ guests: recalcedGuests, tables: recalcedTables })
+      }
+
+      return guest
+    } catch {
+      return null
+    }
   },
 
   // Computed

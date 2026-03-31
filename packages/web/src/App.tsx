@@ -7,6 +7,7 @@ import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 import ImportPage from '@/pages/ImportPage'
 import WorkspacePage from '@/pages/WorkspacePage'
+import GuestManagementPage from '@/pages/GuestManagementPage'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -26,6 +27,7 @@ function App() {
             {/* Import + Workspace（Phase 1 不需要登入） */}
             <Route path="/import" element={<ImportPage />} />
             <Route path="/workspace/:eventId" element={<WorkspacePage />} />
+            <Route path="/workspace/:eventId/guests" element={<GuestManagementPage />} />
 
             {/* Protected routes */}
             <Route path="/dashboard" element={<ProtectedRoute><DashboardPlaceholder /></ProtectedRoute>} />

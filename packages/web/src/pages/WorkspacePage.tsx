@@ -289,7 +289,7 @@ export default function WorkspacePage() {
               opacity: autoAssignProgress ? 0.4 : 1,
               pointerEvents: autoAssignProgress ? 'none' : undefined,
             }}>
-              <SidePanel onCollapse={() => setSidebarCollapsed(true)} />
+              <SidePanel onCollapse={() => setSidebarCollapsed(true)} onPanToTable={(x, y) => floorPlanRef.current?.panToPoint(x, y)} />
             </div>
           </div>
           <div className="flex-1 min-w-0">
