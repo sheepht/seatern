@@ -20,7 +20,6 @@ export function GuestChip({ guest, animIndex }: Props) {
     id: guest.id,
     data: { type: 'guest', guest },
   })
-  const lastResetAt = useSeatingStore((s) => s.lastResetAt)
   const setHoveredGuest = useSeatingStore((s) => s.setHoveredGuest)
   const bestSwapTableId = useSeatingStore((s) => s.bestSwapTableId)
   const moveGuestToSeat = useSeatingStore((s) => s.moveGuestToSeat)
@@ -31,10 +30,9 @@ export function GuestChip({ guest, animIndex }: Props) {
 
   const categoryStyle = CATEGORY_STYLES[guest.category] || DEFAULT_CATEGORY_STYLE
 
-  // 重排後 800ms 內顯示交錯入場動畫
-  const isRecentReset = Date.now() - lastResetAt < 800
-  const animClass = isRecentReset && animIndex !== undefined ? 'chip-enter' : ''
-  const animDelay = isRecentReset && animIndex !== undefined ? `${animIndex * 25}ms` : undefined
+  // 入場動畫已移除（人多時等太久）
+  const animClass = ''
+  const animDelay = undefined
 
   const cancelLongPress = () => {
     if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null }

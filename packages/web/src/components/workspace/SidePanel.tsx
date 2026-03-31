@@ -582,19 +582,19 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
         {/* 第一列：儲存/讀取 + 還原/重做 */}
         <div className="flex gap-2 mb-2">
           <div className="flex" style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-            <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', borderRight: '1px solid var(--border)', fontSize: 12 }}>
-              <Save size={13} /> {saving ? '儲存中...' : '儲存'}
+            <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', borderRight: '1px solid var(--border)', fontSize: 14 }}>
+              <Save size={14} /> {saving ? '儲存中...' : '儲存'}
             </button>
-            <button onClick={() => setShowRestoreConfirm(true)} disabled={snapshots.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 12 }}>
-              <History size={13} /> 讀取
+            <button onClick={() => setShowRestoreConfirm(true)} disabled={snapshots.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 14 }}>
+              <History size={14} /> 讀取
             </button>
           </div>
           <div className="flex" style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-            <button onClick={() => undo()} disabled={undoStack.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', borderRight: '1px solid var(--border)', fontSize: 12 }}>
-              <Undo2 size={13} /> 還原
+            <button onClick={() => undo()} disabled={undoStack.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', borderRight: '1px solid var(--border)', fontSize: 14 }}>
+              <Undo2 size={14} /> 還原
             </button>
-            <button disabled className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 12 }}>
-              <Redo2 size={13} /> 重做
+            <button disabled className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 14 }}>
+              <Redo2 size={14} /> 重做
             </button>
           </div>
         </div>
@@ -603,20 +603,20 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
           {/* 新桌 / 清桌 group */}
           <div className="flex" style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', overflow: 'hidden' }}>
             <Tip text="新增一張空桌">
-              <button onClick={handleAddTable} disabled={adding} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', borderRight: '1px solid var(--border)', fontSize: 12 }}>
-                <Plus size={13} /> 新桌
+              <button onClick={handleAddTable} disabled={adding} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', borderRight: '1px solid var(--border)', fontSize: 14 }}>
+                <Plus size={14} /> 新桌
               </button>
             </Tip>
             <Tip text="刪除所有沒人坐的桌子">
-              <button onClick={handleDeleteEmptyTables} disabled={tables.filter((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')).length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 12 }}>
-                <Trash2 size={13} /> 清桌
+              <button onClick={handleDeleteEmptyTables} disabled={tables.filter((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')).length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 14 }}>
+                <Trash2 size={14} /> 清桌
               </button>
             </Tip>
           </div>
           {/* 重排 */}
           <Tip text="清除所有座位安排，賓客回到待排區">
-            <button onClick={() => resetAllSeats()} disabled={guests.filter(g => g.assignedTableId).length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium rounded border cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-ui)', fontSize: 12 }}>
-              <Shuffle size={13} /> 重排
+            <button onClick={() => resetAllSeats()} disabled={guests.filter(g => g.assignedTableId).length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium rounded border cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)]" style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-ui)', fontSize: 14 }}>
+              <Shuffle size={14} /> 重排
             </button>
           </Tip>
         </div>

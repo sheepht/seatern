@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, Trash2, ChevronDown, ChevronRight, Search, X } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
-import { Toolbar } from '@/components/workspace/Toolbar'
 import type { Guest } from '@/lib/types'
 
 // ─── Types ──────────────────────────────────────────
@@ -265,8 +264,6 @@ function StatsBar({
 export default function GuestManagementPage() {
   const { eventId } = useParams<{ eventId: string }>()
   const navigate = useNavigate()
-  const loadEvent = useSeatingStore((s) => s.loadEvent)
-  const loading = useSeatingStore((s) => s.loading)
   const guests = useSeatingStore((s) => s.guests)
   const tables = useSeatingStore((s) => s.tables)
   const eventName = useSeatingStore((s) => s.eventName)
@@ -287,11 +284,6 @@ export default function GuestManagementPage() {
   const [newGuestName, setNewGuestName] = useState('')
   const newGuestRef = useRef<HTMLInputElement>(null)
   const deleteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
-
-  // Load event data
-  useEffect(() => {
-    if (eventId) loadEvent(eventId)
-  }, [eventId, loadEvent])
 
   // Cleanup delete timers on unmount / navigate away
   useEffect(() => {
@@ -368,13 +360,14 @@ export default function GuestManagementPage() {
         onUndo: () => {
           clearTimeout(timer)
           deleteTimers.current.delete(guest.id)
-          // Restore by re-adding (simplified: reload event)
-          if (eventId) loadEvent(eventId)
+          // Restore by re-loading event data
+          const { loadEvent: reload } = useSeatingStore.getState()
+          if (eventId) reload(eventId)
           setToast(null)
         },
       })
     }
-  }, [deleteGuest, eventId, loadEvent, tableNameMap])
+  }, [deleteGuest, eventId, tableNameMap])
 
   const handleConfirmDelete = useCallback(async () => {
     if (!deleteConfirm) return
@@ -421,19 +414,10 @@ export default function GuestManagementPage() {
     setRsvpFilter((prev) => prev === status ? null : status)
   }
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
-        <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>載入中...</p>
-      </div>
-    )
-  }
-
   // ─── Empty state ────────────────────────────────────
   if (guests.length === 0 && !addingGuest) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
-        <Toolbar page="guests" />
+      <div style={{ flex: 1, background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ maxWidth: 1440, margin: '0 auto', padding: '32px 24px', width: '100%' }}>
           <div style={{ textAlign: 'center', padding: '80px 24px' }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>尚無賓客</h2>
@@ -454,8 +438,7 @@ export default function GuestManagementPage() {
 
   // ─── Main table view ────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar page="guests" />
+    <div style={{ flex: 1, background: 'var(--bg-primary)', overflow: 'auto' }}>
       <div style={{ maxWidth: 1440, margin: '0 auto', padding: '24px 24px', width: '100%' }}>
 
         {/* Stats Bar */}

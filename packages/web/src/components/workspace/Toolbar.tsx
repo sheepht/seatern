@@ -459,7 +459,7 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
   return (
     <>
       <div
-        className="h-14 border-b bg-white px-5 flex items-center justify-between"
+        className="h-14 border-b bg-white px-5 flex items-stretch justify-between"
         style={{ borderColor: 'var(--border)' }}
       >
         {/* Left: Brand + Event name + stats */}
@@ -524,10 +524,41 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
           </>}
         </div>
 
-        {/* Right: Actions */}
-        <div className="flex items-center gap-2">
+        {/* Right: Tab nav + ☰ */}
+        <div className="flex items-stretch gap-2">
+          {/* 頁面 Tab — 左上右有邊框，active tab 底部開口連接內容區 */}
+          <div className="flex self-stretch items-end" style={{ marginBottom: -1 }}>
+            <button
+              onClick={() => { if (!isWorkspace) navigate(`/workspace/${eid}`) }}
+              style={{
+                padding: '10px 16px', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500,
+                cursor: isWorkspace ? 'default' : 'pointer',
+                background: isWorkspace ? 'var(--bg-primary)' : 'transparent',
+                color: isWorkspace ? 'var(--text-primary)' : 'var(--text-muted)',
+                border: isWorkspace ? '1px solid var(--border)' : '1px solid transparent',
+                borderBottom: isWorkspace ? '1px solid var(--bg-primary)' : '1px solid transparent',
+                borderRadius: '6px 6px 0 0',
+                marginRight: -1,
+                transition: 'color 150ms',
+              }}
+            >排位畫布</button>
+            <button
+              onClick={() => { if (isWorkspace) navigate(`/workspace/${eid}/guests`) }}
+              style={{
+                padding: '10px 16px', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500,
+                cursor: isWorkspace ? 'pointer' : 'default',
+                background: !isWorkspace ? 'var(--bg-primary)' : 'transparent',
+                color: !isWorkspace ? 'var(--text-primary)' : 'var(--text-muted)',
+                border: !isWorkspace ? '1px solid var(--border)' : '1px solid transparent',
+                borderBottom: !isWorkspace ? '1px solid var(--bg-primary)' : '1px solid transparent',
+                borderRadius: '6px 6px 0 0',
+                transition: 'color 150ms',
+              }}
+            >賓客名單</button>
+          </div>
+
           {/* ☰ 選單按鈕 */}
-          <div className="relative">
+          <div className="relative self-center">
             <button
               onClick={() => setShowMenu(!showMenu)}
               className="flex items-center justify-center w-8 h-8 rounded cursor-pointer hover:bg-[var(--accent-light)] relative"
@@ -535,14 +566,6 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
               title="更多"
             >
               <Menu size={18} />
-              {isWorkspace && avoidPairs.length > 0 && (
-                <span
-                  className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 text-white text-[9px] rounded-full flex items-center justify-center"
-                  style={{ background: 'var(--error)' }}
-                >
-                  {avoidPairs.length}
-                </span>
-              )}
             </button>
 
             {showMenu && (
@@ -557,19 +580,6 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                     boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
                   }}
                 >
-                  {/* 頁面切換 */}
-                  <button
-                    onClick={() => { setShowMenu(false); navigate(isWorkspace ? `/workspace/${eid}/guests` : `/workspace/${eid}`) }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
-                    style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-body)' }}
-                  >
-                    <Users size={16} className="shrink-0" />
-                    <span>{isWorkspace ? '賓客名單' : '排位畫布'}</span>
-                  </button>
-
-                  {/* 分隔線 */}
-                  <div className="my-1" style={{ borderTop: '1px solid var(--border)' }} />
-
                   {/* 登入（未來擴充） */}
                   <button
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"

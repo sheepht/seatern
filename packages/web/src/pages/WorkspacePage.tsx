@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import {
   DndContext,
@@ -13,7 +12,6 @@ import {
   type DragOverEvent,
 } from '@dnd-kit/core'
 import { useSeatingStore, type Guest, type AvoidPair } from '@/stores/seating'
-import { Toolbar } from '@/components/workspace/Toolbar'
 import { FloorPlan, type FloorPlanHandle } from '@/components/workspace/FloorPlan'
 import { SidePanel } from '@/components/workspace/SidePanel'
 import { DragOverlayContent } from '@/components/workspace/DragOverlayContent'
@@ -66,9 +64,6 @@ function ExpandButton({ collapsed, onClick }: { collapsed: boolean; onClick: () 
 }
 
 export default function WorkspacePage() {
-  const { eventId } = useParams<{ eventId: string }>()
-  const loadEvent = useSeatingStore((s) => s.loadEvent)
-  const loading = useSeatingStore((s) => s.loading)
   const guests = useSeatingStore((s) => s.guests)
   const moveGuest = useSeatingStore((s) => s.moveGuest)
   const moveGuestToSeat = useSeatingStore((s) => s.moveGuestToSeat)
@@ -110,10 +105,6 @@ export default function WorkspacePage() {
       activationConstraint: { distance: 5 },
     }),
   )
-
-  useEffect(() => {
-    if (eventId) loadEvent(eventId)
-  }, [eventId, loadEvent])
 
   /** 從 drag event 取得賓客 ID */
   const getGuestId = (event: DragStartEvent | DragOverEvent | DragEndEvent): string => {
@@ -243,14 +234,6 @@ export default function WorkspacePage() {
     setPendingMove(null)
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">載入中...</p>
-      </div>
-    )
-  }
-
   // 取得違規的衝突對象名稱
   const getConflictName = () => {
     if (!pendingMove) return ''
@@ -262,13 +245,7 @@ export default function WorkspacePage() {
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-      <div className="h-screen flex flex-col bg-gray-50">
-        <Toolbar
-          onFitAll={() => floorPlanRef.current?.fitAll(true)}
-          onPanToTable={(x, y) => floorPlanRef.current?.panToPoint(x, y)}
-        />
-
-        <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden">
           {/* 折疊時的展開條（永遠渲染，寬度跟側邊欄同步動畫） */}
           <ExpandButton collapsed={sidebarCollapsed} onClick={() => setSidebarCollapsed(false)} />
           {/* 側邊欄 — z-index 高於 SVG 溢出的推薦線 */}
@@ -296,8 +273,6 @@ export default function WorkspacePage() {
             <FloorPlan ref={floorPlanRef} />
           </div>
         </div>
-
-      </div>
 
       <DragOverlay dropAnimation={null}>
         {activeGuest && <DragOverlayContent guest={activeGuest} />}

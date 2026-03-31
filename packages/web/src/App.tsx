@@ -6,6 +6,7 @@ import LandingPage from '@/pages/LandingPage'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 import ImportPage from '@/pages/ImportPage'
+import WorkspaceLayout from '@/pages/WorkspaceLayout'
 import WorkspacePage from '@/pages/WorkspacePage'
 import GuestManagementPage from '@/pages/GuestManagementPage'
 
@@ -26,8 +27,10 @@ function App() {
 
             {/* Import + Workspace（Phase 1 不需要登入） */}
             <Route path="/import" element={<ImportPage />} />
-            <Route path="/workspace/:eventId" element={<WorkspacePage />} />
-            <Route path="/workspace/:eventId/guests" element={<GuestManagementPage />} />
+            <Route path="/workspace/:eventId" element={<WorkspaceLayout />}>
+              <Route index element={<WorkspacePage />} />
+              <Route path="guests" element={<GuestManagementPage />} />
+            </Route>
 
             {/* Protected routes */}
             <Route path="/dashboard" element={<ProtectedRoute><DashboardPlaceholder /></ProtectedRoute>} />
