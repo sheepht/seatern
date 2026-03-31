@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, Trash2, ChevronDown, ChevronRight, Search, X } from 'lucide-react'
+import { Plus, Trash2, Search, X } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
-import type { Guest } from '@/lib/types'
+import type { Guest, Table } from '@/lib/types'
 
 // ─── Types ──────────────────────────────────────────
 
@@ -53,14 +54,14 @@ function Toast({ message, onUndo, onClose }: { message: string; onUndo?: () => v
       style={{
         position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
         background: 'var(--text-primary)', color: 'var(--bg-surface)', padding: '10px 20px',
-        borderRadius: 'var(--radius-md, 8px)', fontSize: 13, fontFamily: 'var(--font-body)',
+        borderRadius: 'var(--radius-md, 8px)', fontSize: 14, fontFamily: 'var(--font-body)',
         display: 'flex', alignItems: 'center', gap: 12, zIndex: 9999,
         boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
       }}
     >
       <span>{message}</span>
       {onUndo && (
-        <button onClick={onUndo} style={{ color: 'var(--accent-light)', fontWeight: 600, cursor: 'pointer', background: 'none', border: 'none', fontSize: 13 }}>
+        <button onClick={onUndo} style={{ color: 'var(--accent-light)', fontWeight: 600, cursor: 'pointer', background: 'none', border: 'none', fontSize: 14 }}>
           復原
         </button>
       )}
@@ -116,68 +117,66 @@ function EditableText({
   )
 }
 
-function NumberStepper({ value, min, max, onSave }: { value: number; min: number; max: number; onSave: (v: number) => void }) {
+function NumberStepper({ value, min, max, onSave, maxTooltip }: { value: number; min: number; max: number; onSave: (v: number) => void; maxTooltip?: string }) {
+  const atMax = value >= max
+  const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null)
+  const popoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const btnRef = useRef<HTMLSpanElement>(null)
+
+  const handleMaxHover = () => {
+    if (!atMax || !maxTooltip) return
+    popoverTimer.current = setTimeout(() => {
+      if (btnRef.current) {
+        const r = btnRef.current.getBoundingClientRect()
+        setPopoverPos({ x: r.right, y: r.top - 6 })
+      }
+    }, 300)
+  }
+  const handleMaxLeave = () => {
+    if (popoverTimer.current) clearTimeout(popoverTimer.current)
+    setPopoverPos(null)
+  }
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       <button
         onClick={() => value > min && onSave(value - 1)}
         disabled={value <= min}
         style={{
-          width: 22, height: 22, borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
+          width: 24, height: 24, borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
           background: value <= min ? 'transparent' : 'var(--bg-surface)', cursor: value <= min ? 'default' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
           color: value <= min ? 'var(--text-muted)' : 'var(--text-secondary)',
         }}
       >−</button>
-      <span style={{ fontFamily: 'var(--font-data)', fontVariantNumeric: 'tabular-nums', minWidth: 16, textAlign: 'center' }}>{value}</span>
-      <button
-        onClick={() => value < max && onSave(value + 1)}
-        disabled={value >= max}
-        style={{
-          width: 22, height: 22, borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
-          background: value >= max ? 'transparent' : 'var(--bg-surface)', cursor: value >= max ? 'default' : 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
-          color: value >= max ? 'var(--text-muted)' : 'var(--text-secondary)',
-        }}
-      >+</button>
+      <span style={{ fontFamily: 'var(--font-data)', fontVariantNumeric: 'tabular-nums', minWidth: 18, textAlign: 'center' }}>{value}</span>
+      <span ref={btnRef} onMouseEnter={handleMaxHover} onMouseLeave={handleMaxLeave} style={{ display: 'inline-flex' }}>
+        <button
+          onClick={() => !atMax && onSave(value + 1)}
+          disabled={atMax}
+          style={{
+            width: 24, height: 24, borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
+            background: atMax ? 'transparent' : 'var(--bg-surface)', cursor: atMax ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+            color: atMax ? 'var(--text-muted)' : 'var(--text-secondary)',
+          }}
+        >+</button>
+      </span>
+      {popoverPos && maxTooltip && createPortal(
+        <div style={{
+          position: 'fixed', left: popoverPos.x, top: popoverPos.y,
+          transform: 'translate(-100%, -100%)',
+          background: 'var(--text-primary)', color: 'var(--bg-surface)',
+          padding: '4px 10px', borderRadius: 'var(--radius-sm, 4px)',
+          fontSize: 12, fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', pointerEvents: 'none',
+          zIndex: 9999,
+        }}>
+          {maxTooltip}
+        </div>,
+        document.body
+      )}
     </div>
-  )
-}
-
-// ─── Row Expand ─────────────────────────────────────
-
-function RowExpand({ guest, onSave }: { guest: Guest; onSave: (patch: Partial<Guest>) => void }) {
-  return (
-    <tr>
-      <td colSpan={9} style={{ background: 'var(--bg-primary)', padding: '12px 16px 12px 48px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', fontSize: 13, fontFamily: 'var(--font-body)', color: 'var(--text-secondary)' }}>
-          <div style={{ minWidth: 200 }}>
-            <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>別名</div>
-            <div>{guest.aliases.length > 0 ? guest.aliases.join('、') : '—'}</div>
-          </div>
-          <div style={{ minWidth: 120 }}>
-            <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>關係分數</div>
-            <div style={{ display: 'flex', gap: 2 }}>
-              {[1, 2, 3].map((s) => (
-                <span
-                  key={s}
-                  onClick={() => onSave({ relationScore: s })}
-                  style={{ cursor: 'pointer', fontSize: 16, color: s <= guest.relationScore ? 'var(--accent)' : 'var(--border)' }}
-                >★</span>
-              ))}
-            </div>
-          </div>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>飲食備註</div>
-            <EditableText value={guest.dietaryNote || ''} onSave={(v) => onSave({ dietaryNote: v })} placeholder="無" maxLength={100} />
-          </div>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>特殊備註</div>
-            <EditableText value={guest.specialNote || ''} onSave={(v) => onSave({ specialNote: v })} placeholder="無" maxLength={100} />
-          </div>
-        </div>
-      </td>
-    </tr>
   )
 }
 
@@ -189,18 +188,18 @@ function DeleteConfirmModal({ guestName, tableName, onConfirm, onCancel }: {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
       <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg, 12px)', padding: 24, maxWidth: 400, width: '90%', boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }}>
-        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>確定要刪除？</h3>
-        <p style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 20px' }}>
+        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>確定要刪除？</h3>
+        <p style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text-secondary)', margin: '0 0 20px' }}>
           {guestName} 目前在{tableName}，刪除後該座位會空出。
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button
             onClick={onCancel}
-            style={{ padding: '6px 16px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', background: 'var(--bg-surface)', cursor: 'pointer', fontSize: 13, fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)' }}
+            style={{ padding: '6px 16px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', background: 'var(--bg-surface)', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)' }}
           >取消</button>
           <button
             onClick={onConfirm}
-            style={{ padding: '6px 16px', borderRadius: 'var(--radius-sm, 4px)', border: 'none', background: 'var(--error)', color: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'var(--font-ui)', fontWeight: 500 }}
+            style={{ padding: '6px 16px', borderRadius: 'var(--radius-sm, 4px)', border: 'none', background: 'var(--error)', color: '#fff', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500 }}
           >刪除</button>
         </div>
       </div>
@@ -229,7 +228,7 @@ function StatsBar({
   return (
     <div style={{
       display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '12px 0',
-      fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text-secondary)',
+      fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text-secondary)',
       borderBottom: '1px solid var(--border)',
     }}>
       <div style={statStyle()} onClick={() => onFilterClick('confirmed')}>
@@ -267,6 +266,7 @@ export default function GuestManagementPage() {
   const guests = useSeatingStore((s) => s.guests)
   const tables = useSeatingStore((s) => s.tables)
   const eventName = useSeatingStore((s) => s.eventName)
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs)
   const updateGuest = useSeatingStore((s) => s.updateGuest)
   const deleteGuest = useSeatingStore((s) => s.deleteGuest)
   const addGuest = useSeatingStore((s) => s.addGuest)
@@ -277,7 +277,6 @@ export default function GuestManagementPage() {
   const [rsvpFilter, setRsvpFilter] = useState<string | null>(null)
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ guestId: string; guestName: string; tableName: string } | null>(null)
   const [addingGuest, setAddingGuest] = useState(false)
@@ -308,8 +307,9 @@ export default function GuestManagementPage() {
   // Get unique categories from event
   const categories = Array.from(new Set(guests.map((g) => g.category).filter(Boolean))) as string[]
 
-  // Table name lookup
+  // Lookup maps
   const tableNameMap = new Map(tables.map((t) => [t.id, t.name]))
+  const guestNameMap = new Map(guests.map((g) => [g.id, g.name]))
 
   // Filter + sort
   const filtered = guests.filter((g) => {
@@ -395,14 +395,6 @@ export default function GuestManagementPage() {
     handleSave(guest.id, { rsvpStatus: next as any })
   }, [handleSave])
 
-  const toggleExpand = (id: string) => {
-    setExpandedRows((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      return next
-    })
-  }
-
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
     else { setSortField(field); setSortDir('asc') }
@@ -423,10 +415,10 @@ export default function GuestManagementPage() {
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>尚無賓客</h2>
             <p style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text-secondary)', marginBottom: 24 }}>點擊下方新增或返回匯入名單</p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-              <button onClick={() => setAddingGuest(true)} style={{ padding: '8px 20px', borderRadius: 'var(--radius-sm, 4px)', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'var(--font-ui)', fontWeight: 500 }}>
+              <button onClick={() => setAddingGuest(true)} style={{ padding: '8px 20px', borderRadius: 'var(--radius-sm, 4px)', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500 }}>
                 <Plus size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> 新增賓客
               </button>
-              <button onClick={() => navigate('/import')} style={{ padding: '8px 20px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', background: 'var(--bg-surface)', cursor: 'pointer', fontSize: 13, fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)' }}>
+              <button onClick={() => navigate('/import')} style={{ padding: '8px 20px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', background: 'var(--bg-surface)', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)' }}>
                 匯入名單
               </button>
             </div>
@@ -455,7 +447,7 @@ export default function GuestManagementPage() {
               placeholder="搜尋姓名/暱稱..."
               style={{
                 width: '100%', padding: '6px 10px 6px 30px', borderRadius: 'var(--radius-sm, 4px)',
-                border: '1px solid var(--border)', background: 'var(--bg-surface)', fontSize: 13,
+                border: '1px solid var(--border)', background: 'var(--bg-surface)', fontSize: 14,
                 fontFamily: 'var(--font-body)', color: 'var(--text-primary)', outline: 'none',
               }}
             />
@@ -473,7 +465,7 @@ export default function GuestManagementPage() {
                 key={cat}
                 onClick={() => { setCategoryFilter(cat as CategoryFilter); setRsvpFilter(null) }}
                 style={{
-                  padding: '5px 12px', border: 'none', fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 500,
+                  padding: '5px 12px', border: 'none', fontSize: 13, fontFamily: 'var(--font-ui)', fontWeight: 500,
                   cursor: 'pointer',
                   background: categoryFilter === cat ? 'var(--accent)' : 'var(--bg-surface)',
                   color: categoryFilter === cat ? '#fff' : 'var(--text-secondary)',
@@ -489,7 +481,7 @@ export default function GuestManagementPage() {
               style={{
                 display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
                 borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
-                background: 'var(--accent-light)', fontSize: 12, fontFamily: 'var(--font-ui)',
+                background: 'var(--accent-light)', fontSize: 13, fontFamily: 'var(--font-ui)',
                 cursor: 'pointer', color: 'var(--text-primary)',
               }}
             >
@@ -500,36 +492,70 @@ export default function GuestManagementPage() {
 
         {/* Table */}
         <div style={{ overflowX: 'auto', marginTop: 8 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-body)', fontSize: 13 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-body)', fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                <th style={{ width: 28 }} />
                 <th onClick={() => handleSort('name')} style={thStyle}>姓名{sortArrow('name')}</th>
                 <th onClick={() => handleSort('category')} style={thStyle}>分類{sortArrow('category')}</th>
                 <th style={thStyle}>標籤</th>
+                <th style={{ ...thStyle, textAlign: 'center' }}>關係</th>
                 <th onClick={() => handleSort('assignedTableId')} style={thStyle}>桌次{sortArrow('assignedTableId')}</th>
                 <th onClick={() => handleSort('satisfactionScore')} style={{ ...thStyle, textAlign: 'right' }}>滿意度{sortArrow('satisfactionScore')}</th>
                 <th onClick={() => handleSort('rsvpStatus')} style={{ ...thStyle, textAlign: 'center' }}>出席{sortArrow('rsvpStatus')}</th>
                 <th style={{ ...thStyle, textAlign: 'center' }}>人數</th>
+                <th style={thStyle}>想同桌</th>
+                <th style={thStyle}>要避桌</th>
+                <th style={thStyle}>飲食</th>
+                <th style={thStyle}>特殊需求</th>
                 <th style={{ width: 36 }} />
               </tr>
             </thead>
             <tbody>
               {filtered.map((guest) => {
-                const expanded = expandedRows.has(guest.id)
                 const tableName = guest.assignedTableId ? tableNameMap.get(guest.assignedTableId) || '—' : '未排座'
                 const satColor = guest.assignedTableId ? getSatisfactionColor(guest.satisfactionScore) : 'var(--text-muted)'
                 const tags = guest.guestTags.map((gt) => gt.tag.name)
+
+                // Compute dynamic max attendeeCount based on table capacity
+                let maxAttendee = 10
+                let maxAttendeeTooltip: string | undefined
+                if (guest.assignedTableId) {
+                  const table = tables.find((t) => t.id === guest.assignedTableId)
+                  if (table) {
+                    const othersSeats = guests
+                      .filter((g) => g.assignedTableId === table.id && g.id !== guest.id && g.rsvpStatus === 'confirmed')
+                      .reduce((sum, g) => sum + g.attendeeCount, 0)
+                    maxAttendee = Math.min(10, table.capacity - othersSeats)
+                    if (maxAttendee <= guest.attendeeCount) {
+                      const used = othersSeats + guest.attendeeCount
+                      maxAttendeeTooltip = `${table.name}已滿 (${used}/${table.capacity})`
+                    }
+                  }
+                }
+
+                // Seat preference names (sorted by rank)
+                const prefNames = guest.seatPreferences
+                  .slice().sort((a, b) => a.rank - b.rank)
+                  .map((p) => guestNameMap.get(p.preferredGuestId))
+                  .filter(Boolean) as string[]
+
+                // Avoid pair names for this guest
+                const avoidNames = avoidPairs
+                  .filter((ap) => ap.guestAId === guest.id || ap.guestBId === guest.id)
+                  .map((ap) => guestNameMap.get(ap.guestAId === guest.id ? ap.guestBId : ap.guestAId))
+                  .filter(Boolean) as string[]
 
                 return (
                   <GuestRow
                     key={guest.id}
                     guest={guest}
-                    expanded={expanded}
                     tableName={tableName}
                     satColor={satColor}
                     tags={tags}
-                    onToggleExpand={() => toggleExpand(guest.id)}
+                    maxAttendee={maxAttendee}
+                    maxAttendeeTooltip={maxAttendeeTooltip}
+                    prefNames={prefNames}
+                    avoidNames={avoidNames}
                     onSave={(patch) => handleSave(guest.id, patch)}
                     onRsvpToggle={() => handleRsvpToggle(guest)}
                     onDelete={() => handleDelete(guest)}
@@ -539,7 +565,7 @@ export default function GuestManagementPage() {
 
               {/* Empty search result */}
               {filtered.length === 0 && guests.length > 0 && (
-                <tr><td colSpan={9} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
+                <tr><td colSpan={13} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
                   沒有符合的賓客
                 </td></tr>
               )}
@@ -547,8 +573,7 @@ export default function GuestManagementPage() {
               {/* Add guest row */}
               {addingGuest && (
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ width: 28 }} />
-                  <td colSpan={7} style={{ padding: '8px 12px' }}>
+                  <td colSpan={12} style={{ padding: '8px 12px' }}>
                     <input
                       ref={newGuestRef}
                       value={newGuestName}
@@ -559,7 +584,7 @@ export default function GuestManagementPage() {
                       style={{
                         width: '100%', padding: '4px 8px', border: 'none',
                         borderBottom: '2px solid var(--accent)', background: 'var(--accent-light)',
-                        fontSize: 13, fontFamily: 'var(--font-body)', outline: 'none',
+                        fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none',
                         borderRadius: 2, color: 'var(--text-primary)',
                       }}
                     />
@@ -578,7 +603,7 @@ export default function GuestManagementPage() {
             style={{
               display: 'flex', alignItems: 'center', gap: 4, marginTop: 12, padding: '8px 16px',
               background: 'none', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm, 4px)',
-              cursor: 'pointer', fontSize: 13, fontFamily: 'var(--font-ui)', fontWeight: 500, color: 'var(--accent)',
+              cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500, color: 'var(--accent)',
             }}
           >
             <Plus size={14} /> 新增賓客
@@ -604,105 +629,136 @@ export default function GuestManagementPage() {
 
 // ─── Guest Row (memo for perf) ──────────────────────
 
-const GuestRow = ({ guest, expanded, tableName, satColor, tags, onToggleExpand, onSave, onRsvpToggle, onDelete }: {
-  guest: Guest; expanded: boolean; tableName: string; satColor: string; tags: string[]
-  onToggleExpand: () => void; onSave: (patch: Partial<Guest>) => void; onRsvpToggle: () => void; onDelete: () => void
+const GuestRow = ({ guest, tableName, satColor, tags, maxAttendee, maxAttendeeTooltip, prefNames, avoidNames, onSave, onRsvpToggle, onDelete }: {
+  guest: Guest; tableName: string; satColor: string; tags: string[]
+  maxAttendee: number; maxAttendeeTooltip?: string
+  prefNames: string[]; avoidNames: string[]
+  onSave: (patch: Partial<Guest>) => void; onRsvpToggle: () => void; onDelete: () => void
 }) => {
   const [hovered, setHovered] = useState(false)
+  const aliasText = guest.aliases.length > 0 ? `（${guest.aliases.join('、')}）` : ''
 
   return (
-    <>
-      <tr
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{ borderBottom: expanded ? 'none' : '1px solid var(--border)', background: hovered ? 'var(--accent-light)' : 'transparent', transition: 'background 50ms' }}
-      >
-        {/* Expand toggle */}
-        <td style={{ width: 28, padding: '0 0 0 8px', cursor: 'pointer' }} onClick={onToggleExpand}>
-          {expanded ? <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} /> : <ChevronRight size={14} style={{ color: 'var(--text-muted)' }} />}
-        </td>
-
-        {/* Name */}
-        <td style={tdStyle}>
+    <tr
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ borderBottom: '1px solid var(--border)', background: hovered ? 'var(--accent-light)' : 'transparent', transition: 'background 50ms' }}
+    >
+      {/* Name + aliases */}
+      <td style={tdStyle}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
           <EditableText value={guest.name} onSave={(v) => onSave({ name: v })} />
-          {guest.aliases.length > 0 && (
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-              {guest.aliases.slice(0, 2).join('、')}
-              {guest.aliases.length > 2 && <span> +{guest.aliases.length - 2}</span>}
-            </div>
-          )}
-        </td>
+          {aliasText && <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{aliasText}</span>}
+        </div>
+      </td>
 
-        {/* Category */}
-        <td style={tdStyle}>
-          {guest.category && (
-            <span style={{ ...categoryBadgeStyle(guest.category), padding: '1px 8px', borderRadius: 'var(--radius-sm, 4px)', fontSize: 11, fontFamily: 'var(--font-ui)', fontWeight: 500 }}>
-              {guest.category}
-            </span>
-          )}
-        </td>
+      {/* Category */}
+      <td style={tdStyle}>
+        {guest.category && (
+          <span style={{ ...categoryBadgeStyle(guest.category), padding: '1px 8px', borderRadius: 'var(--radius-sm, 4px)', fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 500 }}>
+            {guest.category}
+          </span>
+        )}
+      </td>
 
-        {/* Tags */}
-        <td style={tdStyle}>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {tags.slice(0, 2).map((t) => (
-              <span key={t} style={{ padding: '1px 6px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)' }}>{t}</span>
-            ))}
-            {tags.length > 2 && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>+{tags.length - 2}</span>}
-          </div>
-        </td>
+      {/* Tags */}
+      <td style={tdStyle}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {tags.slice(0, 2).map((t) => (
+            <span key={t} style={{ padding: '1px 6px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)' }}>{t}</span>
+          ))}
+          {tags.length > 2 && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>+{tags.length - 2}</span>}
+        </div>
+      </td>
 
-        {/* Table */}
-        <td style={tdStyle}>
-          <span style={{ color: guest.assignedTableId ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 12 }}>{tableName}</span>
-        </td>
+      {/* Relation score (stars) */}
+      <td style={{ ...tdStyle, textAlign: 'center' }}>
+        <div style={{ display: 'inline-flex', gap: 1 }}>
+          {[1, 2, 3].map((s) => (
+            <span
+              key={s}
+              onClick={() => onSave({ relationScore: s })}
+              style={{ cursor: 'pointer', fontSize: 14, color: s <= guest.relationScore ? 'var(--accent)' : 'var(--border)' }}
+            >★</span>
+          ))}
+        </div>
+      </td>
 
-        {/* Satisfaction */}
-        <td style={{ ...tdStyle, textAlign: 'right' }}>
-          {guest.assignedTableId ? (
-            <span style={{ color: satColor, fontFamily: 'var(--font-data)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-              {guest.satisfactionScore.toFixed(0)}
-            </span>
-          ) : (
-            <span style={{ color: 'var(--text-muted)' }}>—</span>
-          )}
-        </td>
+      {/* Table */}
+      <td style={tdStyle}>
+        <span style={{ color: guest.assignedTableId ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 13 }}>{tableName}</span>
+      </td>
 
-        {/* RSVP toggle */}
-        <td style={{ ...tdStyle, textAlign: 'center' }}>
-          <button
-            onClick={onRsvpToggle}
-            title={RSVP_LABELS[guest.rsvpStatus]}
-            style={{
-              width: 28, height: 28, borderRadius: 'var(--radius-sm, 4px)',
-              border: '1px solid var(--border)', background: 'var(--bg-surface)',
-              cursor: 'pointer', fontSize: 14, fontWeight: 600,
-              color: rsvpColor(guest.rsvpStatus), display: 'inline-flex',
-              alignItems: 'center', justifyContent: 'center',
-            }}
-          >{rsvpIcon(guest.rsvpStatus)}</button>
-        </td>
+      {/* Satisfaction */}
+      <td style={{ ...tdStyle, textAlign: 'right' }}>
+        {guest.assignedTableId ? (
+          <span style={{ color: satColor, fontFamily: 'var(--font-data)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+            {guest.satisfactionScore.toFixed(0)}
+          </span>
+        ) : (
+          <span style={{ color: 'var(--text-muted)' }}>—</span>
+        )}
+      </td>
 
-        {/* Attendee count stepper */}
-        <td style={{ ...tdStyle, textAlign: 'center' }}>
-          <NumberStepper value={guest.attendeeCount} min={1} max={10} onSave={(v) => onSave({ attendeeCount: v })} />
-        </td>
+      {/* RSVP toggle */}
+      <td style={{ ...tdStyle, textAlign: 'center' }}>
+        <button
+          onClick={onRsvpToggle}
+          title={RSVP_LABELS[guest.rsvpStatus]}
+          style={{
+            width: 28, height: 28, borderRadius: 'var(--radius-sm, 4px)',
+            border: '1px solid var(--border)', background: 'var(--bg-surface)',
+            cursor: 'pointer', fontSize: 14, fontWeight: 600,
+            color: rsvpColor(guest.rsvpStatus), display: 'inline-flex',
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >{rsvpIcon(guest.rsvpStatus)}</button>
+      </td>
 
-        {/* Delete */}
-        <td style={{ width: 36, padding: '0 8px' }}>
-          <button
-            onClick={onDelete}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: hovered ? 'var(--error)' : 'transparent', padding: 4, borderRadius: 'var(--radius-sm, 4px)', transition: 'color 100ms' }}
-            title="刪除"
-          >
-            <Trash2 size={14} />
-          </button>
-        </td>
-      </tr>
+      {/* Attendee count stepper */}
+      <td style={{ ...tdStyle, textAlign: 'center' }}>
+        <NumberStepper value={guest.attendeeCount} min={1} max={maxAttendee} onSave={(v) => onSave({ attendeeCount: v })} maxTooltip={maxAttendeeTooltip} />
+      </td>
 
-      {/* Expanded row */}
-      {expanded && <RowExpand guest={guest} onSave={(patch) => onSave(patch)} />}
-    </>
+      {/* Seat preferences */}
+      <td style={tdStyle}>
+        {prefNames.length > 0 ? (
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{prefNames.join('、')}</span>
+        ) : (
+          <span style={{ color: 'var(--text-muted)' }}>—</span>
+        )}
+      </td>
+
+      {/* Avoid pairs */}
+      <td style={tdStyle}>
+        {avoidNames.length > 0 ? (
+          <span style={{ fontSize: 13, color: 'var(--error)' }}>{avoidNames.join('、')}</span>
+        ) : (
+          <span style={{ color: 'var(--text-muted)' }}>—</span>
+        )}
+      </td>
+
+      {/* Dietary note */}
+      <td style={tdStyle}>
+        <EditableText value={guest.dietaryNote || ''} onSave={(v) => onSave({ dietaryNote: v })} placeholder="—" maxLength={100} />
+      </td>
+
+      {/* Special note */}
+      <td style={tdStyle}>
+        <EditableText value={guest.specialNote || ''} onSave={(v) => onSave({ specialNote: v })} placeholder="—" maxLength={100} />
+      </td>
+
+      {/* Delete */}
+      <td style={{ width: 36, padding: '0 8px' }}>
+        <button
+          onClick={onDelete}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: hovered ? 'var(--error)' : 'transparent', padding: 4, borderRadius: 'var(--radius-sm, 4px)', transition: 'color 100ms' }}
+          title="刪除"
+        >
+          <Trash2 size={14} />
+        </button>
+      </td>
+    </tr>
   )
 }
 
@@ -710,7 +766,7 @@ const GuestRow = ({ guest, expanded, tableName, satColor, tags, onToggleExpand, 
 
 const thStyle: React.CSSProperties = {
   padding: '8px 12px', textAlign: 'left', fontFamily: 'var(--font-ui)',
-  fontSize: 12, fontWeight: 600, color: 'var(--text-muted)',
+  fontSize: 13, fontWeight: 600, color: 'var(--text-muted)',
   textTransform: 'uppercase' as const, cursor: 'pointer', userSelect: 'none',
   whiteSpace: 'nowrap',
 }
