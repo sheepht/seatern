@@ -337,11 +337,8 @@ export async function autoAssignGuests(
   }
 
   // ─── Step 3: 消除「想換桌」標記 ────────────────────────
-  // 用跟 FloorPlan 背景掃描完全相同的條件，掃描「所有已入座賓客」
-  // （不只新分配的），反覆移動直到沒有任何人會被標上「想換桌」圖示。
-  const allSeatedIds = simGuests
-    .filter((g) => g.assignedTableId && g.rsvpStatus === 'confirmed')
-    .map((g) => g.id)
+  // 只掃描新分配的賓客，不移動已入座的人。
+  const newlyAssignedIds = [...assigned.keys()]
 
   const MAX_ELIM_ROUNDS = 50
   for (let round = 0; round < MAX_ELIM_ROUNDS; round++) {
@@ -370,7 +367,7 @@ export async function autoAssignGuests(
     let bestCandidate: { guestId: string; tableId: string; guestDelta: number } | null = null
 
     let step3CalcCount = 0
-    for (const guestId of allSeatedIds) {
+    for (const guestId of newlyAssignedIds) {
       const guest = simGuests.find((g) => g.id === guestId)!
       if (!guest.assignedTableId) continue
       const guestCurrentScore = currentScores.get(guestId) ?? 0
@@ -400,7 +397,7 @@ export async function autoAssignGuests(
 
     if (!bestCandidate) break // 沒有任何人想換桌了
 
-    // 執行移動（如果是原本就入座的賓客，也加入 assigned 讓 caller 知道）
+    // 執行移動
     const guest = simGuests.find((g) => g.id === bestCandidate.guestId)!
     guest.assignedTableId = bestCandidate.tableId
     assigned.set(bestCandidate.guestId, bestCandidate.tableId)
