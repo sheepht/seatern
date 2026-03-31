@@ -61,9 +61,8 @@ export function estimateAutoAssignTime(
   const step2Rounds = 10 // 平均約跑一半的 MAX_ROUNDS
   const step2Calls = step2CallsPerRound * step2Rounds
 
-  // Step 3 每輪：N_all_seated * N_tables
-  const nAllSeated = confirmed.length
-  const step3CallsPerRound = nAllSeated * nTables
+  // Step 3 每輪：只掃描新分配的賓客
+  const step3CallsPerRound = nAssigned * nTables
   const step3Rounds = 5 // 平均約 5 輪
   const step3Calls = step3CallsPerRound * step3Rounds
 
