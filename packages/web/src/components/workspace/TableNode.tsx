@@ -50,6 +50,7 @@ interface Props {
   table: Table
   isSelected: boolean
   isDragging: boolean
+  isOverlapping?: boolean
   isDimmed?: boolean
   zoom: number
   onMouseDown: (e: React.MouseEvent) => void
@@ -143,7 +144,7 @@ function TableScoreRing({ score, originalScore, hasGuests, hideDelta }: { score:
   )
 }
 
-export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMouseDown, onEmptySeatClick }: Props) {
+export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimmed, zoom, onMouseDown, onEmptySeatClick }: Props) {
   const counterScale = 1 / zoom // 桌名等維持固定螢幕大小
   const rawGuestScale = dampedCounterScale(zoom) // 賓客元素：阻尼縮小
   const nameAlpha = labelOpacity(zoom)         // 名字漸進淡出
@@ -345,7 +346,7 @@ export function TableNode({ table, isSelected, isDragging, isDimmed, zoom, onMou
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}
-      opacity={isDimmed ? 0.2 : isDragging ? 0.6 : 1}
+      opacity={isDimmed ? 0.2 : isOverlapping ? 0.4 : 1}
       style={{ transition: 'opacity 200ms ease-out' }}
     >
       {/* 操作圖示 — 畫在桌子圓形之前，讓桌面蓋住圖示（從背後彈出效果） */}

@@ -147,6 +147,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const dragOffsetRef = useRef({ x: 0, y: 0 })
   const dragStartPosRef = useRef({ x: 0, y: 0 })
   const didDragRef = useRef(false)
+  const [dragOverlap, setDragOverlap] = useState(false)
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -593,11 +594,28 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       didDragRef.current = true
       const point = getSvgPoint(e.clientX, e.clientY)
       const offset = dragOffsetRef.current
-      // 不再限制 CANVAS_WIDTH/HEIGHT，zoom/pan 下畫布無界
-      updateTablePosition(draggingTableId, point.x - offset.x, point.y - offset.y)
+      // Grid snap: 拖曳時即時吸附到 50px 格線
+      const rawX = point.x - offset.x
+      const rawY = point.y - offset.y
+      const snappedX = Math.round(rawX / 50) * 50
+      const snappedY = Math.round(rawY / 50) * 50
+      updateTablePosition(draggingTableId, snappedX, snappedY)
       updateScreenPositions()
+      // 偵測是否跟其他桌重疊
+      const dragTable = tables.find((t) => t.id === draggingTableId)
+      if (dragTable) {
+        const rDrag = Math.max(58 + Math.min(dragTable.capacity, 12) * 7, 88)
+        const overlaps = tables.some((t) => {
+          if (t.id === draggingTableId) return false
+          const rOther = Math.max(58 + Math.min(t.capacity, 12) * 7, 88)
+          const dx = snappedX - t.positionX
+          const dy = snappedY - t.positionY
+          return Math.sqrt(dx * dx + dy * dy) < rDrag + rOther - 10
+        })
+        setDragOverlap(overlaps)
+      }
     },
-    [draggingTableId, getSvgPoint, updateTablePosition, updateScreenPositions],
+    [draggingTableId, getSvgPoint, updateTablePosition, updateScreenPositions, tables],
   )
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
@@ -612,20 +630,17 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       return
     }
     if (draggingTableId && didDragRef.current) {
-      // Grid snap: 桌子位置吸附到最近的 50px 格線
-      const table = tables.find((t) => t.id === draggingTableId)
-      if (table) {
-        const snappedX = Math.round(table.positionX / 50) * 50
-        const snappedY = Math.round(table.positionY / 50) * 50
-        if (snappedX !== table.positionX || snappedY !== table.positionY) {
-          updateTablePosition(draggingTableId, snappedX, snappedY)
-          updateScreenPositions()
-        }
+      if (dragOverlap) {
+        // 重疊 → 回到原位
+        updateTablePosition(draggingTableId, dragStartPosRef.current.x, dragStartPosRef.current.y)
+        updateScreenPositions()
+      } else {
+        saveTablePosition(draggingTableId, dragStartPosRef.current.x, dragStartPosRef.current.y)
       }
-      saveTablePosition(draggingTableId, dragStartPosRef.current.x, dragStartPosRef.current.y)
     }
     setDraggingTableId(null)
-  }, [draggingTableId, saveTablePosition, tables, updateTablePosition, updateScreenPositions])
+    setDragOverlap(false)
+  }, [draggingTableId, dragOverlap, saveTablePosition, updateTablePosition, updateScreenPositions])
 
   const wasPanningRef = useRef(false)
   const handleCanvasClick = useCallback(
@@ -732,7 +747,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       >
         <defs>
           <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-            <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#E5E7EB" strokeWidth="0.5" />
+            <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#D6D3D1" strokeWidth="1" />
           </pattern>
           {/* 裁切推薦虛線，不讓線跑到側欄後面 */}
           <clipPath id="viewbox-clip">
@@ -878,6 +893,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                   table={table}
                   isSelected={table.id === selectedTableId}
                   isDragging={draggingTableId === table.id}
+                  isOverlapping={draggingTableId === table.id && dragOverlap}
                   isDimmed={shouldDim && !highlightedIds.has(table.id)}
                   zoom={zoom}
                   onMouseDown={(e) => handleMouseDown(table.id, e)}
