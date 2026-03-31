@@ -114,19 +114,18 @@ export async function autoAssignGuests(
 
   reportProgress('正在分組...', `${unassigned.length} 位賓客待分配`, 0.02, 0)
 
-  // 建立賓客間的親和度矩陣（用於分群）
+  // 建立賓客間的親和度矩陣（包含已入座的人，這樣新分配的人會考慮已有桌友的 tag）
   const affinityMap = new Map<string, Map<string, number>>()
-  for (const g of unassigned) {
+  for (const g of confirmed) {
     affinityMap.set(g.id, new Map())
   }
 
-  // 同 tag → 親和度 +2
-  for (let i = 0; i < unassigned.length; i++) {
-    const a = unassigned[i]
+  // 同 tag → 親和度 +2（unassigned 與所有 confirmed 之間）
+  for (const a of unassigned) {
     const aTags = a.guestTags.map((gt) => gt.tag.name)
     if (aTags.length === 0) continue
-    for (let j = i + 1; j < unassigned.length; j++) {
-      const b = unassigned[j]
+    for (const b of confirmed) {
+      if (a.id === b.id) continue
       const bTags = b.guestTags.map((gt) => gt.tag.name)
       const shared = aTags.some((t) => bTags.includes(t))
       if (shared) {
@@ -136,10 +135,10 @@ export async function autoAssignGuests(
     }
   }
 
-  // seatPreference → 親和度 +5（雙向 +10）
+  // seatPreference → 親和度 +5（unassigned 與所有 confirmed 之間）
   for (const g of unassigned) {
     for (const pref of g.seatPreferences) {
-      const other = unassigned.find((u) => u.id === pref.preferredGuestId)
+      const other = confirmed.find((u) => u.id === pref.preferredGuestId)
       if (other) {
         affinityMap.get(g.id)!.set(other.id, (affinityMap.get(g.id)!.get(other.id) || 0) + 5)
       }
