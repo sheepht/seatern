@@ -55,6 +55,18 @@
 - 推薦前 3 名最佳入座、hover 即時預覽桌子滿意度和賓客圓形
 - 畫布自動平移避免 popover 蓋到桌子
 
+### ~~避免同桌 Modal 重新設計~~ ✅ Done (2026-03-31)
+- 左右分欄寬 modal（800px）：左側分類→標籤分組賓客列表（點擊選人），右側已設定避桌組別
+- 已設定組別顯示 `[標籤]名字 vs 名字[標籤]`，標籤 badge 用 category 顏色區分男女方
+- 同桌狀態提示、重複配對防護、原因選填
+- 取代原本的兩個 `<select>` 下拉
+
+### AvoidPair store actions error handling (P3)
+- **什麼：** `addAvoidPair` 和 `removeAvoidPair` 的 API call 失敗時，local state 已更新但 server 沒有同步
+- **為什麼：** 網路斷線或 server error 時，用戶看到的 avoid pairs 跟 server 不一致。下次 reload 會回到舊狀態
+- **前提：** 不依賴其他功能
+- **Effort：** S（human）→ S（CC+gstack）
+
 ### 賓客資料管理 (P2, after auto-optimize)
 - **什麼：** 在 app 內編輯賓客資料（名字、群組、分類）、修改男方/女方/共同方名稱和顏色
 - **為什麼：** 目前修改資料需要重新匯入 Google Sheet，不方便
