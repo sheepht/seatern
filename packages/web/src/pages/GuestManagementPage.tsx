@@ -29,10 +29,107 @@ function rsvpColor(status: string) {
   return status === 'confirmed' ? 'var(--success)' : 'var(--error)'
 }
 
-function categoryBadgeStyle(category: string | undefined) {
-  if (category === '男方') return { background: '#DBEAFE', border: '1px solid #BFDBFE', color: '#1E40AF' }
-  if (category === '女方') return { background: '#FEE2E2', border: '1px solid #FECACA', color: '#991B1B' }
-  return { background: '#F3F4F6', border: '1px solid #D1D5DB', color: '#374151' }
+// ─── Category Color Presets ──────────────────────────
+
+interface CategoryColor { background: string; border: string; color: string }
+
+// 8 hues × 5 saturations + 5 grays = 45 presets (≈ square grid 8×6)
+const PALETTE_HUES = [0, 30, 55, 140, 195, 220, 275, 330] // red, orange, yellow, green, cyan, blue, purple, pink
+const PALETTE_SATS = [90, 72, 55, 40, 25] // vivid → muted
+
+function hslToHex(h: number, s: number, l: number): string {
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12
+    const a = s / 100 * Math.min(l / 100, 1 - l / 100)
+    const v = l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))
+    return Math.round(255 * v).toString(16).padStart(2, '0')
+  }
+  return `#${f(0)}${f(8)}${f(4)}`
+}
+
+function makeColor(h: number, s: number): CategoryColor {
+  return {
+    background: hslToHex(h, s, 88),
+    border: hslToHex(h, s, 75),
+    color: hslToHex(h, s, 28),
+  }
+}
+
+const COLOR_PRESETS: CategoryColor[][] = [
+  ...PALETTE_HUES.map((h) => PALETTE_SATS.map((s) => makeColor(h, s))),
+  // grays (same count as PALETTE_SATS)
+  PALETTE_SATS.map((_, i) => {
+    const lights = [92, 86, 78, 70, 60]
+    const l = lights[i]
+    return { background: hslToHex(220, 8, l), border: hslToHex(220, 8, l - 10), color: hslToHex(220, 10, 22) }
+  }),
+]
+
+const DEFAULT_CATEGORY_COLORS: Record<string, CategoryColor> = {
+  '男方': COLOR_PRESETS[5][0],  // 藍 (hue 220)
+  '女方': COLOR_PRESETS[0][0],  // 紅 (hue 0)
+  '共同': COLOR_PRESETS[8][0],  // 灰
+}
+
+function loadCategoryColors(eventId: string): Record<string, CategoryColor> {
+  try {
+    const raw = localStorage.getItem(`seatern:categoryColors:${eventId}`)
+    return raw ? { ...DEFAULT_CATEGORY_COLORS, ...JSON.parse(raw) } : { ...DEFAULT_CATEGORY_COLORS }
+  } catch { return { ...DEFAULT_CATEGORY_COLORS } }
+}
+
+function saveCategoryColors(eventId: string, colors: Record<string, CategoryColor>) {
+  localStorage.setItem(`seatern:categoryColors:${eventId}`, JSON.stringify(colors))
+}
+
+const FALLBACK_COLOR: CategoryColor = { background: '#E5E7EB', border: '#D1D5DB', color: '#374151' }
+
+function getCategoryBadgeStyle(category: string | undefined, colors: Record<string, CategoryColor>): CategoryColor {
+  if (!category) return FALLBACK_COLOR
+  return colors[category] || FALLBACK_COLOR
+}
+
+// ─── Category Color Picker ──────────────────────────
+
+function CategoryColorPicker({ current, onPick, onPreview, rect, onEnter, onClose }: {
+  current: CategoryColor; onPick: (c: CategoryColor) => void; onPreview: (c: CategoryColor | null) => void
+  rect: { left: number; bottom: number }; onEnter: () => void; onClose: () => void
+}) {
+  const cols = PALETTE_HUES.length + 1 // hues + gray column
+  const rows = PALETTE_SATS.length
+
+  return createPortal(
+    <div
+      onMouseEnter={onEnter}
+      onMouseLeave={onClose}
+      style={{
+        position: 'fixed', left: rect.left, top: rect.bottom + 4,
+        background: 'var(--bg-surface)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md, 8px)', padding: 8,
+        boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 9999,
+      }}
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 20px)`, gap: 3 }}>
+        {Array.from({ length: rows }, (_, si) =>
+          COLOR_PRESETS.map((hueRow, hi) => (
+            <div
+              key={`${hi}-${si}`}
+              onClick={() => onPick(hueRow[si])}
+              onMouseEnter={() => onPreview(hueRow[si])}
+              onMouseLeave={() => onPreview(null)}
+              style={{
+                width: 20, height: 20, borderRadius: 3, cursor: 'pointer',
+                background: hueRow[si].background,
+                outline: hueRow[si].color === current.color ? `2px solid ${hueRow[si].color}` : 'none',
+                outlineOffset: -1,
+              }}
+            />
+          ))
+        )}
+      </div>
+    </div>,
+    document.body,
+  )
 }
 
 // ─── Toast ──────────────────────────────────────────
@@ -204,8 +301,8 @@ function DeleteConfirmModal({ guestName, tableName, onConfirm, onCancel }: {
 // ─── Stats Bar ──────────────────────────────────────
 
 function StatsBar({
-  guests, tables, activeFilter, onFilterClick,
-}: { guests: Guest[]; tables: { id: string; name: string }[]; activeFilter: CategoryFilter; onFilterClick: (status: string) => void }) {
+  guests, onFilterClick,
+}: { guests: Guest[]; onFilterClick: (status: string) => void }) {
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed').length
   const declined = guests.filter((g) => g.rsvpStatus === 'declined').length
   const totalSeats = guests.filter((g) => g.rsvpStatus === 'confirmed').reduce((s, g) => s + g.attendeeCount, 0)
@@ -213,16 +310,12 @@ function StatsBar({
   const avgSat = assigned.length > 0 ? assigned.reduce((s, g) => s + g.satisfactionScore, 0) / assigned.length : 0
 
   const statStyle = () => ({
-    display: 'flex', alignItems: 'baseline', gap: 4, cursor: 'pointer',
+    display: 'flex' as const, alignItems: 'baseline' as const, gap: 4, cursor: 'pointer',
     padding: '4px 8px', borderRadius: 'var(--radius-sm, 4px)',
   })
 
   return (
-    <div style={{
-      display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '12px 0',
-      fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text-secondary)',
-      borderBottom: '1px solid var(--border)',
-    }}>
+    <>
       <div style={statStyle()} onClick={() => onFilterClick('confirmed')}>
         <span style={{ fontFamily: 'var(--font-data)', fontWeight: 700, fontSize: 20, color: 'var(--success)', fontVariantNumeric: 'tabular-nums' }}>{confirmed}</span>
         <span>確認</span>
@@ -242,7 +335,7 @@ function StatsBar({
         </span>
         <span>平均滿意度</span>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -258,6 +351,29 @@ export default function GuestManagementPage() {
   const updateGuest = useSeatingStore((s) => s.updateGuest)
   const deleteGuest = useSeatingStore((s) => s.deleteGuest)
   const addGuest = useSeatingStore((s) => s.addGuest)
+
+  // Category colors (localStorage-backed)
+  const [categoryColors, setCategoryColors] = useState<Record<string, CategoryColor>>(() => loadCategoryColors(eventId || ''))
+  const handleColorChange = useCallback((cat: string, c: CategoryColor) => {
+    setCategoryColors((prev) => {
+      const next = { ...prev, [cat]: c }
+      saveCategoryColors(eventId || '', next)
+      return next
+    })
+  }, [eventId])
+
+  // Color picker state
+  const [pickerCat, setPickerCat] = useState<{ cat: string; rect: { left: number; bottom: number } } | null>(null)
+  const [previewColor, setPreviewColor] = useState<{ cat: string; color: CategoryColor } | null>(null)
+  const pickerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pickerCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancelPickerClose = useCallback(() => {
+    if (pickerCloseTimer.current) { clearTimeout(pickerCloseTimer.current); pickerCloseTimer.current = null }
+  }, [])
+  const schedulePickerClose = useCallback(() => {
+    cancelPickerClose()
+    pickerCloseTimer.current = setTimeout(() => setPickerCat(null), 150)
+  }, [cancelPickerClose])
 
   // UI state
   const [search, setSearch] = useState('')
@@ -294,6 +410,11 @@ export default function GuestManagementPage() {
 
   // Get unique categories from event
   const categories = Array.from(new Set(guests.map((g) => g.category).filter(Boolean))) as string[]
+
+  // Merge preview color into effective colors
+  const effectiveColors = previewColor
+    ? { ...categoryColors, [previewColor.cat]: previewColor.color }
+    : categoryColors
 
   // Lookup maps
   const tableNameMap = new Map(tables.map((t) => [t.id, t.name]))
@@ -421,13 +542,14 @@ export default function GuestManagementPage() {
     <div style={{ flex: 1, background: 'var(--bg-primary)', overflow: 'auto' }}>
       <div style={{ maxWidth: 1440, margin: '0 auto', padding: '24px 24px', width: '100%' }}>
 
-        {/* Stats Bar */}
-        <StatsBar guests={guests} tables={tables} activeFilter={categoryFilter} onFilterClick={handleRsvpFilterClick} />
-
-        {/* Search + Filter + Sort */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-          {/* Search */}
-          <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: 300 }}>
+        {/* Toolbar: Search + Filter (left) | Stats (right) */}
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '12px 0',
+          fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text-secondary)',
+          borderBottom: '1px solid var(--border)',
+        }}>
+          {/* Left: Search + Category + RSVP badge */}
+          <div style={{ position: 'relative', flex: '0 1 240px' }}>
             <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               value={search}
@@ -446,23 +568,55 @@ export default function GuestManagementPage() {
             )}
           </div>
 
-          {/* Category segment */}
           <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm, 4px)', overflow: 'hidden' }}>
-            {['全部', ...categories].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => { setCategoryFilter(cat as CategoryFilter); setRsvpFilter(null) }}
-                style={{
-                  padding: '5px 12px', border: 'none', fontSize: 13, fontFamily: 'var(--font-ui)', fontWeight: 500,
-                  cursor: 'pointer',
-                  background: categoryFilter === cat ? 'var(--accent)' : 'var(--bg-surface)',
-                  color: categoryFilter === cat ? '#fff' : 'var(--text-secondary)',
-                }}
-              >{cat}</button>
-            ))}
+            {['全部', ...categories].map((cat) => {
+              const count = cat === '全部' ? guests.length : guests.filter((g) => g.category === cat).length
+              return (
+                <button
+                  key={cat}
+                  onClick={() => { setCategoryFilter(cat as CategoryFilter); setRsvpFilter(null) }}
+                  onMouseEnter={(e) => {
+                    if (cat === '全部') return
+                    if (pickerTimer.current) clearTimeout(pickerTimer.current)
+                    const r = e.currentTarget.getBoundingClientRect()
+                    pickerTimer.current = setTimeout(() => setPickerCat({ cat, rect: { left: r.left, bottom: r.bottom } }), 400)
+                  }}
+                  onMouseLeave={() => {
+                    if (pickerTimer.current) clearTimeout(pickerTimer.current)
+                    schedulePickerClose()
+                  }}
+                  style={{
+                    padding: '5px 12px', border: 'none', fontSize: 13, fontFamily: 'var(--font-ui)', fontWeight: 500,
+                    cursor: 'pointer',
+                    ...(() => {
+                      if (cat === '全部') {
+                        return categoryFilter === cat
+                          ? { background: 'var(--accent)', color: '#fff' }
+                          : { background: 'var(--bg-surface)', color: 'var(--text-secondary)' }
+                      }
+                      const badge = getCategoryBadgeStyle(cat, effectiveColors)
+                      return categoryFilter === cat
+                        ? { background: badge.color, color: '#fff' }
+                        : { background: badge.background, color: badge.color }
+                    })(),
+                  }}
+                >{cat} {count}</button>
+              )
+            })}
           </div>
 
-          {/* RSVP filter badge */}
+          {/* Category color picker */}
+          {pickerCat && (
+            <CategoryColorPicker
+              current={getCategoryBadgeStyle(pickerCat.cat, effectiveColors)}
+              onPick={(c) => { setPreviewColor(null); handleColorChange(pickerCat.cat, c); setPickerCat(null) }}
+              onPreview={(c) => setPreviewColor(c ? { cat: pickerCat.cat, color: c } : null)}
+              rect={pickerCat.rect}
+              onEnter={cancelPickerClose}
+              onClose={() => { setPreviewColor(null); schedulePickerClose() }}
+            />
+          )}
+
           {rsvpFilter && (
             <button
               onClick={() => setRsvpFilter(null)}
@@ -476,6 +630,11 @@ export default function GuestManagementPage() {
               {RSVP_LABELS[rsvpFilter] || rsvpFilter} <X size={12} />
             </button>
           )}
+
+          {/* Right: Stats */}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <StatsBar guests={guests} onFilterClick={handleRsvpFilterClick} />
+          </div>
         </div>
 
         {/* Table */}
@@ -544,6 +703,7 @@ export default function GuestManagementPage() {
                     maxAttendeeTooltip={maxAttendeeTooltip}
                     prefNames={prefNames}
                     avoidNames={avoidNames}
+                    catColor={getCategoryBadgeStyle(guest.category, effectiveColors)}
                     onSave={(patch) => handleSave(guest.id, patch)}
                     onRsvpToggle={() => handleRsvpToggle(guest)}
                     onDelete={() => handleDelete(guest)}
@@ -617,10 +777,11 @@ export default function GuestManagementPage() {
 
 // ─── Guest Row (memo for perf) ──────────────────────
 
-const GuestRow = ({ guest, tableName, satColor, tags, maxAttendee, maxAttendeeTooltip, prefNames, avoidNames, onSave, onRsvpToggle, onDelete }: {
+const GuestRow = ({ guest, tableName, satColor, tags, maxAttendee, maxAttendeeTooltip, prefNames, avoidNames, catColor, onSave, onRsvpToggle, onDelete }: {
   guest: Guest; tableName: string; satColor: string; tags: string[]
   maxAttendee: number; maxAttendeeTooltip?: string
   prefNames: string[]; avoidNames: string[]
+  catColor: CategoryColor
   onSave: (patch: Partial<Guest>) => void; onRsvpToggle: () => void; onDelete: () => void
 }) => {
   const [hovered, setHovered] = useState(false)
@@ -643,7 +804,7 @@ const GuestRow = ({ guest, tableName, satColor, tags, maxAttendee, maxAttendeeTo
       {/* Category */}
       <td style={tdStyle}>
         {guest.category && (
-          <span style={{ ...categoryBadgeStyle(guest.category), padding: '1px 8px', borderRadius: 'var(--radius-sm, 4px)', fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 500 }}>
+          <span style={{ background: catColor.background, border: `1px solid ${catColor.border}`, color: catColor.color, padding: '1px 8px', borderRadius: 'var(--radius-sm, 4px)', fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 500 }}>
             {guest.category}
           </span>
         )}
