@@ -24,14 +24,14 @@
 │   │   ├── tsconfig.json
 │   │   └── src/
 │   │       ├── index.ts
-│   │       ├── types/              # Contact, Guest, Table, Edge, Tag, SeatPreference, Event, User
+│   │       ├── types/              # Contact, Guest, Table, Edge, Subcategory, SeatPreference, Event, User
 │   │       └── schemas/            # Zod validation schemas
 │   ├── db/                         # Prisma ORM
 │   │   ├── package.json
 │   │   ├── tsconfig.json
 │   │   ├── src/index.ts            # PrismaClient singleton export
 │   │   └── prisma/
-│   │       ├── schema.prisma       # 10 models: User, Contact, Event, Guest, Tag, GuestTag, SeatPreference, SeatingSnapshot, Table, Edge
+│   │       ├── schema.prisma       # 9 models: User, Contact, Event, Guest, Subcategory, SeatPreference, SeatingSnapshot, Table, Edge
 │   │       └── seed.ts
 │   ├── api/                        # Hono backend
 │   │   ├── package.json
@@ -115,7 +115,7 @@ git init && git add -A && git commit -m "Initial project setup"
 - `User` / `Event` — 多租戶基礎
 - `Contact` — 持久通訊錄，跨活動共用（姓名、別名、email、phone）
 - `Guest` — 活動出席紀錄，透過 `contactId` 連結通訊錄，含 `formToken` 做賓客專屬連結、`dietaryNote`/`specialNote` 備註
-- `Tag` + `GuestTag` (join table) — 多對多標籤，含 `assignedBy`（HOST / GUEST）
+- `Subcategory` — 子分類（單選），每個子分類隸屬一個分類，Guest 透過 `subcategoryId` FK 關聯
 - `SeatPreference` — 賓客想同桌偏好（最多 3 位，帶 rank），雙向 FK 到 Guest
 - `SeatingSnapshot` — 座位快照（每活動最多一份），Json 儲存完整排位，支援一鍵回復
 - `Table` — 含 `positionX`/`positionY` 做鄰桌計算（自由座標）、`color`、`note`
