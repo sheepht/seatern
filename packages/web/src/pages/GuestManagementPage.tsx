@@ -5,7 +5,8 @@ import { Plus, Trash2, Search, X } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
 import { loadCategoryColors, saveCategoryColors, getCategoryColor, COLOR_PRESETS, PALETTE_HUES, PALETTE_SATS, FALLBACK_COLOR, type CategoryColor } from '@/lib/category-colors'
-import type { Guest, Table } from '@/lib/types'
+import GuestEditModal from '@/components/GuestEditModal'
+import type { Guest } from '@/lib/types'
 
 // ─── Types ──────────────────────────────────────────
 
@@ -292,6 +293,12 @@ export default function GuestManagementPage() {
   const updateGuest = useSeatingStore((s) => s.updateGuest)
   const deleteGuest = useSeatingStore((s) => s.deleteGuest)
   const addGuest = useSeatingStore((s) => s.addGuest)
+  const moveGuest = useSeatingStore((s) => s.moveGuest)
+  const updateGuestPreferences = useSeatingStore((s) => s.updateGuestPreferences)
+  const addGuestTag = useSeatingStore((s) => s.addGuestTag)
+  const removeGuestTag = useSeatingStore((s) => s.removeGuestTag)
+  const addAvoidPair = useSeatingStore((s) => s.addAvoidPair)
+  const removeAvoidPair = useSeatingStore((s) => s.removeAvoidPair)
 
   // Category colors (localStorage-backed)
   const [categoryColors, setCategoryColors] = useState<Record<string, CategoryColor>>(() => loadCategoryColors(eventId || ''))
@@ -331,6 +338,7 @@ export default function GuestManagementPage() {
   const [newGuestName, setNewGuestName] = useState('')
   const newGuestRef = useRef<HTMLInputElement>(null)
   const deleteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const [editingGuestId, setEditingGuestId] = useState<string | null>(null)
 
   // Cleanup delete timers on unmount / navigate away
   useEffect(() => {
@@ -354,6 +362,9 @@ export default function GuestManagementPage() {
 
   // Get unique categories from event
   const categories = Array.from(new Set(guests.map((g) => g.category).filter(Boolean))) as string[]
+
+  // All unique tag names (for tag autocomplete)
+  const allTags = Array.from(new Set(guests.flatMap((g) => g.guestTags.map((gt) => gt.tag.name))))
 
   // Merge preview color into effective colors
   const effectiveColors = previewColor
@@ -634,7 +645,7 @@ export default function GuestManagementPage() {
 
         {/* Table */}
         <div style={{ overflowX: 'auto', marginTop: 8 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-body)', fontSize: 14 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-body)', fontSize: 15 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)' }}>
                 <th onClick={() => handleSort('name')} style={thStyle}>姓名{sortArrow('name')}</th>
@@ -648,7 +659,7 @@ export default function GuestManagementPage() {
                 <th onClick={() => handleSort('avoidCount')} style={thStyle}>要避桌{sortArrow('avoidCount')}</th>
                 <th onClick={() => handleSort('dietaryNote')} style={thStyle}>飲食{sortArrow('dietaryNote')}</th>
                 <th onClick={() => handleSort('specialNote')} style={thStyle}>特殊需求{sortArrow('specialNote')}</th>
-                <th style={{ width: 36 }} />
+                <th style={{ width: 60 }} />
               </tr>
             </thead>
             <tbody>
@@ -674,17 +685,20 @@ export default function GuestManagementPage() {
                   }
                 }
 
-                // Seat preference names (sorted by rank)
-                const prefNames = guest.seatPreferences
+                // Seat preference guests (sorted by rank)
+                const prefGuests = guest.seatPreferences
                   .slice().sort((a, b) => a.rank - b.rank)
-                  .map((p) => guestNameMap.get(p.preferredGuestId))
-                  .filter(Boolean) as string[]
+                  .map((p) => guests.find((g) => g.id === p.preferredGuestId))
+                  .filter(Boolean) as Guest[]
 
-                // Avoid pair names for this guest
-                const avoidNames = avoidPairs
+                // Avoid pair guests for this guest
+                const avoidGuests = avoidPairs
                   .filter((ap) => ap.guestAId === guest.id || ap.guestBId === guest.id)
-                  .map((ap) => guestNameMap.get(ap.guestAId === guest.id ? ap.guestBId : ap.guestAId))
-                  .filter(Boolean) as string[]
+                  .map((ap) => {
+                    const otherId = ap.guestAId === guest.id ? ap.guestBId : ap.guestAId
+                    return guests.find((g) => g.id === otherId)
+                  })
+                  .filter(Boolean) as Guest[]
 
                 return (
                   <GuestRow
@@ -695,12 +709,14 @@ export default function GuestManagementPage() {
                     tags={tags}
                     maxAttendee={maxAttendee}
                     maxAttendeeTooltip={maxAttendeeTooltip}
-                    prefNames={prefNames}
-                    avoidNames={avoidNames}
+                    prefGuests={prefGuests}
+                    avoidGuests={avoidGuests}
+                    categoryColors={effectiveColors}
                     catColor={getCategoryColor(guest.category, effectiveColors)}
                     onSave={(patch) => handleSave(guest.id, patch)}
                     onRsvpToggle={() => handleRsvpToggle(guest)}
                     onDelete={() => handleDelete(guest)}
+                    onEdit={() => setEditingGuestId(guest.id)}
                   />
                 )
               })}
@@ -765,58 +781,96 @@ export default function GuestManagementPage() {
           onCancel={() => setDeleteConfirm(null)}
         />
       )}
+
+      {/* Guest edit modal */}
+      {editingGuestId && (() => {
+        const editGuest = guests.find((g) => g.id === editingGuestId)
+        if (!editGuest) return null
+        return (
+          <GuestEditModal
+            guest={editGuest}
+            tables={tables}
+            guests={guests}
+            avoidPairs={avoidPairs}
+            categories={categories}
+            allTags={allTags}
+            categoryColors={effectiveColors}
+            onSave={async (gid, patch) => { const ok = await updateGuest(gid, patch); if (!ok) setToast({ message: '儲存失敗，已還原' }); return ok }}
+            onMoveToTable={(gid, tid) => moveGuest(gid, tid)}
+            onUpdatePreferences={(gid, prefs) => updateGuestPreferences(gid, prefs)}
+            onAddTag={(gid, name) => addGuestTag(gid, name)}
+            onRemoveTag={(gid, tid) => removeGuestTag(gid, tid)}
+            onAddAvoidPair={(a, b) => addAvoidPair(a, b)}
+            onRemoveAvoidPair={(pid) => removeAvoidPair(pid)}
+            onRsvpToggle={(gid) => handleRsvpToggle(guests.find((g) => g.id === gid)!)}
+            onDelete={(gid) => { setEditingGuestId(null); handleDelete(guests.find((g) => g.id === gid)!) }}
+            onClose={() => setEditingGuestId(null)}
+          />
+        )
+      })()}
     </div>
   )
 }
 
-// ─── Guest Row (memo for perf) ──────────────────────
+// ─── Guest Row (read-only display + quick edits) ───
 
-const GuestRow = ({ guest, tableName, satColor, tags, maxAttendee, maxAttendeeTooltip, prefNames, avoidNames, catColor, onSave, onRsvpToggle, onDelete }: {
+const GuestRow = ({ guest, tableName, satColor, tags, maxAttendee, maxAttendeeTooltip, prefGuests, avoidGuests, catColor, categoryColors, onSave, onRsvpToggle, onDelete, onEdit }: {
   guest: Guest; tableName: string; satColor: string; tags: string[]
   maxAttendee: number; maxAttendeeTooltip?: string
-  prefNames: string[]; avoidNames: string[]
-  catColor: CategoryColor
+  prefGuests: Guest[]; avoidGuests: Guest[]
+  catColor: CategoryColor; categoryColors: Record<string, CategoryColor>
   onSave: (patch: Partial<Guest>) => void; onRsvpToggle: () => void; onDelete: () => void
+  onEdit: () => void
 }) => {
   const [hovered, setHovered] = useState(false)
-  const aliasText = guest.aliases.length > 0 ? `（${guest.aliases.join('、')}）` : ''
 
   return (
     <tr
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ borderBottom: '1px solid var(--border)', background: hovered ? 'var(--accent-light)' : 'transparent', transition: 'background 50ms' }}
+      onClick={onEdit}
+      style={{ borderBottom: '1px solid var(--border)', background: hovered ? 'var(--accent-light)' : 'transparent', transition: 'background 50ms', cursor: 'pointer' }}
     >
-      {/* Name + aliases */}
-      <td style={tdStyle}>
+      {/* Name + aliases (name is quick-editable) */}
+      <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
           <EditableText value={guest.name} onSave={(v) => onSave({ name: v })} />
-          {aliasText && <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{aliasText}</span>}
+          {guest.aliases.length > 0 && (
+            <span style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>
+              ({guest.aliases.join('、')})
+            </span>
+          )}
         </div>
       </td>
 
-      {/* Category */}
+      {/* Category (read-only badge) */}
       <td style={tdStyle}>
         {guest.category && (
-          <span style={{ background: catColor.background, border: `1px solid ${catColor.border}`, color: catColor.color, padding: '1px 8px', borderRadius: 'var(--radius-sm, 4px)', fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 500 }}>
+          <span style={{ background: catColor.background, border: `1px solid ${catColor.border}`, color: catColor.color, padding: '1px 8px', borderRadius: 'var(--radius-sm, 4px)', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500 }}>
             {guest.category}
           </span>
         )}
       </td>
 
-      {/* Tags */}
+      {/* Tags (read-only chips) */}
       <td style={tdStyle}>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {tags.slice(0, 2).map((t) => (
-            <span key={t} style={{ padding: '1px 6px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)' }}>{t}</span>
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          {tags.map((t) => (
+            <span key={t} style={{
+              padding: '1px 6px', borderRadius: 'var(--radius-sm, 4px)',
+              border: '1px solid var(--border)', fontSize: 14, color: 'var(--text-secondary)',
+              fontFamily: 'var(--font-ui)',
+            }}>{t}</span>
           ))}
-          {tags.length > 2 && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>+{tags.length - 2}</span>}
+          {tags.length === 0 && <span style={{ color: 'var(--text-muted)' }}>—</span>}
         </div>
       </td>
 
-      {/* Table */}
+      {/* Table (read-only) */}
       <td style={tdStyle}>
-        <span style={{ color: guest.assignedTableId ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 13 }}>{tableName}</span>
+        <span style={{ color: guest.assignedTableId ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 15 }}>
+          {tableName}
+        </span>
       </td>
 
       {/* Satisfaction */}
@@ -830,8 +884,8 @@ const GuestRow = ({ guest, tableName, satColor, tags, maxAttendee, maxAttendeeTo
         )}
       </td>
 
-      {/* RSVP toggle */}
-      <td style={{ ...tdStyle, textAlign: 'center' }}>
+      {/* RSVP toggle (quick edit) */}
+      <td style={{ ...tdStyle, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onRsvpToggle}
           title={RSVP_LABELS[guest.rsvpStatus]}
@@ -845,43 +899,69 @@ const GuestRow = ({ guest, tableName, satColor, tags, maxAttendee, maxAttendeeTo
         >{rsvpIcon(guest.rsvpStatus)}</button>
       </td>
 
-      {/* Attendee count stepper */}
-      <td style={{ ...tdStyle, textAlign: 'center' }}>
+      {/* Attendee count stepper (quick edit) */}
+      <td style={{ ...tdStyle, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
         <NumberStepper value={guest.attendeeCount} min={1} max={maxAttendee} onSave={(v) => onSave({ attendeeCount: v })} maxTooltip={maxAttendeeTooltip} />
       </td>
 
-      {/* Seat preferences */}
+      {/* Seat preferences (read-only) */}
       <td style={tdStyle}>
-        {prefNames.length > 0 ? (
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{prefNames.join('、')}</span>
+        {prefGuests.length > 0 ? (
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {prefGuests.map((g) => {
+              const cc = getCategoryColor(g.category, categoryColors)
+              return (
+                <span key={g.id} style={{
+                  padding: '1px 6px', borderRadius: 'var(--radius-sm, 4px)',
+                  background: cc.background, border: `1px solid ${cc.border}`,
+                  fontSize: 14, color: cc.color, fontFamily: 'var(--font-ui)',
+                }}>{g.aliases.length > 0 ? g.aliases[0] : g.name}</span>
+              )
+            })}
+          </div>
         ) : (
           <span style={{ color: 'var(--text-muted)' }}>—</span>
         )}
       </td>
 
-      {/* Avoid pairs */}
+      {/* Avoid pairs (read-only) */}
       <td style={tdStyle}>
-        {avoidNames.length > 0 ? (
-          <span style={{ fontSize: 13, color: 'var(--error)' }}>{avoidNames.join('、')}</span>
+        {avoidGuests.length > 0 ? (
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {avoidGuests.map((g) => {
+              const cc = getCategoryColor(g.category, categoryColors)
+              return (
+                <span key={g.id} style={{
+                  padding: '1px 6px', borderRadius: 'var(--radius-sm, 4px)',
+                  background: cc.background, border: `1px solid ${cc.border}`,
+                  fontSize: 14, color: cc.color, fontFamily: 'var(--font-ui)',
+                }}>{g.aliases.length > 0 ? g.aliases[0] : g.name}</span>
+              )
+            })}
+          </div>
         ) : (
           <span style={{ color: 'var(--text-muted)' }}>—</span>
         )}
       </td>
 
-      {/* Dietary note */}
+      {/* Dietary note (read-only) */}
       <td style={tdStyle}>
-        <EditableText value={guest.dietaryNote || ''} onSave={(v) => onSave({ dietaryNote: v })} placeholder="—" maxLength={100} />
+        <span style={{ fontSize: 15, color: guest.dietaryNote ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+          {guest.dietaryNote || '—'}
+        </span>
       </td>
 
-      {/* Special note */}
+      {/* Special note (read-only) */}
       <td style={tdStyle}>
-        <EditableText value={guest.specialNote || ''} onSave={(v) => onSave({ specialNote: v })} placeholder="—" maxLength={100} />
+        <span style={{ fontSize: 15, color: guest.specialNote ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+          {guest.specialNote || '—'}
+        </span>
       </td>
 
-      {/* Delete */}
-      <td style={{ width: 36, padding: '0 8px' }}>
+      {/* Delete button */}
+      <td style={{ width: 36, padding: '0 4px' }}>
         <button
-          onClick={onDelete}
+          onClick={(e) => { e.stopPropagation(); onDelete() }}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: hovered ? 'var(--error)' : 'transparent', padding: 4, borderRadius: 'var(--radius-sm, 4px)', transition: 'color 100ms' }}
           title="刪除"
         >
@@ -896,7 +976,7 @@ const GuestRow = ({ guest, tableName, satColor, tags, maxAttendee, maxAttendeeTo
 
 const thStyle: React.CSSProperties = {
   padding: '8px 12px', textAlign: 'left', fontFamily: 'var(--font-ui)',
-  fontSize: 13, fontWeight: 600, color: 'var(--text-muted)',
+  fontSize: 14, fontWeight: 600, color: 'var(--text-muted)',
   textTransform: 'uppercase' as const, cursor: 'pointer', userSelect: 'none',
   whiteSpace: 'nowrap',
 }

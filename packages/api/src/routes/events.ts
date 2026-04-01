@@ -424,6 +424,41 @@ events.post('/:id/preferences/batch', async (c) => {
   return c.json({ count: created.length }, 201)
 })
 
+// PUT /events/:eventId/guests/:guestId/preferences — 替換單一賓客的座位偏好
+events.put('/:eventId/guests/:guestId/preferences', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const { eventId, guestId } = c.req.param()
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  const body = await c.req.json<{
+    preferences: Array<{ preferredGuestId: string; rank: number }>
+  }>()
+
+  if (body.preferences.length > 3) {
+    return c.json({ error: 'Maximum 3 preferences allowed' }, 400)
+  }
+
+  // 刪除該賓客的舊偏好，再建立新的
+  await prisma.seatPreference.deleteMany({ where: { guestId } })
+
+  const created = await prisma.$transaction(
+    body.preferences.map((p) =>
+      prisma.seatPreference.create({
+        data: {
+          guestId,
+          preferredGuestId: p.preferredGuestId,
+          rank: p.rank,
+        },
+      })
+    )
+  )
+
+  return c.json(created)
+})
+
 // ─── 標籤 ─────────────────────────────────────────────
 
 // POST /events/:id/tags/batch — 批次建立標籤並關聯賓客
@@ -470,6 +505,60 @@ events.post('/:id/tags/batch', async (c) => {
   }
 
   return c.json({ tags: tagNames.length, guestTags: created }, 201)
+})
+
+// POST /events/:eventId/guests/:guestId/tags — 為單一賓客新增標籤
+events.post('/:eventId/guests/:guestId/tags', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const { eventId, guestId } = c.req.param()
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  const body = await c.req.json<{ tagName: string; category?: string }>()
+
+  if (!body.tagName?.trim()) return c.json({ error: 'tagName is required' }, 400)
+
+  // upsert 標籤（同名不重複建立）
+  const tag = await prisma.tag.upsert({
+    where: { eventId_name: { eventId, name: body.tagName } },
+    create: { eventId, name: body.tagName, category: body.category || null },
+    update: {},
+  })
+
+  // 建立 guestTag，跳過已存在的
+  let guestTag
+  try {
+    guestTag = await prisma.guestTag.create({
+      data: { guestId, tagId: tag.id },
+      include: { tag: true },
+    })
+  } catch {
+    // unique constraint violation = 已存在，直接查出來回傳
+    guestTag = await prisma.guestTag.findFirst({
+      where: { guestId, tagId: tag.id },
+      include: { tag: true },
+    })
+  }
+
+  return c.json(guestTag, 201)
+})
+
+// DELETE /events/:eventId/guests/:guestId/tags/:tagId — 移除賓客的標籤關聯
+events.delete('/:eventId/guests/:guestId/tags/:tagId', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const { eventId, guestId, tagId } = c.req.param()
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  await prisma.guestTag.deleteMany({
+    where: { guestId, tagId },
+  })
+
+  return c.json({ ok: true })
 })
 
 // ─── 避免同桌 ────────────────────────────────────────

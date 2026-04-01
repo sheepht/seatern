@@ -145,6 +145,11 @@ interface SeatingState {
   deleteGuest: (guestId: string) => Promise<boolean>
   addGuest: (data: { name: string; category?: string; rsvpStatus?: string; attendeeCount?: number; dietaryNote?: string; specialNote?: string }) => Promise<Guest | null>
 
+  // Per-guest preference & tag management
+  updateGuestPreferences: (guestId: string, preferences: Array<{ preferredGuestId: string; rank: number }>) => Promise<boolean>
+  addGuestTag: (guestId: string, tagName: string, category?: string) => Promise<{ tag: { id: string; name: string } } | null>
+  removeGuestTag: (guestId: string, tagId: string) => Promise<boolean>
+
   // Computed helpers
   getTableGuests: (tableId: string) => Guest[]
   getUnassignedGuests: () => Guest[]
@@ -1374,6 +1379,114 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       return guest
     } catch {
       return null
+    }
+  },
+
+  // ─── Per-guest preference & tag management ─────────
+
+  updateGuestPreferences: async (guestId, preferences) => {
+    const { eventId, guests, tables, avoidPairs } = get()
+    if (!eventId) return false
+
+    // Enforce max 3 preferences
+    const clamped = preferences.slice(0, 3)
+
+    // Optimistic update
+    const prevGuests = guests
+    const idx = guests.findIndex((g) => g.id === guestId)
+    if (idx < 0) return false
+    const nextGuests = [...guests]
+    nextGuests[idx] = { ...nextGuests[idx], seatPreferences: clamped }
+    set({ guests: nextGuests })
+
+    try {
+      const res = await fetch(`/api/events/${eventId}/guests/${guestId}/preferences`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ preferences: clamped }),
+      })
+      if (!res.ok) {
+        set({ guests: prevGuests })
+        return false
+      }
+      // Recalculate since preferences affect satisfaction scores
+      const latest = get()
+      const result = recalculateAll(latest.guests, latest.tables, latest.avoidPairs)
+      const recalcedGuests = latest.guests.map((g) => {
+        const s = result.guests.find((gs) => gs.id === g.id)
+        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
+      })
+      const recalcedTables = latest.tables.map((t) => {
+        const ts = result.tables.find((ts) => ts.id === t.id)
+        return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t
+      })
+      set({ guests: recalcedGuests, tables: recalcedTables })
+      return true
+    } catch {
+      set({ guests: prevGuests })
+      return false
+    }
+  },
+
+  addGuestTag: async (guestId, tagName, category) => {
+    const { eventId, guests } = get()
+    if (!eventId) return null
+
+    try {
+      const res = await fetch(`/api/events/${eventId}/guests/${guestId}/tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ tagName, category }),
+      })
+      if (!res.ok) return null
+      const guestTag = await res.json() as { tag: { id: string; name: string } }
+
+      // Add to guest's guestTags array on success
+      const idx = guests.findIndex((g) => g.id === guestId)
+      if (idx >= 0) {
+        const nextGuests = [...guests]
+        nextGuests[idx] = {
+          ...nextGuests[idx],
+          guestTags: [...nextGuests[idx].guestTags, guestTag],
+        }
+        set({ guests: nextGuests })
+      }
+      return guestTag
+    } catch {
+      return null
+    }
+  },
+
+  removeGuestTag: async (guestId, tagId) => {
+    const { eventId, guests } = get()
+    if (!eventId) return false
+
+    // Optimistic: remove tag from guest
+    const prevGuests = guests
+    const idx = guests.findIndex((g) => g.id === guestId)
+    if (idx < 0) return false
+    const nextGuests = [...guests]
+    nextGuests[idx] = {
+      ...nextGuests[idx],
+      guestTags: nextGuests[idx].guestTags.filter((gt) => gt.tag.id !== tagId),
+    }
+    set({ guests: nextGuests })
+
+    try {
+      const res = await fetch(`/api/events/${eventId}/guests/${guestId}/tags/${tagId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        set({ guests: prevGuests })
+        return false
+      }
+      return true
+    } catch {
+      set({ guests: prevGuests })
+      return false
     }
   },
 
