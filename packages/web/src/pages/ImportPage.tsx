@@ -74,7 +74,6 @@ export default function ImportPage() {
             name: g.name,
             aliases: g.aliases,
             category: g.category || undefined,
-            relationScore: 2,
             rsvpStatus: g.rsvpStatus,
             attendeeCount: g.attendeeCount,
             dietaryNote: g.dietaryNote || undefined,

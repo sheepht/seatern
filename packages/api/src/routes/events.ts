@@ -100,7 +100,6 @@ events.post('/:id/guests/batch', async (c) => {
       name: string
       aliases?: string[]
       category?: string
-      relationScore?: number
       rsvpStatus?: string
       attendeeCount?: number
       dietaryNote?: string
@@ -116,7 +115,6 @@ events.post('/:id/guests/batch', async (c) => {
           name: g.name,
           aliases: g.aliases || [],
           category: g.category,
-          relationScore: g.relationScore ?? 2,
           rsvpStatus: (g.rsvpStatus as any) || 'confirmed',
           attendeeCount: g.attendeeCount ?? 1,
           dietaryNote: g.dietaryNote,
@@ -229,7 +227,6 @@ events.post('/:eventId/guests', async (c) => {
     name: string
     aliases?: string[]
     category?: string
-    relationScore?: number
     rsvpStatus?: string
     attendeeCount?: number
     dietaryNote?: string
@@ -244,7 +241,6 @@ events.post('/:eventId/guests', async (c) => {
       name: body.name.trim(),
       aliases: body.aliases || [],
       category: body.category,
-      relationScore: body.relationScore ?? 2,
       rsvpStatus: (body.rsvpStatus as any) || 'confirmed',
       attendeeCount: body.attendeeCount ?? 1,
       dietaryNote: body.dietaryNote,
@@ -261,7 +257,7 @@ events.post('/:eventId/guests', async (c) => {
 
 // PATCH /events/:eventId/guests/:guestId — 更新單筆賓客（partial update, whitelist）
 const GUEST_UPDATABLE_FIELDS = [
-  'name', 'aliases', 'category', 'relationScore',
+  'name', 'aliases', 'category',
   'rsvpStatus', 'attendeeCount', 'dietaryNote', 'specialNote',
 ] as const
 

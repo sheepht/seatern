@@ -104,6 +104,11 @@ button, a, input, select, textarea {
 }
 
 /* Table node icons — fly out from table center to final position */
+@keyframes pickerProgress {
+  from { transform: scaleX(0); transform-origin: left; }
+  to   { transform: scaleX(1); transform-origin: left; }
+}
+
 @keyframes table-icon-pop {
   0%   { transform: translate(var(--icon-from-x, 0px), var(--icon-from-y, 0px)) scale(0); opacity: 0; }
   100% { transform: translate(0px, 0px) scale(1); opacity: 1; }

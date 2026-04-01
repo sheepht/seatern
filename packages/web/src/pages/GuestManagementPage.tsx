@@ -9,7 +9,7 @@ import type { Guest, Table } from '@/lib/types'
 
 // ─── Types ──────────────────────────────────────────
 
-type SortField = 'name' | 'category' | 'rsvpStatus' | 'satisfactionScore' | 'assignedTableId'
+type SortField = 'name' | 'category' | 'rsvpStatus' | 'satisfactionScore' | 'assignedTableId' | 'attendeeCount' | 'prefCount' | 'avoidCount' | 'dietaryNote' | 'specialNote'
 type SortDir = 'asc' | 'desc'
 type CategoryFilter = '全部' | string
 
@@ -306,8 +306,10 @@ export default function GuestManagementPage() {
   // Color picker state
   const [pickerCat, setPickerCat] = useState<{ cat: string; rect: { left: number; bottom: number } } | null>(null)
   const [previewColor, setPreviewColor] = useState<{ cat: string; color: CategoryColor } | null>(null)
+  const [holdingCat, setHoldingCat] = useState<string | null>(null) // which button shows progress bar
   const pickerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pickerCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const PICKER_DELAY = 800
   const cancelPickerClose = useCallback(() => {
     if (pickerCloseTimer.current) { clearTimeout(pickerCloseTimer.current); pickerCloseTimer.current = null }
   }, [])
@@ -374,12 +376,18 @@ export default function GuestManagementPage() {
     return true
   }).sort((a, b) => {
     let cmp = 0
+    const avoidCount = (g: Guest) => avoidPairs.filter((ap) => ap.guestAId === g.id || ap.guestBId === g.id).length
     switch (sortField) {
       case 'name': cmp = a.name.localeCompare(b.name, 'zh-Hant'); break
       case 'category': cmp = (a.category || '').localeCompare(b.category || '', 'zh-Hant'); break
       case 'rsvpStatus': cmp = a.rsvpStatus.localeCompare(b.rsvpStatus); break
       case 'satisfactionScore': cmp = a.satisfactionScore - b.satisfactionScore; break
       case 'assignedTableId': cmp = (a.assignedTableId || '').localeCompare(b.assignedTableId || ''); break
+      case 'attendeeCount': cmp = a.attendeeCount - b.attendeeCount; break
+      case 'prefCount': cmp = a.seatPreferences.length - b.seatPreferences.length; break
+      case 'avoidCount': cmp = avoidCount(a) - avoidCount(b); break
+      case 'dietaryNote': cmp = (a.dietaryNote || '').localeCompare(b.dietaryNote || '', 'zh-Hant'); break
+      case 'specialNote': cmp = (a.specialNote || '').localeCompare(b.specialNote || '', 'zh-Hant'); break
     }
     return sortDir === 'asc' ? cmp : -cmp
   })
@@ -519,14 +527,17 @@ export default function GuestManagementPage() {
                   onMouseEnter={(e) => {
                     if (cat === '全部') return
                     if (pickerTimer.current) clearTimeout(pickerTimer.current)
+                    setHoldingCat(cat)
                     const r = e.currentTarget.getBoundingClientRect()
-                    pickerTimer.current = setTimeout(() => setPickerCat({ cat, rect: { left: r.left, bottom: r.bottom } }), 400)
+                    pickerTimer.current = setTimeout(() => { setHoldingCat(null); setPickerCat({ cat, rect: { left: r.left, bottom: r.bottom } }) }, PICKER_DELAY)
                   }}
                   onMouseLeave={() => {
                     if (pickerTimer.current) clearTimeout(pickerTimer.current)
+                    setHoldingCat(null)
                     schedulePickerClose()
                   }}
                   style={{
+                    position: 'relative', overflow: 'hidden',
                     padding: '5px 12px', border: 'none', fontSize: 13, fontFamily: 'var(--font-ui)', fontWeight: 500,
                     cursor: 'pointer',
                     ...(() => {
@@ -541,7 +552,17 @@ export default function GuestManagementPage() {
                         : { background: badge.background, color: badge.color }
                     })(),
                   }}
-                >{cat} {count}</button>
+                >
+                  {cat} {count}
+                  {holdingCat === cat && (
+                    <div style={{
+                      position: 'absolute', left: 0, bottom: 0, height: 2, width: '100%',
+                      background: getCategoryColor(cat, effectiveColors).color,
+                      animation: `pickerProgress ${PICKER_DELAY}ms linear forwards`,
+                      opacity: 0.6,
+                    }} />
+                  )}
+                </button>
               )
             })}
           </div>
@@ -586,15 +607,14 @@ export default function GuestManagementPage() {
                 <th onClick={() => handleSort('name')} style={thStyle}>姓名{sortArrow('name')}</th>
                 <th onClick={() => handleSort('category')} style={thStyle}>分類{sortArrow('category')}</th>
                 <th style={thStyle}>標籤</th>
-                <th style={{ ...thStyle, textAlign: 'center' }}>關係</th>
                 <th onClick={() => handleSort('assignedTableId')} style={thStyle}>桌次{sortArrow('assignedTableId')}</th>
                 <th onClick={() => handleSort('satisfactionScore')} style={{ ...thStyle, textAlign: 'right' }}>滿意度{sortArrow('satisfactionScore')}</th>
                 <th onClick={() => handleSort('rsvpStatus')} style={{ ...thStyle, textAlign: 'center' }}>出席{sortArrow('rsvpStatus')}</th>
-                <th style={{ ...thStyle, textAlign: 'center' }}>人數</th>
-                <th style={thStyle}>想同桌</th>
-                <th style={thStyle}>要避桌</th>
-                <th style={thStyle}>飲食</th>
-                <th style={thStyle}>特殊需求</th>
+                <th onClick={() => handleSort('attendeeCount')} style={{ ...thStyle, textAlign: 'center' }}>人數{sortArrow('attendeeCount')}</th>
+                <th onClick={() => handleSort('prefCount')} style={thStyle}>想同桌{sortArrow('prefCount')}</th>
+                <th onClick={() => handleSort('avoidCount')} style={thStyle}>要避桌{sortArrow('avoidCount')}</th>
+                <th onClick={() => handleSort('dietaryNote')} style={thStyle}>飲食{sortArrow('dietaryNote')}</th>
+                <th onClick={() => handleSort('specialNote')} style={thStyle}>特殊需求{sortArrow('specialNote')}</th>
                 <th style={{ width: 36 }} />
               </tr>
             </thead>
@@ -654,7 +674,7 @@ export default function GuestManagementPage() {
 
               {/* Empty search result */}
               {filtered.length === 0 && guests.length > 0 && (
-                <tr><td colSpan={13} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
+                <tr><td colSpan={12} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
                   沒有符合的賓客
                 </td></tr>
               )}
@@ -758,19 +778,6 @@ const GuestRow = ({ guest, tableName, satColor, tags, maxAttendee, maxAttendeeTo
             <span key={t} style={{ padding: '1px 6px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)' }}>{t}</span>
           ))}
           {tags.length > 2 && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>+{tags.length - 2}</span>}
-        </div>
-      </td>
-
-      {/* Relation score (stars) */}
-      <td style={{ ...tdStyle, textAlign: 'center' }}>
-        <div style={{ display: 'inline-flex', gap: 1 }}>
-          {[1, 2, 3].map((s) => (
-            <span
-              key={s}
-              onClick={() => onSave({ relationScore: s })}
-              style={{ cursor: 'pointer', fontSize: 14, color: s <= guest.relationScore ? 'var(--accent)' : 'var(--border)' }}
-            >★</span>
-          ))}
         </div>
       </td>
 

@@ -10,7 +10,6 @@ function makeGuest(overrides: Partial<Guest> = {}): Guest {
     name: '王小明',
     aliases: [],
     category: '男方',
-    relationScore: 2,
     rsvpStatus: 'confirmed',
     attendeeCount: 1,
     dietaryNote: '',

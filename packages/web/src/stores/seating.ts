@@ -143,7 +143,7 @@ interface SeatingState {
   // Guest CRUD (管理頁面用)
   updateGuest: (guestId: string, patch: Partial<Guest>) => Promise<boolean>
   deleteGuest: (guestId: string) => Promise<boolean>
-  addGuest: (data: { name: string; category?: string; relationScore?: number; rsvpStatus?: string; attendeeCount?: number; dietaryNote?: string; specialNote?: string }) => Promise<Guest | null>
+  addGuest: (data: { name: string; category?: string; rsvpStatus?: string; attendeeCount?: number; dietaryNote?: string; specialNote?: string }) => Promise<Guest | null>
 
   // Computed helpers
   getTableGuests: (tableId: string) => Guest[]
@@ -199,7 +199,6 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         name: g.name,
         aliases: g.aliases || [],
         category: g.category || '',
-        relationScore: g.relationScore,
         rsvpStatus: g.rsvpStatus,
         attendeeCount: g.attendeeCount,
         dietaryNote: g.dietaryNote || '',

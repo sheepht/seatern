@@ -16,7 +16,6 @@ export interface Guest {
   eventId: string
   contactId: string
   category?: string
-  relationScore: number
   tagIds: string[]
   rsvpStatus: RsvpStatus
   attendeeCount: number
