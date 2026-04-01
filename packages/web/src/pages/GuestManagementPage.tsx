@@ -6,6 +6,7 @@ import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
 import { loadCategoryColors, saveCategoryColors, getCategoryColor, COLOR_PRESETS, PALETTE_HUES, PALETTE_SATS, FALLBACK_COLOR, type CategoryColor } from '@/lib/category-colors'
 import GuestEditModal from '@/components/GuestEditModal'
+import { AvoidPairModal } from '@/components/workspace/AvoidPairModal'
 import type { Guest } from '@/lib/types'
 
 // ─── Types ──────────────────────────────────────────
@@ -291,6 +292,7 @@ export default function GuestManagementPage() {
   const newGuestRef = useRef<HTMLInputElement>(null)
   const deleteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const [editingGuestId, setEditingGuestId] = useState<string | null>(null)
+  const [showAvoidModal, setShowAvoidModal] = useState(false)
 
   // Cleanup delete timers on unmount / navigate away
   useEffect(() => {
@@ -586,6 +588,20 @@ export default function GuestManagementPage() {
             顯示婉拒
           </label>
 
+          {/* Avoid pairs overview */}
+          <button
+            onClick={() => setShowAvoidModal(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px',
+              borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
+              background: avoidPairs.length > 0 ? '#FEF2F2' : 'var(--bg-surface)',
+              fontSize: 13, fontFamily: 'var(--font-ui)', cursor: 'pointer',
+              color: avoidPairs.length > 0 ? '#DC2626' : 'var(--text-secondary)',
+            }}
+          >
+            避桌 {avoidPairs.length > 0 && <span style={{ fontWeight: 600 }}>{avoidPairs.length}</span>}
+          </button>
+
           {/* Right: Stats */}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
             <StatsBar guests={guests} onFilterClick={handleRsvpFilterClick} />
@@ -756,6 +772,7 @@ export default function GuestManagementPage() {
           />
         )
       })()}
+      {showAvoidModal && <AvoidPairModal onClose={() => setShowAvoidModal(false)} />}
     </div>
   )
 }
