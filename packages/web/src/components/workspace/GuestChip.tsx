@@ -1,14 +1,8 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useDraggable } from '@dnd-kit/core'
 import { useSeatingStore, type Guest } from '@/stores/seating'
-
-const CATEGORY_STYLES: Record<string, { background: string; borderColor: string; color: string }> = {
-  '男方': { background: '#DBEAFE', borderColor: '#BFDBFE', color: '#1E40AF' },
-  '女方': { background: '#FEE2E2', borderColor: '#FECACA', color: '#991B1B' },
-  '共同': { background: '#F3F4F6', borderColor: '#D1D5DB', color: '#374151' },
-}
-const DEFAULT_CATEGORY_STYLE = { background: '#F3F4F6', borderColor: '#D1D5DB', color: '#374151' }
+import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors'
 
 interface Props {
   guest: Guest
@@ -23,12 +17,15 @@ export function GuestChip({ guest, animIndex }: Props) {
   const setHoveredGuest = useSeatingStore((s) => s.setHoveredGuest)
   const bestSwapTableId = useSeatingStore((s) => s.bestSwapTableId)
   const moveGuestToSeat = useSeatingStore((s) => s.moveGuestToSeat)
+  const eventId = useSeatingStore((s) => s.eventId)
 
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [longPressProgress, setLongPressProgress] = useState(false)
   const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null)
 
-  const categoryStyle = CATEGORY_STYLES[guest.category] || DEFAULT_CATEGORY_STYLE
+  const colors = useMemo(() => loadCategoryColors(eventId || ''), [eventId])
+  const catColor = getCategoryColor(guest.category, colors)
+  const categoryStyle = { background: catColor.background, borderColor: catColor.border, color: catColor.color }
 
   // 入場動畫已移除（人多時等太久）
   const animClass = ''

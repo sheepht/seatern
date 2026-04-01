@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useDroppable } from '@dnd-kit/core'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +10,7 @@ import { computeSnapshotStats, computeCurrentStats } from '@/lib/snapshot-stats'
 import { findFreePosition, calculateGridLayout } from '@/lib/viewport'
 import { GuestChip } from './GuestChip'
 import { AvoidPairModal } from './AvoidPairModal'
+import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors'
 import type { AutoAssignMode } from '@/lib/auto-assign'
 
 function CollapseButton({ onCollapse }: { onCollapse: () => void }) {
@@ -128,17 +129,13 @@ function TableActions({ tableId, guestCount }: { tableId: string; guestCount: nu
   )
 }
 
-const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  '男方': { bg: '#DBEAFE', text: '#1E40AF', border: '#BFDBFE' },
-  '女方': { bg: '#FEE2E2', text: '#991B1B', border: '#FECACA' },
-  '共同': { bg: '#F3F4F6', text: '#374151', border: '#D1D5DB' },
-}
-
 const CATEGORY_ORDER = ['男方', '女方', '共同']
 
 export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => void; onPanToTable?: (x: number, y: number) => void }) {
   const guests = useSeatingStore((s) => s.guests)
   const tables = useSeatingStore((s) => s.tables)
+  const eventId = useSeatingStore((s) => s.eventId)
+  const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId])
   const getUnassignedGuests = useSeatingStore((s) => s.getUnassignedGuests)
   const autoAssignGuests = useSeatingStore((s) => s.autoAssignGuests)
   const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress)
@@ -267,9 +264,6 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
     }
   }
 
-  const CATEGORY_BG: Record<string, string> = { '男方': '#DBEAFE', '女方': '#FEE2E2', '共同': '#F3F4F6' }
-  const CATEGORY_CLR: Record<string, string> = { '男方': '#1E40AF', '女方': '#991B1B', '共同': '#374151' }
-
   const animateAutoAssign = async (mode: AutoAssignMode = 'balanced') => {
     setAssigning(true)
     const svgEl = document.getElementById('floorplan-svg') as SVGSVGElement | null
@@ -368,8 +362,8 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
         font-size:${fontSize}px;
         font-weight:500;
         font-family:'Noto Sans TC',sans-serif;
-        background:${CATEGORY_BG[guest.category] || '#F3F4F6'};
-        color:${CATEGORY_CLR[guest.category] || '#374151'};
+        background:${getCategoryColor(guest.category, categoryColors).background};
+        color:${getCategoryColor(guest.category, categoryColors).color};
         border:1.5px solid white;
         box-shadow:0 2px 8px rgba(0,0,0,0.15);
         pointer-events:none;
@@ -531,7 +525,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
                 // 計算全域動畫索引
                 let globalIdx = 0
                 return grouped.map(({ category, subGroups }) => {
-                const style = CATEGORY_STYLES[category]
+                const catColor = getCategoryColor(category, categoryColors)
                 const totalCount = subGroups.reduce((s, sg) => s + sg.guests.length, 0)
                 return (
                   <div key={category}>
@@ -540,9 +534,9 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
                       <span
                         className="text-sm font-medium px-1.5 py-0.5 rounded"
                         style={{
-                          background: style?.bg ?? '#F3F4F6',
-                          color: style?.text ?? '#374151',
-                          border: `1px solid ${style?.border ?? '#D1D5DB'}`,
+                          background: catColor.background,
+                          color: catColor.color,
+                          border: `1px solid ${catColor.border}`,
                         }}
                       >
                         {category}
@@ -552,7 +546,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
                       </span>
                     </div>
                     {/* 標籤子分組 */}
-                    <div className="space-y-2 pl-2" style={{ borderLeft: `2px solid ${style?.border ?? '#D1D5DB'}` }}>
+                    <div className="space-y-2 pl-2" style={{ borderLeft: `2px solid ${catColor.border}` }}>
                       {subGroups.map(({ tagName, guests: sgGuests }) => (
                         <div key={tagName ?? '__no_tag__'}>
                           {tagName && (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid, Trash2, Dices, Users } from 'lucide-react'
@@ -7,6 +7,7 @@ import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction'
 import { calculateGridLayout, findFreePosition } from '@/lib/viewport'
 import { AvoidPairModal } from './AvoidPairModal'
 import { computeSnapshotStats, computeCurrentStats } from '@/lib/snapshot-stats'
+import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors'
 
 interface ToolbarProps {
   onFitAll?: () => void
@@ -17,6 +18,7 @@ interface ToolbarProps {
 export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarProps = {}) {
   const isWorkspace = page === 'workspace'
   const eid = useSeatingStore((s) => s.eventId)
+  const categoryColors = useMemo(() => loadCategoryColors(eid || ''), [eid])
   const eventName = useSeatingStore((s) => s.eventName)
   const tables = useSeatingStore((s) => s.tables)
   const addTable = useSeatingStore((s) => s.addTable)
@@ -119,10 +121,6 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
     }
   }
 
-  const CATEGORY_BG: Record<string, string> = { '男方': '#DBEAFE', '女方': '#FEE2E2', '共同': '#F3F4F6' }
-  const CATEGORY_CLR: Record<string, string> = { '男方': '#1E40AF', '女方': '#991B1B', '共同': '#374151' }
-  const CATEGORY_BD: Record<string, string> = { '男方': '#BFDBFE', '女方': '#FECACA', '共同': '#D1D5DB' }
-
   // 計算賓客在桌上的螢幕位置
   const getSeatScreenPos = (
     svgEl: SVGSVGElement,
@@ -166,8 +164,8 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
       font-size:${fontSize}px;
       font-weight:500;
       font-family:'Noto Sans TC',sans-serif;
-      background:${CATEGORY_BG[guest.category] || '#F3F4F6'};
-      color:${CATEGORY_CLR[guest.category] || '#374151'};
+      background:${getCategoryColor(guest.category, categoryColors).background};
+      color:${getCategoryColor(guest.category, categoryColors).color};
       border:1.5px solid white;
       box-shadow:0 2px 8px rgba(0,0,0,0.15);
       pointer-events:none;

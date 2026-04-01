@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useSeatingStore, type Guest } from '@/stores/seating'
+import { getCategoryColor, loadCategoryColors, type CategoryColor } from '@/lib/category-colors'
 
 interface Props {
   onClose: () => void
@@ -7,26 +8,17 @@ interface Props {
 
 const REASONS = ['前任關係', '家庭糾紛', '工作嫌隙', '其他']
 
-const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  '男方': { bg: '#DBEAFE', text: '#1E40AF', border: '#BFDBFE' },
-  '女方': { bg: '#FEE2E2', text: '#991B1B', border: '#FECACA' },
-  '共同': { bg: '#F3F4F6', text: '#374151', border: '#D1D5DB' },
-}
 const CATEGORY_ORDER = ['男方', '女方', '共同']
-
-function getCatStyle(cat: string) {
-  return CATEGORY_STYLES[cat] || CATEGORY_STYLES['共同']
-}
 
 // --- Guest tag label: [大學同學] with category color ---
 
-function TagLabel({ guest }: { guest: Guest }) {
-  const catStyle = getCatStyle(guest.category ?? '')
+function TagLabel({ guest, categoryColors }: { guest: Guest; categoryColors: Record<string, CategoryColor> }) {
+  const catColor = getCategoryColor(guest.category, categoryColors)
   const tagName = guest.guestTags.length > 0 ? guest.guestTags[0].tag.name : (guest.category ?? '共同')
   return (
     <span className="whitespace-nowrap shrink-0" style={{
       fontSize: 12, fontWeight: 600, padding: '1px 5px', borderRadius: 3,
-      background: catStyle.bg, color: catStyle.text, border: `1px solid ${catStyle.border}`,
+      background: catColor.background, color: catColor.color, border: `1px solid ${catColor.border}`,
     }}>
       {tagName}
     </span>
@@ -35,8 +27,8 @@ function TagLabel({ guest }: { guest: Guest }) {
 
 // --- Selectable chip (left panel) ---
 
-function SelectableChip({ guest, selected, onClick }: { guest: Guest; selected: boolean; onClick: () => void }) {
-  const catStyle = getCatStyle(guest.category ?? '')
+function SelectableChip({ guest, selected, onClick, categoryColors }: { guest: Guest; selected: boolean; onClick: () => void; categoryColors: Record<string, CategoryColor> }) {
+  const catColor = getCategoryColor(guest.category, categoryColors)
   return (
     <button
       onClick={onClick}
@@ -44,9 +36,9 @@ function SelectableChip({ guest, selected, onClick }: { guest: Guest; selected: 
       style={{
         fontFamily: 'var(--font-body)',
         borderRadius: 'var(--radius-sm)',
-        border: selected ? '2px solid var(--error)' : `1px solid ${catStyle.border}`,
-        backgroundColor: selected ? '#FEF2F2' : catStyle.bg,
-        color: selected ? '#DC2626' : catStyle.text,
+        border: selected ? '2px solid var(--error)' : `1px solid ${catColor.border}`,
+        backgroundColor: selected ? '#FEF2F2' : catColor.background,
+        color: selected ? '#DC2626' : catColor.color,
         fontWeight: selected ? 600 : 400,
       }}
     >
@@ -57,8 +49,8 @@ function SelectableChip({ guest, selected, onClick }: { guest: Guest; selected: 
 
 // --- Avoid pair row (right panel): [tag]名字 vs [tag]名字 ---
 
-function PairRow({ guestA, guestB, reason, onRemove }: {
-  guestA: Guest; guestB: Guest; reason: string | null; onRemove: () => void
+function PairRow({ guestA, guestB, reason, onRemove, categoryColors }: {
+  guestA: Guest; guestB: Guest; reason: string | null; onRemove: () => void; categoryColors: Record<string, CategoryColor>
 }) {
   const nameA = guestA.aliases.length > 0 ? guestA.aliases[0] : guestA.name
   const nameB = guestB.aliases.length > 0 ? guestB.aliases[0] : guestB.name
@@ -68,11 +60,11 @@ function PairRow({ guestA, guestB, reason, onRemove }: {
       style={{ background: '#FEF2F2', borderRadius: 'var(--radius-sm)', border: '1px solid #FECACA', fontSize: 13 }}
     >
       <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-nowrap">
-        <TagLabel guest={guestA} />
+        <TagLabel guest={guestA} categoryColors={categoryColors} />
         <span className="whitespace-nowrap" style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{nameA}</span>
         <span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>vs</span>
         <span className="whitespace-nowrap" style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{nameB}</span>
-        <TagLabel guest={guestB} />
+        <TagLabel guest={guestB} categoryColors={categoryColors} />
         {reason && <span className="whitespace-nowrap" style={{ color: 'var(--text-muted)', fontSize: 11 }}>({reason})</span>}
       </div>
       <button
@@ -94,6 +86,8 @@ export function AvoidPairModal({ onClose }: Props) {
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
   const addAvoidPair = useSeatingStore((s) => s.addAvoidPair)
   const removeAvoidPair = useSeatingStore((s) => s.removeAvoidPair)
+  const eventId = useSeatingStore((s) => s.eventId)
+  const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId])
 
   const confirmed = useMemo(() => guests.filter((g) => g.rsvpStatus === 'confirmed'), [guests])
 
@@ -257,18 +251,18 @@ export function AvoidPairModal({ onClose }: Props) {
               ) : (
                 <div className="space-y-3">
                   {grouped.map(({ category, subGroups }) => {
-                    const style = getCatStyle(category)
+                    const catColor = getCategoryColor(category, categoryColors)
                     return (
                       <div key={category}>
                         <div className="flex items-center gap-1.5 mb-1.5">
                           <span
                             className="text-xs font-medium px-1.5 py-0.5 rounded"
-                            style={{ background: style.bg, color: style.text, border: `1px solid ${style.border}` }}
+                            style={{ background: catColor.background, color: catColor.color, border: `1px solid ${catColor.border}` }}
                           >
                             {category}
                           </span>
                         </div>
-                        <div className="space-y-1.5 pl-2" style={{ borderLeft: `2px solid ${style.border}` }}>
+                        <div className="space-y-1.5 pl-2" style={{ borderLeft: `2px solid ${catColor.border}` }}>
                           {subGroups.map(({ tagName, guests: sgGuests }) => (
                             <div key={tagName ?? '__no_tag__'}>
                               {tagName && (
@@ -281,6 +275,7 @@ export function AvoidPairModal({ onClose }: Props) {
                                     guest={g}
                                     selected={g.id === selectedA || g.id === selectedB}
                                     onClick={() => handleChipClick(g.id)}
+                                    categoryColors={categoryColors}
                                   />
                                 ))}
                               </div>
@@ -367,6 +362,7 @@ export function AvoidPairModal({ onClose }: Props) {
                       guestB={b}
                       reason={ap.reason}
                       onRemove={() => removeAvoidPair(ap.id)}
+                      categoryColors={categoryColors}
                     />
                   )
                 })

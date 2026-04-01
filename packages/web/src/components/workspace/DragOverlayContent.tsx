@@ -1,12 +1,7 @@
+import { useMemo } from 'react'
 import { useSeatingStore, type Guest } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
-
-const CATEGORY_STYLES: Record<string, { background: string; borderColor: string; color: string }> = {
-  '男方': { background: '#DBEAFE', borderColor: '#BFDBFE', color: '#1E40AF' },
-  '女方': { background: '#FEE2E2', borderColor: '#FECACA', color: '#991B1B' },
-  '共同': { background: '#F3F4F6', borderColor: '#D1D5DB', color: '#374151' },
-}
-const DEFAULT_STYLE = { background: '#F3F4F6', borderColor: '#D1D5DB', color: '#374151' }
+import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors'
 
 function getDisplayName(name: string): string {
   if (name.length <= 2) return name
@@ -22,7 +17,10 @@ export function DragOverlayContent({ guest }: Props) {
   const dragPreview = useSeatingStore((s) => s.dragPreview)
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
   const guests = useSeatingStore((s) => s.guests)
-  const catStyle = CATEGORY_STYLES[guest.category] || DEFAULT_STYLE
+  const eventId = useSeatingStore((s) => s.eventId)
+  const colors = useMemo(() => loadCategoryColors(eventId || ''), [eventId])
+  const catColor = getCategoryColor(guest.category, colors)
+  const catStyle = { background: catColor.background, borderColor: catColor.border, color: catColor.color }
   const displayName = getDisplayName(guest.name)
 
   // 預覽分數：hover 到座位時即時計算的分數

@@ -1,8 +1,9 @@
-import { useRef, useLayoutEffect, useState, useEffect } from 'react'
+import { useRef, useLayoutEffect, useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useSeatingStore, type Table, type Guest } from '@/stores/seating'
 import { getSatisfactionColor, formatScoreDelta } from '@/lib/satisfaction'
 import { dampedCounterScale, labelOpacity, satisfactionBlend, blendColors } from '@/lib/viewport'
+import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors'
 import type { Slot } from '@/lib/seat-shift'
 
 /**
@@ -32,17 +33,6 @@ function useAnimatedNumber(target: number, duration = 400): number {
   return current
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  '男方': '#DBEAFE',
-  '女方': '#FEE2E2',
-  '共同': '#F3F4F6',
-}
-
-const CATEGORY_TEXT: Record<string, string> = {
-  '男方': '#1E40AF',
-  '女方': '#991B1B',
-  '共同': '#374151',
-}
 
 // zoom level 目前只有 normal（overview 模式已停用）
 
@@ -149,6 +139,8 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
   const rawGuestScale = dampedCounterScale(zoom) // 賓客元素：阻尼縮小
   const nameAlpha = labelOpacity(zoom)         // 名字漸進淡出
   const satBlend = satisfactionBlend(zoom)     // 填色從分類色→滿意度色
+  const eventId = useSeatingStore((s) => s.eventId)
+  const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId])
   const getTableGuests = useSeatingStore((s) => s.getTableGuests)
   const getTableSeatCount = useSeatingStore((s) => s.getTableSeatCount)
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
@@ -480,7 +472,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
           key={`arc-${i}`}
           d={arc.path}
           fill="none"
-          stroke={CATEGORY_COLORS[arc.category] || '#F3F4F6'}
+          stroke={getCategoryColor(arc.category, categoryColors).background}
           strokeWidth={40 * guestScale}
           strokeLinecap="round"
           opacity={0.5}
@@ -492,7 +484,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
         const isPreview = seatPreviewGuest?.tableId === table.id && seatPreviewGuest?.seatIndex === seat.seatIndex
         const previewScore = isPreview ? seatPreviewGuest.predictedScore : 0
         const previewCategory = isPreview ? seatPreviewGuest.category : undefined
-        const previewBgColor = isPreview ? (CATEGORY_COLORS[previewCategory ?? ''] || '#F3F4F6') : undefined
+        const previewBgColor = isPreview ? getCategoryColor(previewCategory, categoryColors).background : undefined
         const previewSatColor = isPreview ? getSatisfactionColor(previewScore) : undefined
         const guestR = 20 * guestScale
         const guestRingR = guestR + 3 * guestScale
@@ -537,7 +529,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
                   <text
                     y={6 * guestScale}
                     textAnchor="middle"
-                    fill={CATEGORY_TEXT[previewCategory ?? ''] || '#374151'}
+                    fill={getCategoryColor(previewCategory, categoryColors).color}
                     fontSize={16 * guestScale}
                     fontWeight="500"
                     fontFamily="'Noto Sans TC', sans-serif"
@@ -594,8 +586,9 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
         const isFlying = flyingGuestIds.has(seat.guest!.id)
 
         if (seat.type === 'companion' || seat.type === 'overflow-companion') {
-          const bgColor = CATEGORY_COLORS[seat.guest!.category] || '#F3F4F6'
-          const textColor = CATEGORY_TEXT[seat.guest!.category] || '#374151'
+          const companionCatColor = getCategoryColor(seat.guest!.category, categoryColors)
+          const bgColor = companionCatColor.background
+          const textColor = companionCatColor.color
           const totalCompanions = seat.guest!.attendeeCount - 1
           const isLast = seat.companionIndex === totalCompanions
           return (
@@ -625,8 +618,9 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
         }
 
         // 賓客本人
-        const bgColor = CATEGORY_COLORS[seat.guest!.category] || '#F3F4F6'
-        const textColor = CATEGORY_TEXT[seat.guest!.category] || '#374151'
+        const guestCatColor = getCategoryColor(seat.guest!.category, categoryColors)
+        const bgColor = guestCatColor.background
+        const textColor = guestCatColor.color
         const displayName = getDisplayName(seat.guest!.name, seat.guest!.aliases)
         const recGuestScore = recommendationGuestScore?.guestId === seat.guest!.id ? recommendationGuestScore.score : undefined
         const guestScore = previewScores?.get(seat.guest!.id) ?? recGuestScore ?? seat.guest!.satisfactionScore

@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Search, X } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
+import { loadCategoryColors, saveCategoryColors, getCategoryColor, COLOR_PRESETS, PALETTE_HUES, PALETTE_SATS, FALLBACK_COLOR, type CategoryColor } from '@/lib/category-colors'
 import type { Guest, Table } from '@/lib/types'
 
 // ─── Types ──────────────────────────────────────────
@@ -27,66 +28,6 @@ function rsvpIcon(status: string) {
 
 function rsvpColor(status: string) {
   return status === 'confirmed' ? 'var(--success)' : 'var(--error)'
-}
-
-// ─── Category Color Presets ──────────────────────────
-
-interface CategoryColor { background: string; border: string; color: string }
-
-// 8 hues × 5 saturations + 5 grays = 45 presets (≈ square grid 8×6)
-const PALETTE_HUES = [0, 30, 55, 140, 195, 220, 275, 330] // red, orange, yellow, green, cyan, blue, purple, pink
-const PALETTE_SATS = [90, 72, 55, 40, 25] // vivid → muted
-
-function hslToHex(h: number, s: number, l: number): string {
-  const f = (n: number) => {
-    const k = (n + h / 30) % 12
-    const a = s / 100 * Math.min(l / 100, 1 - l / 100)
-    const v = l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))
-    return Math.round(255 * v).toString(16).padStart(2, '0')
-  }
-  return `#${f(0)}${f(8)}${f(4)}`
-}
-
-function makeColor(h: number, s: number): CategoryColor {
-  return {
-    background: hslToHex(h, s, 88),
-    border: hslToHex(h, s, 75),
-    color: hslToHex(h, s, 28),
-  }
-}
-
-const COLOR_PRESETS: CategoryColor[][] = [
-  ...PALETTE_HUES.map((h) => PALETTE_SATS.map((s) => makeColor(h, s))),
-  // grays (same count as PALETTE_SATS)
-  PALETTE_SATS.map((_, i) => {
-    const lights = [92, 86, 78, 70, 60]
-    const l = lights[i]
-    return { background: hslToHex(220, 8, l), border: hslToHex(220, 8, l - 10), color: hslToHex(220, 10, 22) }
-  }),
-]
-
-const DEFAULT_CATEGORY_COLORS: Record<string, CategoryColor> = {
-  '男方': COLOR_PRESETS[5][0],  // 藍 (hue 220)
-  '女方': COLOR_PRESETS[0][0],  // 紅 (hue 0)
-  '共同': COLOR_PRESETS[8][0],  // 灰
-}
-
-function loadCategoryColors(eventId: string): Record<string, CategoryColor> {
-  try {
-    const raw = localStorage.getItem(`seatern:categoryColors:${eventId}`)
-    return raw ? { ...DEFAULT_CATEGORY_COLORS, ...JSON.parse(raw) } : { ...DEFAULT_CATEGORY_COLORS }
-  } catch { return { ...DEFAULT_CATEGORY_COLORS } }
-}
-
-function saveCategoryColors(eventId: string, colors: Record<string, CategoryColor>) {
-  localStorage.setItem(`seatern:categoryColors:${eventId}`, JSON.stringify(colors))
-}
-
-const FALLBACK_COLOR: CategoryColor = { background: '#E5E7EB', border: '#D1D5DB', color: '#374151' }
-
-function getCategoryBadgeStyle(category: string | undefined, colors: Record<string, CategoryColor>): CategoryColor {
-  if (!category) return FALLBACK_COLOR
-  return colors[category] || FALLBACK_COLOR
 }
 
 // ─── Category Color Picker ──────────────────────────
@@ -594,7 +535,7 @@ export default function GuestManagementPage() {
                           ? { background: 'var(--accent)', color: '#fff' }
                           : { background: 'var(--bg-surface)', color: 'var(--text-secondary)' }
                       }
-                      const badge = getCategoryBadgeStyle(cat, effectiveColors)
+                      const badge = getCategoryColor(cat, effectiveColors)
                       return categoryFilter === cat
                         ? { background: badge.color, color: '#fff' }
                         : { background: badge.background, color: badge.color }
@@ -608,7 +549,7 @@ export default function GuestManagementPage() {
           {/* Category color picker */}
           {pickerCat && (
             <CategoryColorPicker
-              current={getCategoryBadgeStyle(pickerCat.cat, effectiveColors)}
+              current={getCategoryColor(pickerCat.cat, effectiveColors)}
               onPick={(c) => { setPreviewColor(null); handleColorChange(pickerCat.cat, c); setPickerCat(null) }}
               onPreview={(c) => setPreviewColor(c ? { cat: pickerCat.cat, color: c } : null)}
               rect={pickerCat.rect}
@@ -703,7 +644,7 @@ export default function GuestManagementPage() {
                     maxAttendeeTooltip={maxAttendeeTooltip}
                     prefNames={prefNames}
                     avoidNames={avoidNames}
-                    catColor={getCategoryBadgeStyle(guest.category, effectiveColors)}
+                    catColor={getCategoryColor(guest.category, effectiveColors)}
                     onSave={(patch) => handleSave(guest.id, patch)}
                     onRsvpToggle={() => handleRsvpToggle(guest)}
                     onDelete={() => handleDelete(guest)}

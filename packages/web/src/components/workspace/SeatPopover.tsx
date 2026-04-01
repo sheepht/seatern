@@ -2,12 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useSeatingStore } from '@/stores/seating'
 import { recalculateAll, getSatisfactionColor, formatScoreDelta } from '@/lib/satisfaction'
-
-const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  '男方': { bg: '#DBEAFE', text: '#1E40AF', border: '#BFDBFE' },
-  '女方': { bg: '#FEE2E2', text: '#991B1B', border: '#FECACA' },
-  '共同': { bg: '#F3F4F6', text: '#374151', border: '#D1D5DB' },
-}
+import { getCategoryColor, loadCategoryColors, type CategoryColor } from '@/lib/category-colors'
 
 interface Props {
   tableId: string
@@ -36,6 +31,8 @@ export function SeatPopover({ tableId, seatIndex, seatX, seatY, tableCenterX, ta
   const tables = useSeatingStore((s) => s.tables)
   const avoidPairs = useSeatingStore((s) => s.avoidPairs)
   const moveGuestToSeat = useSeatingStore((s) => s.moveGuestToSeat)
+  const eventId = useSeatingStore((s) => s.eventId)
+  const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId])
 
   // 自動 focus 搜尋框
   useEffect(() => { inputRef.current?.focus() }, [])
@@ -175,7 +172,7 @@ export function SeatPopover({ tableId, seatIndex, seatX, seatY, tableCenterX, ta
             推薦入座
           </div>
           {top3.map((p) => (
-            <GuestRow key={p.guest.id} prediction={p} onClick={() => handleSelect(p.guest.id)} highlight tableId={tableId} seatIndex={seatIndex} />
+            <GuestRow key={p.guest.id} prediction={p} onClick={() => handleSelect(p.guest.id)} highlight tableId={tableId} seatIndex={seatIndex} categoryColors={categoryColors} />
           ))}
         </div>
       )}
@@ -193,7 +190,7 @@ export function SeatPopover({ tableId, seatIndex, seatX, seatY, tableCenterX, ta
           </div>
         )}
         {(search.trim() ? filtered : filtered.slice(top3.length)).map((p) => (
-          <GuestRow key={p.guest.id} prediction={p} onClick={() => handleSelect(p.guest.id)} tableId={tableId} seatIndex={seatIndex} />
+          <GuestRow key={p.guest.id} prediction={p} onClick={() => handleSelect(p.guest.id)} tableId={tableId} seatIndex={seatIndex} categoryColors={categoryColors} />
         ))}
         {filtered.length === 0 && (
           <div style={{ padding: '16px 0', textAlign: 'center', color: '#A8A29E', fontSize: '13px' }}>
@@ -206,16 +203,18 @@ export function SeatPopover({ tableId, seatIndex, seatX, seatY, tableCenterX, ta
   )
 }
 
-function GuestRow({ prediction, onClick, highlight, tableId, seatIndex }: {
+function GuestRow({ prediction, onClick, highlight, tableId, seatIndex, categoryColors }: {
   prediction: Prediction
   onClick: () => void
   highlight?: boolean
   tableId: string
   seatIndex: number
+  categoryColors: Record<string, CategoryColor>
 }) {
   const { guest, predictedScore, tableDelta, newTableAvg } = prediction
   // 用分類決定顏色（男方藍、女方紅），badge 文字顯示標籤名
-  const catStyle = CATEGORY_STYLES[guest.category ?? ''] || { bg: '#F3F4F6', text: '#374151', border: '#D1D5DB' }
+  const catColor = getCategoryColor(guest.category, categoryColors)
+  const catStyle = { bg: catColor.background, text: catColor.color, border: catColor.border }
   const tagLabel = guest.guestTags.length > 0 ? guest.guestTags[0].tag.name : (guest.category ?? '其他')
   const scoreColor = getSatisfactionColor(predictedScore)
   const deltaColor = tableDelta > 0 ? '#16A34A' : tableDelta < 0 ? '#DC2626' : '#A8A29E'
