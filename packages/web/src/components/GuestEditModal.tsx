@@ -426,7 +426,6 @@ export default function GuestEditModal({
                   cursor: 'pointer',
                 }}
               >
-                <option value="">（無子分類）</option>
                 {subcategories
                   .filter((sc) => !guest.category || sc.category === guest.category)
                   .map((sc) => (

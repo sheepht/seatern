@@ -548,12 +548,10 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
                     {/* 標籤子分組 */}
                     <div className="space-y-2 pl-2" style={{ borderLeft: `2px solid ${catColor.border}` }}>
                       {subGroups.map(({ tagName, guests: sgGuests }) => (
-                        <div key={tagName ?? '__no_tag__'}>
-                          {tagName && (
-                            <div className="text-sm mb-1" style={{ color: 'var(--text-muted)' }}>
-                              {tagName}
-                            </div>
-                          )}
+                        <div key={tagName ?? '__no_subcat__'}>
+                          <div className="text-sm mb-1" style={{ color: 'var(--text-muted)' }}>
+                            {tagName ?? '未分類'}
+                          </div>
                           <div className="flex flex-wrap gap-1">
                             {sgGuests.map((g) => (
                               <GuestChip key={g.id} guest={g} animIndex={globalIdx++} />

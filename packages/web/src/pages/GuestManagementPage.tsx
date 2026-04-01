@@ -102,54 +102,6 @@ function Toast({ message, onUndo, onClose }: { message: string; onUndo?: () => v
   )
 }
 
-// ─── Inline Editable Cell ───────────────────────────
-
-function EditableText({
-  value, onSave, maxLength = 50, placeholder,
-}: { value: string; onSave: (v: string) => void; maxLength?: number; placeholder?: string }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => { setDraft(value) }, [value])
-  useEffect(() => { if (editing) inputRef.current?.select() }, [editing])
-
-  const commit = () => {
-    const trimmed = draft.trim()
-    if (trimmed && trimmed !== value) onSave(trimmed)
-    else setDraft(value)
-    setEditing(false)
-  }
-
-  if (!editing) {
-    return (
-      <span
-        onClick={() => setEditing(true)}
-        className="cursor-pointer hover:bg-[var(--accent-light)] px-1 -mx-1 rounded"
-        style={{ minHeight: 20, display: 'inline-block' }}
-      >
-        {value || <span style={{ color: 'var(--text-muted)' }}>{placeholder || '—'}</span>}
-      </span>
-    )
-  }
-
-  return (
-    <input
-      ref={inputRef}
-      value={draft}
-      onChange={(e) => setDraft(e.target.value.slice(0, maxLength))}
-      onBlur={commit}
-      onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false) } }}
-      className="outline-none w-full"
-      style={{
-        background: 'var(--accent-light)', border: 'none', borderBottom: '2px solid var(--accent)',
-        padding: '1px 4px', fontSize: 'inherit', fontFamily: 'inherit', color: 'inherit',
-        borderRadius: 2,
-      }}
-    />
-  )
-}
-
 function NumberStepper({ value, min, max, onSave, maxTooltip }: { value: number; min: number; max: number; onSave: (v: number) => void; maxTooltip?: string }) {
   const atMax = value >= max
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null)
@@ -827,10 +779,10 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxAttendee, maxAtte
       onClick={onEdit}
       style={{ borderBottom: '1px solid var(--border)', background: hovered ? 'var(--accent-light)' : 'transparent', transition: 'background 50ms', cursor: 'pointer' }}
     >
-      {/* Name + aliases (name is quick-editable) */}
-      <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
+      {/* Name + aliases */}
+      <td style={tdStyle}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <EditableText value={guest.name} onSave={(v) => onSave({ name: v })} />
+          <span style={{ fontSize: 15, fontFamily: 'var(--font-body)', color: 'var(--text-primary)' }}>{guest.name}</span>
           {guest.aliases.length > 0 && (
             <span style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>
               ({guest.aliases.join('、')})

@@ -264,10 +264,8 @@ export function AvoidPairModal({ onClose }: Props) {
                         </div>
                         <div className="space-y-1.5 pl-2" style={{ borderLeft: `2px solid ${catColor.border}` }}>
                           {subGroups.map(({ tagName, guests: sgGuests }) => (
-                            <div key={tagName ?? '__no_tag__'}>
-                              {tagName && (
-                                <div className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>{tagName}</div>
-                              )}
+                            <div key={tagName ?? '__no_subcat__'}>
+                              <div className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>{tagName ?? '未分類'}</div>
                               <div className="flex flex-wrap gap-1">
                                 {sgGuests.map((g) => (
                                   <SelectableChip
