@@ -265,22 +265,22 @@ export default function GuestEditModal({
 
   // Table info
   const tableInfo = tables.map((t) => {
-    const used = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed').reduce((s, g) => s + g.attendeeCount, 0)
+    const used = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed').reduce((s, g) => s + g.seatCount, 0)
     return { ...t, used, remaining: t.capacity - used }
   })
 
   const currentTable = guest.assignedTableId ? tables.find((t) => t.id === guest.assignedTableId) : null
 
-  // Max attendee count based on table capacity
-  let maxAttendee = 10
-  let maxAttendeeHint = ''
+  // Max companion count based on table capacity
+  let maxCompanion = 9
+  let maxCompanionHint = ''
   if (guest.assignedTableId) {
     const ti = tableInfo.find((t) => t.id === guest.assignedTableId)
     if (ti) {
-      const othersSeats = ti.used - guest.attendeeCount
-      maxAttendee = Math.min(10, ti.capacity - othersSeats)
-      if (maxAttendee <= guest.attendeeCount) {
-        maxAttendeeHint = `${ti.name}已滿 (${ti.used}/${ti.capacity})`
+      const othersSeats = ti.used - guest.seatCount
+      maxCompanion = Math.min(9, ti.capacity - othersSeats - 1)
+      if (maxCompanion <= guest.companionCount) {
+        maxCompanionHint = `${ti.name}已滿 (${ti.used}/${ti.capacity})`
       }
     }
   }
@@ -475,7 +475,7 @@ export default function GuestEditModal({
 
           <div style={sectionTitleStyle}>排位</div>
 
-          {/* 5. 桌次 + 7. 人數 */}
+          {/* 5. 桌次 + 7. 攜眷 */}
           <div style={rowStyle}>
             <span style={labelStyle}>桌次</span>
             <div style={{ flex: 1, paddingTop: 4, position: 'relative' }}>
@@ -505,7 +505,7 @@ export default function GuestEditModal({
                 </div>
                 {tableInfo.map((t) => {
                   const isCurrent = t.id === guest.assignedTableId
-                  const full = isCurrent ? false : t.remaining < guest.attendeeCount
+                  const full = isCurrent ? false : t.remaining < guest.seatCount
                   return (
                     <div
                       key={t.id}
@@ -529,39 +529,39 @@ export default function GuestEditModal({
                 })}
               </FixedDropdown>}
             </div>
-            <span style={{ ...labelStyle, width: 'auto', paddingLeft: 8 }}>人數</span>
+            <span style={{ ...labelStyle, width: 'auto', paddingLeft: 8 }}>攜眷</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingTop: 4 }}>
               <button
-                onClick={() => guest.attendeeCount > 1 && onSave(guest.id, { attendeeCount: guest.attendeeCount - 1 })}
-                disabled={guest.attendeeCount <= 1}
+                onClick={() => guest.companionCount > 0 && onSave(guest.id, { companionCount: guest.companionCount - 1 })}
+                disabled={guest.companionCount <= 0}
                 style={{
                   width: 28, height: 28, borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
-                  background: guest.attendeeCount <= 1 ? 'transparent' : 'var(--bg-surface)', cursor: guest.attendeeCount <= 1 ? 'default' : 'pointer',
+                  background: guest.companionCount <= 0 ? 'transparent' : 'var(--bg-surface)', cursor: guest.companionCount <= 0 ? 'default' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
-                  color: guest.attendeeCount <= 1 ? 'var(--text-muted)' : 'var(--text-secondary)',
+                  color: guest.companionCount <= 0 ? 'var(--text-muted)' : 'var(--text-secondary)',
                 }}
               >−</button>
-              <span style={{ fontFamily: 'var(--font-data)', fontVariantNumeric: 'tabular-nums', minWidth: 24, textAlign: 'center', fontSize: 15 }}>{guest.attendeeCount}</span>
+              <span style={{ fontFamily: 'var(--font-data)', fontVariantNumeric: 'tabular-nums', minWidth: 24, textAlign: 'center', fontSize: 15 }}>{guest.companionCount}</span>
               <span style={{ position: 'relative', display: 'inline-flex' }}>
                 <button
-                  onClick={() => guest.attendeeCount < maxAttendee && onSave(guest.id, { attendeeCount: guest.attendeeCount + 1 })}
-                  disabled={guest.attendeeCount >= maxAttendee}
+                  onClick={() => guest.companionCount < maxCompanion && onSave(guest.id, { companionCount: guest.companionCount + 1 })}
+                  disabled={guest.companionCount >= maxCompanion}
                   style={{
                     width: 28, height: 28, borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
-                    background: guest.attendeeCount >= maxAttendee ? 'transparent' : 'var(--bg-surface)', cursor: guest.attendeeCount >= maxAttendee ? 'default' : 'pointer',
+                    background: guest.companionCount >= maxCompanion ? 'transparent' : 'var(--bg-surface)', cursor: guest.companionCount >= maxCompanion ? 'default' : 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
-                    color: guest.attendeeCount >= maxAttendee ? 'var(--text-muted)' : 'var(--text-secondary)',
+                    color: guest.companionCount >= maxCompanion ? 'var(--text-muted)' : 'var(--text-secondary)',
                   }}
                 >+</button>
-                {maxAttendeeHint && (
+                {maxCompanionHint && (
                   <div style={{
-                    position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+                    position: 'absolute', bottom: '100%', right: 0,
                     marginBottom: 6, padding: '4px 10px', borderRadius: 'var(--radius-sm, 4px)',
                     background: 'var(--text-primary)', color: 'var(--bg-surface)',
                     fontSize: 12, fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.15)', pointerEvents: 'none',
                   }}>
-                    {maxAttendeeHint}
+                    {maxCompanionHint}
                   </div>
                 )}
               </span>

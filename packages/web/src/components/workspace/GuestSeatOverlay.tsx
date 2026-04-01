@@ -81,7 +81,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
             for (const g of tableGuests) {
               if (g.seatIndex !== null) {
                 usedIndices.add(g.seatIndex)
-                for (let c = 1; c < g.attendeeCount; c++) usedIndices.add((g.seatIndex + c) % targetTable.capacity)
+                for (let c = 1; c < g.seatCount; c++) usedIndices.add((g.seatIndex + c) % targetTable.capacity)
               }
             }
             let freeSeat = 0

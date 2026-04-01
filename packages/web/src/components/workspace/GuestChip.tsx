@@ -74,7 +74,7 @@ export function GuestChip({ guest, animIndex }: Props) {
             for (const g of tableGuests) {
               if (g.seatIndex !== null) {
                 usedIndices.add(g.seatIndex)
-                for (let c = 1; c < g.attendeeCount; c++) usedIndices.add((g.seatIndex + c) % targetTable.capacity)
+                for (let c = 1; c < g.seatCount; c++) usedIndices.add((g.seatIndex + c) % targetTable.capacity)
               }
             }
             let freeSeat = 0
@@ -95,11 +95,11 @@ export function GuestChip({ guest, animIndex }: Props) {
         setHoveredGuest(null)
         setTooltip(null)
       }}
-      title={`${guest.name}${guest.aliases.length > 0 ? ` (${guest.aliases[0]})` : ''}${guest.attendeeCount > 1 ? ` +${guest.attendeeCount - 1}` : ''}${guest.dietaryNote ? ` [${guest.dietaryNote}]` : ''}`}
+      title={`${guest.name}${guest.aliases.length > 0 ? ` (${guest.aliases[0]})` : ''}${guest.companionCount > 0 ? ` +${guest.companionCount}` : ''}${guest.dietaryNote ? ` [${guest.dietaryNote}]` : ''}`}
     >
       {guest.aliases.length > 0 ? guest.aliases[0] : guest.name}
-      {guest.attendeeCount > 1 && (
-        <span style={{ color: 'var(--text-muted)' }} className="ml-0.5">+{guest.attendeeCount - 1}</span>
+      {guest.companionCount > 0 && (
+        <span style={{ color: 'var(--text-muted)' }} className="ml-0.5">+{guest.companionCount}</span>
       )}
     </div>
     {tooltip && bestSwapTableId && createPortal(

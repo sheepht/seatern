@@ -7,8 +7,8 @@
  * 3. 拖到帶眷屬賓客的位子 → 不允許
  * 4. 滿桌或被帶眷屬賓客擋住（兩邊都不可達）→ 不允許
  *
- * 帶眷屬賓客（attendeeCount > 1）視為不可移動的牆壁。
- * 位移只會移動單人賓客（attendeeCount = 1）。
+ * 帶眷屬賓客（seatCount > 1）視為不可移動的牆壁。
+ * 位移只會移動單人賓客（seatCount = 1）。
  */
 
 /** 每個 slot 的佔用狀態 */
@@ -25,14 +25,14 @@ export type Slot = SlotOccupant | null
  * 從 guests（含 seatIndex）建立 slot 陣列
  */
 export function buildSlotArray(
-  guests: Array<{ id: string; seatIndex: number; attendeeCount: number }>,
+  guests: Array<{ id: string; seatIndex: number; seatCount: number }>,
   capacity: number,
 ): Slot[] {
   const slots: Slot[] = new Array(capacity).fill(null)
 
   for (const g of guests) {
-    const immovable = g.attendeeCount > 1
-    for (let i = 0; i < g.attendeeCount; i++) {
+    const immovable = g.seatCount > 1
+    for (let i = 0; i < g.seatCount; i++) {
       const idx = (g.seatIndex + i) % capacity
       if (idx < capacity) {
         slots[idx] = { guestId: g.id, isCompanion: i > 0, immovable }
@@ -141,7 +141,7 @@ export function extractSeatIndices(slots: Slot[]): Map<string, number> {
  *
  * - 帶眷屬賓客不可移動（牆壁）
  * - 只位移單人賓客
- * - 多格放置（attendeeCount > 1）時，每格獨立檢查並統一方向位移
+ * - 多格放置（seatCount > 1）時，每格獨立檢查並統一方向位移
  *
  * 回傳新的 slot 陣列，或 null 表示無法放置
  */
@@ -149,17 +149,17 @@ export function placeGuest(
   slots: Slot[],
   targetIndex: number,
   guestId: string,
-  attendeeCount: number,
+  seatCount: number,
   cursorBias?: 'left' | 'right',
 ): Slot[] | null {
   const len = slots.length
 
   // 檢查空位總數
   const emptyCount = slots.filter((s) => s === null).length
-  if (emptyCount < attendeeCount) return null
+  if (emptyCount < seatCount) return null
 
   // 檢查目標區域：不可包含不可移動的牆壁
-  for (let i = 0; i < attendeeCount; i++) {
+  for (let i = 0; i < seatCount; i++) {
     const idx = (targetIndex + i) % len
     const slot = slots[idx]
     if (slot !== null && slot.immovable) return null
@@ -169,7 +169,7 @@ export function placeGuest(
 
   // 統一決定方向（以第一個需要位移的格子為準）
   let direction: 'left' | 'right' | null = null
-  for (let i = 0; i < attendeeCount; i++) {
+  for (let i = 0; i < seatCount; i++) {
     const idx = (targetIndex + i) % len
     if (workingSlots[idx] !== null) {
       direction = computeDirection(workingSlots, idx, cursorBias)
@@ -182,14 +182,14 @@ export function placeGuest(
   // 'left'：從右往左處理，讓最右的賓客先推出左邊界，前面的依序跟上
   if (direction !== null) {
     if (direction === 'right') {
-      for (let i = 0; i < attendeeCount; i++) {
+      for (let i = 0; i < seatCount; i++) {
         const idx = (targetIndex + i) % len
         if (workingSlots[idx] !== null) {
           workingSlots = shiftSlot(workingSlots, idx, 'right')
         }
       }
     } else {
-      for (let i = attendeeCount - 1; i >= 0; i--) {
+      for (let i = seatCount - 1; i >= 0; i--) {
         const idx = (targetIndex + i) % len
         if (workingSlots[idx] !== null) {
           workingSlots = shiftSlot(workingSlots, idx, 'left')
@@ -199,14 +199,14 @@ export function placeGuest(
   }
 
   // 驗證目標區域已全部清空
-  for (let i = 0; i < attendeeCount; i++) {
+  for (let i = 0; i < seatCount; i++) {
     const idx = (targetIndex + i) % len
     if (workingSlots[idx] !== null) return null // 無法清空（不應發生）
   }
 
   // 放入賓客
-  const immovable = attendeeCount > 1
-  for (let i = 0; i < attendeeCount; i++) {
+  const immovable = seatCount > 1
+  for (let i = 0; i < seatCount; i++) {
     const idx = (targetIndex + i) % len
     workingSlots[idx] = { guestId, isCompanion: i > 0, immovable }
   }

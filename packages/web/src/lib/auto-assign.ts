@@ -93,7 +93,7 @@ export async function autoAssignGuests(
   const tableRemaining = new Map<string, number>()
   for (const t of tables) {
     const seated = confirmed.filter((g) => g.assignedTableId === t.id)
-    const seatCount = seated.reduce((s, g) => s + g.attendeeCount, 0)
+    const seatCount = seated.reduce((s, g) => s + g.seatCount, 0)
     tableRemaining.set(t.id, t.capacity - seatCount)
   }
 
@@ -172,7 +172,7 @@ export async function autoAssignGuests(
 
     for (const t of tables) {
       const cap = tableRemaining.get(t.id) || 0
-      if (cap < guest.attendeeCount) continue
+      if (cap < guest.seatCount) continue
 
       // 計算這張桌對這位賓客的吸引力
       let score = 0
@@ -196,7 +196,7 @@ export async function autoAssignGuests(
 
     if (bestTable) {
       assigned.set(guest.id, bestTable)
-      tableRemaining.set(bestTable, (tableRemaining.get(bestTable) || 0) - guest.attendeeCount)
+      tableRemaining.set(bestTable, (tableRemaining.get(bestTable) || 0) - guest.seatCount)
     }
   }
 
@@ -222,7 +222,7 @@ export async function autoAssignGuests(
   const refreshSeatCounts = () => {
     tableSeatCounts.clear()
     for (const t of tables) {
-      const count = simGuests.filter((g) => g.assignedTableId === t.id).reduce((s, g) => s + g.attendeeCount, 0)
+      const count = simGuests.filter((g) => g.assignedTableId === t.id).reduce((s, g) => s + g.seatCount, 0)
       tableSeatCounts.set(t.id, count)
     }
   }
@@ -269,7 +269,7 @@ export async function autoAssignGuests(
       for (const t of tables) {
         if (t.id === guest.assignedTableId) continue
         const targetSeats = tableSeatCounts.get(t.id) || 0
-        if (targetSeats + guest.attendeeCount > t.capacity) continue
+        if (targetSeats + guest.seatCount > t.capacity) continue
 
         const moved = simGuests.map((g) => g.id === guestId ? { ...g, assignedTableId: t.id } : g)
         const result = recalculateAll(moved, tables, avoidPairs)
@@ -295,8 +295,8 @@ export async function autoAssignGuests(
         const seatsB = tableSeatCounts.get(gB.assignedTableId!) || 0
         const capA = tables.find((t) => t.id === gA.assignedTableId)!.capacity
         const capB = tables.find((t) => t.id === gB.assignedTableId)!.capacity
-        if (seatsA - gA.attendeeCount + gB.attendeeCount > capA) continue
-        if (seatsB - gB.attendeeCount + gA.attendeeCount > capB) continue
+        if (seatsA - gA.seatCount + gB.seatCount > capA) continue
+        if (seatsB - gB.seatCount + gA.seatCount > capB) continue
 
         // 試交換
         const swapped = simGuests.map((g) => {
@@ -374,7 +374,7 @@ export async function autoAssignGuests(
       for (const t of tables) {
         if (t.id === guest.assignedTableId) continue
         const targetSeats = tableSeatCounts.get(t.id) || 0
-        if (targetSeats + guest.attendeeCount > t.capacity) continue
+        if (targetSeats + guest.seatCount > t.capacity) continue
 
         const moved = simGuests.map((g) => g.id === guestId ? { ...g, assignedTableId: t.id } : g)
         const simResult = recalculateAll(moved, tables, avoidPairs)

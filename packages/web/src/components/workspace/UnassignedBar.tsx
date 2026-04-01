@@ -11,7 +11,7 @@ export function UnassignedBar() {
     data: { type: 'unassigned' },
   })
 
-  const totalSeats = unassigned.reduce((s, g) => s + g.attendeeCount, 0)
+  const totalSeats = unassigned.reduce((s, g) => s + g.seatCount, 0)
 
   return (
     <div

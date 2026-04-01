@@ -109,8 +109,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         for (const t of tables) {
           if (t.id === guest.assignedTableId) continue
           const tableGuests = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')
-          const seatCount = tableGuests.reduce((s, g) => s + g.attendeeCount, 0)
-          if (seatCount + guest.attendeeCount > t.capacity) continue
+          const seatCount = tableGuests.reduce((s, g) => s + g.seatCount, 0)
+          if (seatCount + guest.seatCount > t.capacity) continue
 
           const simGuests = guests.map((g) => g.id === guest.id ? { ...g, assignedTableId: t.id } : g)
           const simResult = recalculateAll(simGuests, tables, avoidPairs)
@@ -250,8 +250,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         const tableGuests = guests.filter(
           (g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed',
         )
-        const seatCount = tableGuests.reduce((s, g) => s + g.attendeeCount, 0)
-        if (seatCount + guest.attendeeCount > t.capacity) continue
+        const seatCount = tableGuests.reduce((s, g) => s + g.seatCount, 0)
+        if (seatCount + guest.seatCount > t.capacity) continue
 
         const simGuests = guests.map((g) =>
           g.id === hoveredGuestId ? { ...g, assignedTableId: t.id } : g,
@@ -493,8 +493,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         let isCompanionSlot = false
         let companionOwner: Guest | null = null
         for (const g of tableGuests) {
-          if (g.seatIndex !== null && g.attendeeCount > 1) {
-            for (let c = 1; c < g.attendeeCount; c++) {
+          if (g.seatIndex !== null && g.seatCount > 1) {
+            for (let c = 1; c < g.seatCount; c++) {
               if ((g.seatIndex + c) % totalSlots === i) {
                 isCompanionSlot = true
                 companionOwner = g

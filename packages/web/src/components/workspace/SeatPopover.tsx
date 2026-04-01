@@ -66,12 +66,12 @@ export function SeatPopover({ tableId, seatIndex, seatX, seatY, tableCenterX, ta
     if (!table) return []
 
     const tableGuests = guests.filter((g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed')
-    const seatCount = tableGuests.reduce((s, g) => s + g.attendeeCount, 0)
+    const seatCount = tableGuests.reduce((s, g) => s + g.seatCount, 0)
     const currentTableAvg = table.averageSatisfaction
 
     const results: Prediction[] = []
     for (const g of unassigned) {
-      if (seatCount + g.attendeeCount > table.capacity) continue
+      if (seatCount + g.seatCount > table.capacity) continue
       const simGuests = guests.map((og) => og.id === g.id ? { ...og, assignedTableId: tableId } : og)
       const simResult = recalculateAll(simGuests, tables, avoidPairs)
       const newScore = simResult.guests.find((gs) => gs.id === g.id)?.satisfactionScore ?? 55

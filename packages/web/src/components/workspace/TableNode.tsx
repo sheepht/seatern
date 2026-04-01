@@ -589,7 +589,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
           const companionCatColor = getCategoryColor(seat.guest!.category, categoryColors)
           const bgColor = companionCatColor.background
           const textColor = companionCatColor.color
-          const totalCompanions = seat.guest!.attendeeCount - 1
+          const totalCompanions = seat.guest!.companionCount
           const isLast = seat.companionIndex === totalCompanions
           return (
             <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)`, opacity: isFlying ? 0 : undefined }}>
@@ -863,11 +863,11 @@ function buildSeatLayout(
     slots = new Array(totalSlots).fill(null)
     for (const guest of guests) {
       const startIdx = guest.seatIndex ?? 0
-      const immovable = guest.attendeeCount > 1
+      const immovable = guest.seatCount > 1
       if (startIdx < totalSlots) {
         slots[startIdx] = { guestId: guest.id, isCompanion: false, immovable }
       }
-      for (let c = 1; c < guest.attendeeCount; c++) {
+      for (let c = 1; c < guest.seatCount; c++) {
         const idx = (startIdx + c) % totalSlots
         slots[idx] = { guestId: guest.id, isCompanion: true, immovable }
       }
@@ -928,10 +928,10 @@ function buildGroupArcsFromSeats(
     if (processed.has(seat.guest.id)) continue
     processed.add(seat.guest.id)
 
-    if (seat.guest.attendeeCount < 2) continue
+    if (seat.guest.seatCount < 2) continue
 
     const startIndex = seat.seatIndex
-    const seatCount = seat.guest.attendeeCount
+    const seatCount = seat.guest.seatCount
 
     const angleStep = (2 * Math.PI) / totalSlots
     const startAngle = angleStep * startIndex - Math.PI / 2

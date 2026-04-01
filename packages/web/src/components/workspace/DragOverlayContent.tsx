@@ -172,7 +172,7 @@ export function DragOverlayContent({ guest }: Props) {
       )}
 
       {/* 眷屬 badge */}
-      {guest.attendeeCount > 1 && (
+      {guest.companionCount > 0 && (
         <div
           className="absolute flex items-center justify-center"
           style={{
@@ -189,7 +189,7 @@ export function DragOverlayContent({ guest }: Props) {
             border: '2px solid white',
           }}
         >
-          +{guest.attendeeCount - 1}
+          +{guest.companionCount}
         </div>
       )}
     </div>

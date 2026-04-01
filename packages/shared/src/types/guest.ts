@@ -2,7 +2,7 @@ export type RsvpStatus = 'confirmed' | 'declined'
 
 export interface PendingSubmission {
   rsvpStatus: 'confirmed' | 'declined'
-  attendeeCount: number
+  companionCount: number
   infantCount: number
   dietaryNote?: string
   specialNote?: string
@@ -16,7 +16,7 @@ export interface Guest {
   category?: string
   subcategoryId?: string
   rsvpStatus: RsvpStatus
-  attendeeCount: number
+  companionCount: number
   infantCount: number
   dietaryNote?: string
   specialNote?: string

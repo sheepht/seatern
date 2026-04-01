@@ -6,7 +6,9 @@ export interface Guest {
   aliases: string[]
   category: string
   rsvpStatus: 'confirmed' | 'declined'
-  attendeeCount: number
+  companionCount: number
+  /** 佔座位數 = companionCount + 1 */
+  seatCount: number
   dietaryNote: string
   specialNote: string
   satisfactionScore: number

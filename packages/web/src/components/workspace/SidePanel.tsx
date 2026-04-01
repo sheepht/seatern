@@ -197,12 +197,12 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
     for (const t of tables) { remaining.set(t.id, t.capacity); nextSeat.set(t.id, 0) }
     const assignments = new Map<string, { tableId: string; seatIndex: number }>()
     for (const g of shuffled) {
-      const avail = tables.find((t) => (remaining.get(t.id) || 0) >= g.attendeeCount)
+      const avail = tables.find((t) => (remaining.get(t.id) || 0) >= g.seatCount)
       if (avail) {
         const seat = nextSeat.get(avail.id) || 0
         assignments.set(g.id, { tableId: avail.id, seatIndex: seat })
-        remaining.set(avail.id, (remaining.get(avail.id) || 0) - g.attendeeCount)
-        nextSeat.set(avail.id, seat + g.attendeeCount)
+        remaining.set(avail.id, (remaining.get(avail.id) || 0) - g.seatCount)
+        nextSeat.set(avail.id, seat + g.seatCount)
       }
     }
     const updatedGuests = guests.map((g) => {
@@ -399,7 +399,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
 
   const unassignedGuests = getUnassignedGuests()
-  const totalUnassignedSeats = unassignedGuests.reduce((s, g) => s + g.attendeeCount, 0)
+  const totalUnassignedSeats = unassignedGuests.reduce((s, g) => s + g.seatCount, 0)
 
   const { isOver, setNodeRef } = useDroppable({
     id: 'unassigned',

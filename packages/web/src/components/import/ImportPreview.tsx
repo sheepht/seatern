@@ -38,7 +38,7 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
   const declinedCount = allGuests.filter((g) => g.rsvpStatus === 'declined').length
   const totalSeats = allGuests
     .filter((g) => g.rsvpStatus === 'confirmed')
-    .reduce((sum, g) => sum + g.attendeeCount, 0)
+    .reduce((sum, g) => sum + g.companionCount + 1, 0)
 
   // 必填欄位檢查
   const missingRequired = SYSTEM_FIELDS
@@ -114,7 +114,7 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>分類</th>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>子分類</th>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>出席</th>
-                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>人數</th>
+                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>攜眷</th>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>葷素</th>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>想同桌</th>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>避免同桌</th>
@@ -133,7 +133,7 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
                       {g.rsvpStatus === 'confirmed' ? '出席' : g.rsvpStatus === 'declined' ? '婉拒' : '待定'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 font-data">{g.attendeeCount} 席</td>
+                  <td className="px-3 py-2 font-data">{g.companionCount > 0 ? `+${g.companionCount}` : '—'}</td>
                   <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{g.dietaryNote || '—'}</td>
                   <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{g.rawPreferences.join(', ') || '—'}</td>
                   <td className="px-3 py-2" style={{ color: g.rawAvoids.length > 0 ? 'var(--error)' : 'var(--text-secondary)' }}>{g.rawAvoids.join(', ') || '—'}</td>

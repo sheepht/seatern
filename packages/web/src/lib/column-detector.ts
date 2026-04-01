@@ -11,7 +11,7 @@ export type SystemField =
   | 'rsvpStatus'
   | 'category'
   | 'subcategory'
-  | 'attendeeCount'
+  | 'companionCount'
   | 'dietaryNote'
   | 'specialNote'
   | 'seatPreferences'
@@ -30,7 +30,7 @@ export const SYSTEM_FIELDS: FieldMapping[] = [
   { field: 'aliases', label: '外號/暱稱', required: false },
   { field: 'category', label: '分類（男方/女方）', required: false },
   { field: 'subcategory', label: '子分類', required: false },
-  { field: 'attendeeCount', label: '帶眷屬', required: false },
+  { field: 'companionCount', label: '攜眷', required: false },
   { field: 'dietaryNote', label: '葷素/飲食', required: false },
   { field: 'specialNote', label: '備註/特殊需求', required: false },
   { field: 'seatPreferences', label: '想同桌人選', required: false },
@@ -44,7 +44,7 @@ const FIELD_KEYWORDS: Record<SystemField, string[]> = {
   aliases: ['外號', '暱稱', '別名', 'alias', 'nickname'],
   category: ['分類', '男方女方', '類別', 'category', '來賓分類'],
   subcategory: ['子分類', '群組', '標籤', '分組', 'group', 'tag', '圈子', 'subcategory'],
-  attendeeCount: ['眷屬', '+1', '攜伴', '帶人', 'plus one', 'guest count'],
+  companionCount: ['眷屬', '+1', '攜伴', '帶人', 'plus one', 'guest count', '攜眷'],
   dietaryNote: ['葷素', '飲食', 'dietary', '素食', '忌口'],
   specialNote: ['備註', '需求', '特殊', 'note', '其他'],
   seatPreferences: ['同桌', '想跟誰坐', 'preference', '想坐', '同桌人選'],
@@ -78,7 +78,7 @@ export function detectColumns(headers: string[]): DetectionResult {
     rsvpStatus: null,
     category: null,
     subcategory: null,
-    attendeeCount: null,
+    companionCount: null,
     dietaryNote: null,
     specialNote: null,
     seatPreferences: null,
@@ -91,7 +91,7 @@ export function detectColumns(headers: string[]): DetectionResult {
     rsvpStatus: [],
     category: [],
     subcategory: [],
-    attendeeCount: [],
+    companionCount: [],
     dietaryNote: [],
     specialNote: [],
     seatPreferences: [],
@@ -150,7 +150,7 @@ export interface RawGuest {
   aliases: string[]
   category: string
   rsvpStatus: 'confirmed' | 'declined'
-  attendeeCount: number
+  companionCount: number
   dietaryNote: string
   specialNote: string
   rawSubcategory: string   // 子分類（大學同學、高中同學等）
@@ -188,9 +188,9 @@ export function normalizeGuest(
   // 解析子分類
   const rawSubcategory = (get('subcategory') || '').trim()
 
-  // 解析眷屬：Form 填的是額外數（0 或 1），系統 +1
+  // 解析攜眷：0 表示沒帶人，1 表示帶一位
   // 支援多種填法：數字（0, 1, 2）、文字（有、是、帶老婆）、混合（1位、帶1人）
-  const extraRaw = get('attendeeCount').toLowerCase()
+  const extraRaw = get('companionCount').toLowerCase()
   let extra: number
   const numMatch = extraRaw.match(/\d+/)
   if (numMatch) {
@@ -202,7 +202,7 @@ export function normalizeGuest(
   } else {
     extra = 0
   }
-  const attendeeCount = 1 + Math.max(0, extra)
+  const companionCount = Math.max(0, extra)
 
   // 解析想同桌人選
   let rawPreferences: string[] = []
@@ -234,7 +234,7 @@ export function normalizeGuest(
     category: get('category') || '',
     rsvpStatus,
     rawSubcategory,
-    attendeeCount,
+    companionCount,
     dietaryNote: get('dietaryNote'),
     specialNote: get('specialNote'),
     rawPreferences,

@@ -65,7 +65,7 @@ async function main() {
     aliases: string[]
     category: string
     rsvpStatus: 'confirmed' | 'declined'
-    attendeeCount: number
+    companionCount: number
     dietaryNote?: string
     specialNote?: string
     subcategory: string
@@ -73,56 +73,56 @@ async function main() {
 
   const guestInputs: GuestInput[] = [
     // ─── 男方家人 (8人) ─────────
-    { name: '陳爸爸', aliases: ['老陳'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '男方家人' },
-    { name: '陳媽媽', aliases: ['陳太太'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, dietaryNote: '素食', subcategory: '男方家人' },
-    { name: '陳志強', aliases: ['大哥'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 3, subcategory: '男方家人' }, // 帶太太+小孩
-    { name: '陳美玲', aliases: ['大姐'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, specialNote: '需要嬰兒椅', subcategory: '男方家人' },
-    { name: '陳叔叔', aliases: ['二叔'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 2, subcategory: '男方家人' },
-    { name: '陳嬸嬸', aliases: [], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '男方家人' },
+    { name: '陳爸爸', aliases: ['老陳'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '男方家人' },
+    { name: '陳媽媽', aliases: ['陳太太'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, dietaryNote: '素食', subcategory: '男方家人' },
+    { name: '陳志強', aliases: ['大哥'], category: '男方', rsvpStatus: 'confirmed', companionCount: 2, subcategory: '男方家人' }, // 帶太太+小孩
+    { name: '陳美玲', aliases: ['大姐'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, specialNote: '需要嬰兒椅', subcategory: '男方家人' },
+    { name: '陳叔叔', aliases: ['二叔'], category: '男方', rsvpStatus: 'confirmed', companionCount: 1, subcategory: '男方家人' },
+    { name: '陳嬸嬸', aliases: [], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '男方家人' },
     // ─── 女方家人 (6人) ─────────
-    { name: '林爸爸', aliases: ['林伯'], category: '女方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '女方家人' },
-    { name: '林媽媽', aliases: ['林太太'], category: '女方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '女方家人' },
-    { name: '林志偉', aliases: ['小偉', '阿偉'], category: '女方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '女方家人' },
-    { name: '林美華', aliases: ['小華'], category: '女方', rsvpStatus: 'confirmed', attendeeCount: 4, specialNote: '需要嬰兒椅，帶老公+2小孩', subcategory: '女方家人' }, // 帶老公+2小孩
+    { name: '林爸爸', aliases: ['林伯'], category: '女方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '女方家人' },
+    { name: '林媽媽', aliases: ['林太太'], category: '女方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '女方家人' },
+    { name: '林志偉', aliases: ['小偉', '阿偉'], category: '女方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '女方家人' },
+    { name: '林美華', aliases: ['小華'], category: '女方', rsvpStatus: 'confirmed', companionCount: 3, specialNote: '需要嬰兒椅，帶老公+2小孩', subcategory: '女方家人' }, // 帶老公+2小孩
     // ─── 大學同學 (12人) ────────
-    { name: '王大明', aliases: ['大明', 'David'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '大學同學' },
-    { name: '李小華', aliases: ['小華', 'Lisa'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 2, subcategory: '大學同學' },
-    { name: '張雅婷', aliases: ['婷婷'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '大學同學' },
-    { name: '劉建宏', aliases: ['阿宏'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, dietaryNote: '不吃牛', subcategory: '大學同學' },
-    { name: '黃詩涵', aliases: ['涵涵'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '大學同學' },
-    { name: '趙子龍', aliases: ['子龍'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 3, subcategory: '大學同學' }, // 帶太太+小孩
-    { name: '周杰倫', aliases: ['Jay'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '大學同學' },
-    { name: '吳宗憲', aliases: ['憲哥'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '大學同學' },
-    { name: '蔡依琳', aliases: ['Jolin'], category: '女方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '大學同學' },
-    { name: '許志安', aliases: ['安仔'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '大學同學' },
-    { name: '鄭秀文', aliases: ['Sammi'], category: '女方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '大學同學' },
-    { name: '謝霆鋒', aliases: ['霆鋒'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, dietaryNote: '素食', subcategory: '大學同學' },
+    { name: '王大明', aliases: ['大明', 'David'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '大學同學' },
+    { name: '李小華', aliases: ['小華', 'Lisa'], category: '男方', rsvpStatus: 'confirmed', companionCount: 1, subcategory: '大學同學' },
+    { name: '張雅婷', aliases: ['婷婷'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '大學同學' },
+    { name: '劉建宏', aliases: ['阿宏'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, dietaryNote: '不吃牛', subcategory: '大學同學' },
+    { name: '黃詩涵', aliases: ['涵涵'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '大學同學' },
+    { name: '趙子龍', aliases: ['子龍'], category: '男方', rsvpStatus: 'confirmed', companionCount: 2, subcategory: '大學同學' }, // 帶太太+小孩
+    { name: '周杰倫', aliases: ['Jay'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '大學同學' },
+    { name: '吳宗憲', aliases: ['憲哥'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '大學同學' },
+    { name: '蔡依琳', aliases: ['Jolin'], category: '女方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '大學同學' },
+    { name: '許志安', aliases: ['安仔'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '大學同學' },
+    { name: '鄭秀文', aliases: ['Sammi'], category: '女方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '大學同學' },
+    { name: '謝霆鋒', aliases: ['霆鋒'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, dietaryNote: '素食', subcategory: '大學同學' },
     // ─── 公司同事 (10人) ────────
-    { name: '方主管', aliases: ['方姐'], category: '共同', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '公司同事' },
-    { name: '楊經理', aliases: ['楊哥'], category: '共同', rsvpStatus: 'confirmed', attendeeCount: 3, subcategory: '公司同事' }, // 帶太太+小孩
-    { name: '何小敏', aliases: ['小敏'], category: '共同', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '公司同事' },
-    { name: '孫大偉', aliases: ['大偉'], category: '共同', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '公司同事' },
-    { name: '馬小雲', aliases: ['小雲', 'Jack'], category: '共同', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '公司同事' },
-    { name: '郭台明', aliases: ['Terry'], category: '共同', rsvpStatus: 'confirmed', attendeeCount: 1, dietaryNote: '不吃海鮮', subcategory: '公司同事' },
-    { name: '高中華', aliases: ['中華'], category: '共同', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '公司同事' },
-    { name: '呂美玉', aliases: ['美玉'], category: '共同', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '公司同事' },
-    { name: '蘇小安', aliases: ['小安', 'Ann'], category: '共同', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '公司同事' },
-    { name: '葉文龍', aliases: ['文龍'], category: '共同', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '公司同事' },
+    { name: '方主管', aliases: ['方姐'], category: '共同', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '公司同事' },
+    { name: '楊經理', aliases: ['楊哥'], category: '共同', rsvpStatus: 'confirmed', companionCount: 2, subcategory: '公司同事' }, // 帶太太+小孩
+    { name: '何小敏', aliases: ['小敏'], category: '共同', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '公司同事' },
+    { name: '孫大偉', aliases: ['大偉'], category: '共同', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '公司同事' },
+    { name: '馬小雲', aliases: ['小雲', 'Jack'], category: '共同', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '公司同事' },
+    { name: '郭台明', aliases: ['Terry'], category: '共同', rsvpStatus: 'confirmed', companionCount: 0, dietaryNote: '不吃海鮮', subcategory: '公司同事' },
+    { name: '高中華', aliases: ['中華'], category: '共同', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '公司同事' },
+    { name: '呂美玉', aliases: ['美玉'], category: '共同', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '公司同事' },
+    { name: '蘇小安', aliases: ['小安', 'Ann'], category: '共同', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '公司同事' },
+    { name: '葉文龍', aliases: ['文龍'], category: '共同', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '公司同事' },
     // ─── 高中同學 (8人) ─────────
-    { name: '鍾小明', aliases: ['小明', '明仔'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '高中同學' },
-    { name: '溫美麗', aliases: ['美麗', 'Mary'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 2, subcategory: '高中同學' },
-    { name: '戴志豪', aliases: ['阿豪'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '高中同學' },
-    { name: '范小青', aliases: ['小青'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '高中同學' },
-    { name: '湯大同', aliases: ['大同'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '高中同學' },
-    { name: '彭小芳', aliases: ['小芳'], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, dietaryNote: '素食', subcategory: '高中同學' },
+    { name: '鍾小明', aliases: ['小明', '明仔'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '高中同學' },
+    { name: '溫美麗', aliases: ['美麗', 'Mary'], category: '男方', rsvpStatus: 'confirmed', companionCount: 1, subcategory: '高中同學' },
+    { name: '戴志豪', aliases: ['阿豪'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '高中同學' },
+    { name: '范小青', aliases: ['小青'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '高中同學' },
+    { name: '湯大同', aliases: ['大同'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '高中同學' },
+    { name: '彭小芳', aliases: ['小芳'], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, dietaryNote: '素食', subcategory: '高中同學' },
     // ─── 孤立賓客 (3人) ─────────
-    { name: '張三', aliases: [], category: '男方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '' },
-    { name: '王大嬸', aliases: [], category: '女方', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '鄰居' },
-    { name: '陌生人阿強', aliases: ['阿強'], category: '共同', rsvpStatus: 'confirmed', attendeeCount: 1, subcategory: '' },
+    { name: '張三', aliases: [], category: '男方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '' },
+    { name: '王大嬸', aliases: [], category: '女方', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '鄰居' },
+    { name: '陌生人阿強', aliases: ['阿強'], category: '共同', rsvpStatus: 'confirmed', companionCount: 0, subcategory: '' },
     // ─── 婉拒賓客 (3人) ─────────
-    { name: '不來先生', aliases: [], category: '男方', rsvpStatus: 'declined', attendeeCount: 1, subcategory: '高中同學' },
-    { name: '沒空小姐', aliases: ['小空'], category: '女方', rsvpStatus: 'declined', attendeeCount: 1, subcategory: '公司同事' },
-    { name: '出國先生', aliases: [], category: '男方', rsvpStatus: 'declined', attendeeCount: 1, subcategory: '大學同學' },
+    { name: '不來先生', aliases: [], category: '男方', rsvpStatus: 'declined', companionCount: 0, subcategory: '高中同學' },
+    { name: '沒空小姐', aliases: ['小空'], category: '女方', rsvpStatus: 'declined', companionCount: 0, subcategory: '公司同事' },
+    { name: '出國先生', aliases: [], category: '男方', rsvpStatus: 'declined', companionCount: 0, subcategory: '大學同學' },
   ]
 
   const guestMap: Record<string, string> = {} // name → id
@@ -135,7 +135,7 @@ async function main() {
         aliases: g.aliases,
         category: g.category,
         rsvpStatus: g.rsvpStatus,
-        attendeeCount: g.attendeeCount,
+        companionCount: g.companionCount,
         dietaryNote: g.dietaryNote,
         specialNote: g.specialNote,
         subcategoryId: g.subcategory ? subcats[g.subcategory] || null : null,
@@ -145,7 +145,7 @@ async function main() {
   }
 
   const confirmed = guestInputs.filter((g) => g.rsvpStatus === 'confirmed')
-  const totalSeats = confirmed.reduce((sum, g) => sum + g.attendeeCount, 0)
+  const totalSeats = confirmed.reduce((sum, g) => sum + g.companionCount + 1, 0)
   console.log(`✅ 建立 ${guestInputs.length} 位賓客（${confirmed.length} 確認, ${guestInputs.length - confirmed.length} 婉拒, 共 ${totalSeats} 席）`)
 
   // ─── 建立桌次（5桌）───────────────────────
@@ -338,7 +338,7 @@ async function main() {
   console.log(`   座位偏好：${preferences.length} 個（含雙向 + 單向）`)
   console.log(`   避免同桌：${avoidPairs.length} 對`)
   console.log(`   孤立賓客：3 位（張三、王大嬸、陌生人阿強）`)
-  console.log(`   帶眷屬：5 位（attendeeCount=2）`)
+  console.log(`   帶眷屬：5 位（companionCount>=1）`)
   console.log(`   嬰兒椅需求：2 位`)
   console.log('\n✅ 種子資料完成！')
 }

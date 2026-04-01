@@ -10,7 +10,7 @@ import type { Guest } from '@/lib/types'
 
 // ─── Types ──────────────────────────────────────────
 
-type SortField = 'name' | 'category' | 'rsvpStatus' | 'satisfactionScore' | 'assignedTableId' | 'attendeeCount' | 'prefCount' | 'avoidCount' | 'dietaryNote' | 'specialNote'
+type SortField = 'name' | 'category' | 'rsvpStatus' | 'satisfactionScore' | 'assignedTableId' | 'companionCount' | 'prefCount' | 'avoidCount' | 'dietaryNote' | 'specialNote'
 type SortDir = 'asc' | 'desc'
 type CategoryFilter = '全部' | string
 
@@ -199,7 +199,7 @@ function StatsBar({
 }: { guests: Guest[]; onFilterClick: (status: string) => void }) {
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed').length
   const declined = guests.filter((g) => g.rsvpStatus === 'declined').length
-  const totalSeats = guests.filter((g) => g.rsvpStatus === 'confirmed').reduce((s, g) => s + g.attendeeCount, 0)
+  const totalSeats = guests.filter((g) => g.rsvpStatus === 'confirmed').reduce((s, g) => s + g.seatCount, 0)
   const assigned = guests.filter((g) => g.assignedTableId && g.rsvpStatus === 'confirmed')
   const avgSat = assigned.length > 0 ? assigned.reduce((s, g) => s + g.satisfactionScore, 0) / assigned.length : 0
 
@@ -345,7 +345,7 @@ export default function GuestManagementPage() {
       case 'rsvpStatus': cmp = a.rsvpStatus.localeCompare(b.rsvpStatus); break
       case 'satisfactionScore': cmp = a.satisfactionScore - b.satisfactionScore; break
       case 'assignedTableId': cmp = (a.assignedTableId || '').localeCompare(b.assignedTableId || ''); break
-      case 'attendeeCount': cmp = a.attendeeCount - b.attendeeCount; break
+      case 'companionCount': cmp = a.companionCount - b.companionCount; break
       case 'prefCount': cmp = a.seatPreferences.length - b.seatPreferences.length; break
       case 'avoidCount': cmp = avoidCount(a) - avoidCount(b); break
       case 'dietaryNote': cmp = (a.dietaryNote || '').localeCompare(b.dietaryNote || '', 'zh-Hant'); break
@@ -603,7 +603,7 @@ export default function GuestManagementPage() {
                 <th onClick={() => handleSort('assignedTableId')} style={thStyle}>桌次{sortArrow('assignedTableId')}</th>
                 <th onClick={() => handleSort('satisfactionScore')} style={{ ...thStyle, textAlign: 'right' }}>滿意度{sortArrow('satisfactionScore')}</th>
                 <th onClick={() => handleSort('rsvpStatus')} style={{ ...thStyle, textAlign: 'center' }}>出席{sortArrow('rsvpStatus')}</th>
-                <th onClick={() => handleSort('attendeeCount')} style={{ ...thStyle, textAlign: 'center' }}>人數{sortArrow('attendeeCount')}</th>
+                <th onClick={() => handleSort('companionCount')} style={{ ...thStyle, textAlign: 'center' }}>攜眷{sortArrow('companionCount')}</th>
                 <th onClick={() => handleSort('prefCount')} style={thStyle}>想同桌{sortArrow('prefCount')}</th>
                 <th onClick={() => handleSort('avoidCount')} style={thStyle}>要避桌{sortArrow('avoidCount')}</th>
                 <th onClick={() => handleSort('dietaryNote')} style={thStyle}>飲食{sortArrow('dietaryNote')}</th>
@@ -617,19 +617,19 @@ export default function GuestManagementPage() {
                 const satColor = guest.assignedTableId ? getSatisfactionColor(guest.satisfactionScore) : 'var(--text-muted)'
                 const subcatName = guest.subcategory?.name ?? ''
 
-                // Compute dynamic max attendeeCount based on table capacity
-                let maxAttendee = 10
-                let maxAttendeeTooltip: string | undefined
+                // Compute dynamic max companionCount based on table capacity
+                let maxCompanion = 9
+                let maxCompanionTooltip: string | undefined
                 if (guest.assignedTableId) {
                   const table = tables.find((t) => t.id === guest.assignedTableId)
                   if (table) {
                     const othersSeats = guests
                       .filter((g) => g.assignedTableId === table.id && g.id !== guest.id && g.rsvpStatus === 'confirmed')
-                      .reduce((sum, g) => sum + g.attendeeCount, 0)
-                    maxAttendee = Math.min(10, table.capacity - othersSeats)
-                    if (maxAttendee <= guest.attendeeCount) {
-                      const used = othersSeats + guest.attendeeCount
-                      maxAttendeeTooltip = `${table.name}已滿 (${used}/${table.capacity})`
+                      .reduce((sum, g) => sum + g.seatCount, 0)
+                    maxCompanion = Math.min(9, table.capacity - othersSeats - 1)
+                    if (maxCompanion <= guest.companionCount) {
+                      const used = othersSeats + guest.seatCount
+                      maxCompanionTooltip = `${table.name}已滿 (${used}/${table.capacity})`
                     }
                   }
                 }
@@ -656,8 +656,8 @@ export default function GuestManagementPage() {
                     tableName={tableName}
                     satColor={satColor}
                     subcatName={subcatName}
-                    maxAttendee={maxAttendee}
-                    maxAttendeeTooltip={maxAttendeeTooltip}
+                    maxCompanion={maxCompanion}
+                    maxCompanionTooltip={maxCompanionTooltip}
                     prefGuests={prefGuests}
                     avoidGuests={avoidGuests}
                     categoryColors={effectiveColors}
@@ -762,9 +762,9 @@ export default function GuestManagementPage() {
 
 // ─── Guest Row (read-only display + quick edits) ───
 
-const GuestRow = ({ guest, tableName, satColor, subcatName, maxAttendee, maxAttendeeTooltip, prefGuests, avoidGuests, catColor, categoryColors, onSave, onRsvpToggle, onDelete, onEdit }: {
+const GuestRow = ({ guest, tableName, satColor, subcatName, maxCompanion, maxCompanionTooltip, prefGuests, avoidGuests, catColor, categoryColors, onSave, onRsvpToggle, onDelete, onEdit }: {
   guest: Guest; tableName: string; satColor: string; subcatName: string
-  maxAttendee: number; maxAttendeeTooltip?: string
+  maxCompanion: number; maxCompanionTooltip?: string
   prefGuests: Guest[]; avoidGuests: Guest[]
   catColor: CategoryColor; categoryColors: Record<string, CategoryColor>
   onSave: (patch: Partial<Guest>) => void; onRsvpToggle: () => void; onDelete: () => void
@@ -848,7 +848,7 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxAttendee, maxAtte
 
       {/* Attendee count stepper (quick edit) */}
       <td style={{ ...tdStyle, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-        <NumberStepper value={guest.attendeeCount} min={1} max={maxAttendee} onSave={(v) => onSave({ attendeeCount: v })} maxTooltip={maxAttendeeTooltip} />
+        <NumberStepper value={guest.companionCount} min={0} max={maxCompanion} onSave={(v) => onSave({ companionCount: v })} maxTooltip={maxCompanionTooltip} />
       </td>
 
       {/* Seat preferences (read-only) */}

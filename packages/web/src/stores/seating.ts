@@ -144,7 +144,7 @@ interface SeatingState {
   // Guest CRUD (管理頁面用)
   updateGuest: (guestId: string, patch: Partial<Guest>) => Promise<boolean>
   deleteGuest: (guestId: string) => Promise<boolean>
-  addGuest: (data: { name: string; category?: string; rsvpStatus?: string; attendeeCount?: number; dietaryNote?: string; specialNote?: string }) => Promise<Guest | null>
+  addGuest: (data: { name: string; category?: string; rsvpStatus?: string; companionCount?: number; dietaryNote?: string; specialNote?: string }) => Promise<Guest | null>
 
   // Per-guest preference & tag management
   updateGuestPreferences: (guestId: string, preferences: Array<{ preferredGuestId: string; rank: number }>) => Promise<boolean>
@@ -206,7 +206,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         aliases: g.aliases || [],
         category: g.category || '',
         rsvpStatus: g.rsvpStatus,
-        attendeeCount: g.attendeeCount,
+        companionCount: g.companionCount,
+        seatCount: g.companionCount + 1,
         dietaryNote: g.dietaryNote || '',
         specialNote: g.specialNote || '',
         satisfactionScore: 0,
@@ -245,7 +246,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
           // 也要考慮眷屬佔的位子
           for (const g of tableGuests) {
             if (g.seatIndex !== null) {
-              for (let c = 1; c < g.attendeeCount; c++) {
+              for (let c = 1; c < g.seatCount; c++) {
                 usedIndices.add((g.seatIndex + c) % t.capacity)
               }
             }
@@ -255,7 +256,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
             while (usedIndices.has(nextFree)) nextFree++
             g.seatIndex = nextFree
             usedIndices.add(nextFree)
-            for (let c = 1; c < g.attendeeCount; c++) {
+            for (let c = 1; c < g.seatCount; c++) {
               usedIndices.add(nextFree + c)
             }
             nextFree++
@@ -361,10 +362,10 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     const seatGuests = tableGuests
       .filter((g) => g.seatIndex !== null)
-      .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, attendeeCount: g.attendeeCount }))
+      .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, seatCount: g.seatCount }))
 
     const slots = buildSlotArray(seatGuests, table.capacity)
-    const newSlots = placeGuest(slots, seatIndex, guestId, guest.attendeeCount, cursorBias)
+    const newSlots = placeGuest(slots, seatIndex, guestId, guest.seatCount, cursorBias)
 
     if (!newSlots) return // 無法放置
 
@@ -448,15 +449,15 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     )
     const seatGuests = tableGuests
       .filter((g) => g.seatIndex !== null)
-      .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, attendeeCount: g.attendeeCount }))
+      .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, seatCount: g.seatCount }))
 
     const slots = buildSlotArray(seatGuests, table.capacity)
-    const newSlots = placeGuest(slots, seatIndex, draggedGuestId, draggedGuest.attendeeCount, cursorBias)
+    const newSlots = placeGuest(slots, seatIndex, draggedGuestId, draggedGuest.seatCount, cursorBias)
 
     if (!newSlots) {
       // 無法放置 — 區分原因：真的滿桌 vs 不可移動的位子
       const emptySlots = slots.filter((s) => s === null).length
-      const isTrulyFull = emptySlots < draggedGuest.attendeeCount
+      const isTrulyFull = emptySlots < draggedGuest.seatCount
       set({ dragPreview: null, dragRejectTableId: isTrulyFull ? tableId : null })
       return
     }
@@ -942,10 +943,10 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     if (unassigned.length === 0) return
 
     // 檢查容量是否足夠，不夠就自動新增桌子
-    const totalSeatsNeeded = unassigned.reduce((s, g) => s + g.attendeeCount, 0)
+    const totalSeatsNeeded = unassigned.reduce((s, g) => s + g.seatCount, 0)
     const totalRemaining = tables.reduce((s, t) => {
       const seated = confirmed.filter((g) => g.assignedTableId === t.id)
-      const used = seated.reduce((ss, g) => ss + g.attendeeCount, 0)
+      const used = seated.reduce((ss, g) => ss + g.seatCount, 0)
       return s + Math.max(0, t.capacity - used)
     }, 0)
 
@@ -1015,7 +1016,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       for (const g of tableGuests) {
         if (g.seatIndex !== null) {
           usedIndices.add(g.seatIndex)
-          for (let c = 1; c < g.attendeeCount; c++) {
+          for (let c = 1; c < g.seatCount; c++) {
             usedIndices.add((g.seatIndex + c) % t.capacity)
           }
         }
@@ -1025,7 +1026,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         while (usedIndices.has(nextFree)) nextFree++
         g.seatIndex = nextFree
         usedIndices.add(nextFree)
-        for (let c = 1; c < g.attendeeCount; c++) {
+        for (let c = 1; c < g.seatCount; c++) {
           usedIndices.add(nextFree + c)
         }
         nextFree++
@@ -1272,13 +1273,15 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const prevGuests = guests
     const idx = guests.findIndex((g) => g.id === guestId)
     if (idx < 0) return false
-    const updated = { ...guests[idx], ...patch }
+    const merged = { ...guests[idx], ...patch }
+    if ('companionCount' in patch) merged.seatCount = (merged.companionCount ?? 0) + 1
+    const updated = merged
     const nextGuests = [...guests]
     nextGuests[idx] = updated
     set({ guests: nextGuests })
 
     // Recalculate if score-affecting fields changed
-    const scoreFields = ['attendeeCount', 'rsvpStatus'] as const
+    const scoreFields = ['companionCount', 'rsvpStatus'] as const
     const needsRecalc = scoreFields.some((f) => f in patch)
     if (needsRecalc) {
       const result = recalculateAll(nextGuests, tables, avoidPairs)
@@ -1361,7 +1364,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         body: JSON.stringify(data),
       })
       if (!res.ok) return null
-      const guest = await res.json() as Guest
+      const raw = await res.json()
+      const guest: Guest = { ...raw, seatCount: (raw.companionCount ?? 0) + 1 }
       const nextGuests = [...guests, guest]
       set({ guests: nextGuests })
 
@@ -1478,18 +1482,18 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   getTableSeatCount: (tableId) => {
     return get()
       .guests.filter((g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed')
-      .reduce((sum, g) => sum + g.attendeeCount, 0)
+      .reduce((sum, g) => sum + g.seatCount, 0)
   },
 
   getTotalAssignedSeats: () => {
     return get()
       .guests.filter((g) => g.assignedTableId !== null && g.rsvpStatus === 'confirmed')
-      .reduce((sum, g) => sum + g.attendeeCount, 0)
+      .reduce((sum, g) => sum + g.seatCount, 0)
   },
 
   getTotalConfirmedSeats: () => {
     return get()
       .guests.filter((g) => g.rsvpStatus === 'confirmed')
-      .reduce((sum, g) => sum + g.attendeeCount, 0)
+      .reduce((sum, g) => sum + g.seatCount, 0)
   },
 }))

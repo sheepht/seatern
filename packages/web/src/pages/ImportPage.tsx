@@ -75,7 +75,7 @@ export default function ImportPage() {
             aliases: g.aliases,
             category: g.category || undefined,
             rsvpStatus: g.rsvpStatus,
-            attendeeCount: g.attendeeCount,
+            companionCount: g.companionCount,
             dietaryNote: g.dietaryNote || undefined,
             specialNote: g.specialNote || undefined,
           })),
@@ -157,7 +157,7 @@ export default function ImportPage() {
       // 6. 自動產生桌次（根據確認出席的席位數）
       const confirmedSeats = guestList
         .filter((g) => g.rsvpStatus === 'confirmed')
-        .reduce((sum, g) => sum + g.attendeeCount, 0)
+        .reduce((sum, g) => sum + g.companionCount + 1, 0)
       const tableCount = Math.max(1, Math.ceil(confirmedSeats / 10))
 
       for (let i = 0; i < tableCount; i++) {
