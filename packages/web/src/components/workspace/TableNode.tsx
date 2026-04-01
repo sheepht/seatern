@@ -315,7 +315,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
   const fontSize = 20
   const iconArcR = textArcR + fontSize * 0.55  // baseline → 文字視覺中心
   const arcLength = Math.PI * textArcR
-  const iconPad = 20  // 文字邊緣到圖示中心的間距（px）
+  const iconPad = 20 * counterScale  // 文字邊緣到圖示中心的間距（螢幕 px），隨 zoom 反向縮放
   const tEdit = Math.max(0.04, 0.5 - (nameTextLength / 2 + iconPad) / arcLength)
   const tDelete = Math.min(0.96, 0.5 + (nameTextLength / 2 + iconPad) / arcLength)
   const editX = -iconArcR * Math.cos(tEdit * Math.PI)
@@ -346,12 +346,12 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
         <>
           <g
             className="table-btn-edit"
-            transform={`translate(${editX}, ${editY})`}
+            transform={`translate(${editX}, ${editY}) scale(${counterScale})`}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); setRenameValue(table.name); setShowRenameModal(true) }}
             style={{ cursor: 'pointer' }}
           >
-            <g className="table-icon-pop" style={{ '--icon-from-x': `${editFromX}px`, '--icon-from-y': `${editFromY}px` } as React.CSSProperties}>
+            <g className="table-icon-pop" style={{ '--icon-from-x': `${editFromX * zoom}px`, '--icon-from-y': `${editFromY * zoom}px` } as React.CSSProperties}>
               <circle r={iconR} fill="white" stroke="#D6D3D1" strokeWidth="1.5" />
               {/* Pencil icon (lucide) */}
               <g fill="none" stroke="#78716C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="translate(-6,-6) scale(0.5)">
@@ -362,12 +362,12 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
           </g>
           <g
             className="table-btn-delete"
-            transform={`translate(${deleteX}, ${deleteY})`}
+            transform={`translate(${deleteX}, ${deleteY}) scale(${counterScale})`}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); setShowActionConfirm(true) }}
             style={{ cursor: 'pointer' }}
           >
-            <g className="table-icon-pop" style={{ '--icon-from-x': `${deleteFromX}px`, '--icon-from-y': `${deleteFromY}px` } as React.CSSProperties}>
+            <g className="table-icon-pop" style={{ '--icon-from-x': `${deleteFromX * zoom}px`, '--icon-from-y': `${deleteFromY * zoom}px` } as React.CSSProperties}>
               <circle r={iconR} fill="white" stroke="#FECACA" strokeWidth="1.5" />
               {/* X icon (lucide) */}
               <g fill="none" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="translate(-6,-6) scale(0.5)">
@@ -887,12 +887,9 @@ function buildSeatLayout(
       seats.push({ type: 'empty', guest: null, seatIndex: i, ...pos })
     } else if (slot.isCompanion) {
       const guest = guestMap.get(slot.guestId) || null
-      // 計算 companionIndex（往前數同 guestId 的連續 slot）
-      let companionIdx = 0
-      for (let j = i - 1; j >= 0; j--) {
-        if (slots[j]?.guestId === slot.guestId) companionIdx++
-        else break
-      }
+      // 計算 companionIndex（用 circular offset，支援 wrap-around）
+      const mainSeatIdx = guest?.seatIndex ?? 0
+      const companionIdx = (i - mainSeatIdx + totalSlots) % totalSlots
       seats.push({ type: 'companion', guest, companionIndex: companionIdx, seatIndex: i, ...pos })
     } else {
       const guest = guestMap.get(slot.guestId) || null

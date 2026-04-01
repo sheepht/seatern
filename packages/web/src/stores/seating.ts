@@ -1276,9 +1276,57 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const merged = { ...guests[idx], ...patch }
     if ('companionCount' in patch) merged.seatCount = (merged.companionCount ?? 0) + 1
     const updated = merged
-    const nextGuests = [...guests]
+    let nextGuests = [...guests]
     nextGuests[idx] = updated
     set({ guests: nextGuests })
+
+    // When companionCount changes and guest is seated, re-layout seats to avoid overlap
+    if ('companionCount' in patch && updated.assignedTableId && updated.seatIndex !== null) {
+      const table = tables.find((t) => t.id === updated.assignedTableId)
+      if (table) {
+        // Build slot array excluding the updated guest
+        const tableGuests = nextGuests.filter(
+          (g) => g.assignedTableId === table.id && g.rsvpStatus === 'confirmed' && g.id !== guestId,
+        )
+        const seatGuests = tableGuests
+          .filter((g) => g.seatIndex !== null)
+          .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, seatCount: g.seatCount }))
+
+        const slots = buildSlotArray(seatGuests, table.capacity)
+        const newSlots = placeGuest(slots, updated.seatIndex, guestId, updated.seatCount)
+
+        if (newSlots) {
+          const newIndices = extractSeatIndices(newSlots)
+          nextGuests = nextGuests.map((g) => {
+            if (g.id === guestId) {
+              return { ...g, seatIndex: newIndices.get(guestId) ?? updated.seatIndex }
+            }
+            if (newIndices.has(g.id)) {
+              return { ...g, seatIndex: newIndices.get(g.id)! }
+            }
+            return g
+          })
+          set({ guests: nextGuests })
+
+          // Persist shifted seat indices to backend
+          if (eventId) {
+            for (const [id, newIdx] of newIndices) {
+              if (id !== guestId) {
+                const prev = tableGuests.find((g) => g.id === id)
+                if (prev && prev.seatIndex !== newIdx) {
+                  fetch(`/api/events/${eventId}/guests/${id}/table`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ tableId: table.id, seatIndex: newIdx }),
+                  }).catch(console.error)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
 
     // Recalculate if score-affecting fields changed
     const scoreFields = ['companionCount', 'rsvpStatus'] as const
