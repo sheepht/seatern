@@ -55,11 +55,12 @@
 - 推薦前 3 名最佳入座、hover 即時預覽桌子滿意度和賓客圓形
 - 畫布自動平移避免 popover 蓋到桌子
 
-### ~~避免同桌 Modal 重新設計~~ ✅ Done (2026-03-31)
-- 左右分欄寬 modal（800px）：左側分類→子分類分組賓客列表（點擊選人），右側已設定避桌組別
-- 已設定組別顯示 `[子分類]名字 vs 名字[子分類]`，子分類 badge 用 category 顏色區分男女方
-- 同桌狀態提示、重複配對防護、原因選填
-- 取代原本的兩個 `<select>` 下拉
+### ~~避免同桌 Modal 重新設計~~ ✅ Done (2026-03-31, inline picker 重構 2026-04-01)
+- 單欄 modal（560px）：頂部 inline search picker 選兩位賓客，下方 chip 列表顯示已設定組別
+- GuestPicker 元件：搜尋姓名/暱稱，依分類→子分類分組下拉，選取後顯示 category 色 chip
+- 已設定組別以 inline chip 顯示 `[子分類]名字 vs 名字[子分類]`，同桌違規紅底高亮 + ⚠ 提示
+- 移除 reason 欄位（簡化流程）、移除舊的雙欄 chip 選擇佈局
+- GuestManagementPage 新增避桌按鈕入口
 
 ### AvoidPair store actions error handling (P3)
 - **什麼：** `addAvoidPair` 和 `removeAvoidPair` 的 API call 失敗時，local state 已更新但 server 沒有同步
