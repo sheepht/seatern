@@ -1,4 +1,4 @@
-export type RsvpStatus = 'pending' | 'confirmed' | 'declined' | 'modified'
+export type RsvpStatus = 'confirmed' | 'declined'
 
 export interface PendingSubmission {
   rsvpStatus: 'confirmed' | 'declined'

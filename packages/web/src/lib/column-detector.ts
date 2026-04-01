@@ -149,7 +149,7 @@ export interface RawGuest {
   name: string
   aliases: string[]
   category: string
-  rsvpStatus: 'confirmed' | 'declined' | 'pending'
+  rsvpStatus: 'confirmed' | 'declined'
   attendeeCount: number
   dietaryNote: string
   specialNote: string
@@ -180,10 +180,8 @@ export function normalizeGuest(
 
   // 解析 RSVP
   const rsvpRaw = get('rsvpStatus').toLowerCase()
-  let rsvpStatus: 'confirmed' | 'declined' | 'pending' = 'pending'
-  if (['是', '確認', '出席', 'yes', 'y', '1', 'true', '會'].some((k) => rsvpRaw.includes(k))) {
-    rsvpStatus = 'confirmed'
-  } else if (['否', '不', '婉拒', 'no', 'n', '0', 'false', '不會'].some((k) => rsvpRaw.includes(k))) {
+  let rsvpStatus: 'confirmed' | 'declined' = 'confirmed'
+  if (['否', '不', '婉拒', 'no', 'n', '0', 'false', '不會'].some((k) => rsvpRaw.includes(k))) {
     rsvpStatus = 'declined'
   }
 

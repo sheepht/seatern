@@ -65,7 +65,7 @@ async function main() {
     aliases: string[]
     category: string
     relationScore: number
-    rsvpStatus: 'confirmed' | 'declined' | 'pending'
+    rsvpStatus: 'confirmed' | 'declined'
     attendeeCount: number
     dietaryNote?: string
     specialNote?: string

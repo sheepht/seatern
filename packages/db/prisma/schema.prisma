@@ -74,7 +74,7 @@ model Guest {
   relationScore Int       @default(2) // 1-3
 
   // 賓客填寫
-  rsvpStatus    RsvpStatus @default(pending)
+  rsvpStatus    RsvpStatus @default(confirmed)
   attendeeCount Int        @default(1) // 含本人 + 眷屬（成人+小孩）
   dietaryNote   String?
   specialNote   String?    // 嬰兒椅、輪椅等
@@ -104,10 +104,8 @@ model Guest {
 }
 
 enum RsvpStatus {
-  pending
   confirmed
   declined
-  modified
 }
 
 // ─── 桌次 ────────────────────────────────────────────

@@ -16,23 +16,17 @@ type CategoryFilter = '全部' | string
 
 const RSVP_LABELS: Record<string, string> = {
   confirmed: '確認',
-  pending: '未回覆',
   declined: '婉拒',
-  modified: '已修改',
 }
 
-const RSVP_CYCLE: string[] = ['confirmed', 'pending', 'declined']
+const RSVP_CYCLE: string[] = ['confirmed', 'declined']
 
 function rsvpIcon(status: string) {
-  if (status === 'confirmed') return '✓'
-  if (status === 'declined') return '✗'
-  return '?'
+  return status === 'confirmed' ? '✓' : '✗'
 }
 
 function rsvpColor(status: string) {
-  if (status === 'confirmed') return 'var(--success)'
-  if (status === 'declined') return 'var(--error)'
-  return 'var(--warning)'
+  return status === 'confirmed' ? 'var(--success)' : 'var(--error)'
 }
 
 function categoryBadgeStyle(category: string | undefined) {
@@ -213,16 +207,14 @@ function StatsBar({
   guests, tables, activeFilter, onFilterClick,
 }: { guests: Guest[]; tables: { id: string; name: string }[]; activeFilter: CategoryFilter; onFilterClick: (status: string) => void }) {
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed').length
-  const pending = guests.filter((g) => g.rsvpStatus === 'pending').length
   const declined = guests.filter((g) => g.rsvpStatus === 'declined').length
   const totalSeats = guests.filter((g) => g.rsvpStatus === 'confirmed').reduce((s, g) => s + g.attendeeCount, 0)
   const assigned = guests.filter((g) => g.assignedTableId && g.rsvpStatus === 'confirmed')
   const avgSat = assigned.length > 0 ? assigned.reduce((s, g) => s + g.satisfactionScore, 0) / assigned.length : 0
 
-  const statStyle = (active?: boolean) => ({
+  const statStyle = () => ({
     display: 'flex', alignItems: 'baseline', gap: 4, cursor: 'pointer',
     padding: '4px 8px', borderRadius: 'var(--radius-sm, 4px)',
-    background: active ? 'var(--accent-light)' : 'transparent',
   })
 
   return (
@@ -234,10 +226,6 @@ function StatsBar({
       <div style={statStyle()} onClick={() => onFilterClick('confirmed')}>
         <span style={{ fontFamily: 'var(--font-data)', fontWeight: 700, fontSize: 20, color: 'var(--success)', fontVariantNumeric: 'tabular-nums' }}>{confirmed}</span>
         <span>確認</span>
-      </div>
-      <div style={statStyle()} onClick={() => onFilterClick('pending')}>
-        <span style={{ fontFamily: 'var(--font-data)', fontWeight: 700, fontSize: 20, color: 'var(--warning)', fontVariantNumeric: 'tabular-nums' }}>{pending}</span>
-        <span>未回覆</span>
       </div>
       <div style={statStyle()} onClick={() => onFilterClick('declined')}>
         <span style={{ fontFamily: 'var(--font-data)', fontWeight: 700, fontSize: 20, color: 'var(--error)', fontVariantNumeric: 'tabular-nums' }}>{declined}</span>

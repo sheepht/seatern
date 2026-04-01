@@ -245,7 +245,7 @@ events.post('/:eventId/guests', async (c) => {
       aliases: body.aliases || [],
       category: body.category,
       relationScore: body.relationScore ?? 2,
-      rsvpStatus: (body.rsvpStatus as any) || 'pending',
+      rsvpStatus: (body.rsvpStatus as any) || 'confirmed',
       attendeeCount: body.attendeeCount ?? 1,
       dietaryNote: body.dietaryNote,
       specialNote: body.specialNote,

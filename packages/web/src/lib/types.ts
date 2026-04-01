@@ -6,7 +6,7 @@ export interface Guest {
   aliases: string[]
   category: string
   relationScore: number
-  rsvpStatus: 'pending' | 'confirmed' | 'declined' | 'modified'
+  rsvpStatus: 'confirmed' | 'declined'
   attendeeCount: number
   dietaryNote: string
   specialNote: string
