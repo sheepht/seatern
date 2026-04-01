@@ -322,6 +322,7 @@ export default function GuestManagementPage() {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('全部')
   const [rsvpFilter, setRsvpFilter] = useState<string | null>(null)
+  const [showDeclined, setShowDeclined] = useState(false)
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null)
@@ -367,6 +368,7 @@ export default function GuestManagementPage() {
   const filtered = guests.filter((g) => {
     if (categoryFilter !== '全部' && g.category !== categoryFilter) return false
     if (rsvpFilter && g.rsvpStatus !== rsvpFilter) return false
+    if (!showDeclined && !search && g.rsvpStatus === 'declined') return false
     if (search) {
       const q = search.toLowerCase()
       const nameMatch = g.name.toLowerCase().includes(q)
@@ -462,6 +464,7 @@ export default function GuestManagementPage() {
 
   const handleRsvpFilterClick = (status: string) => {
     setRsvpFilter((prev) => prev === status ? null : status)
+    if (status === 'declined') setShowDeclined(true)
   }
 
   // ─── Empty state ────────────────────────────────────
@@ -518,8 +521,10 @@ export default function GuestManagementPage() {
           </div>
 
           <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm, 4px)', overflow: 'hidden' }}>
-            {['全部', ...categories].map((cat) => {
-              const count = cat === '全部' ? guests.length : guests.filter((g) => g.category === cat).length
+            {(() => {
+              const visible = !showDeclined ? guests.filter((g) => g.rsvpStatus !== 'declined') : guests
+              return ['全部', ...categories].map((cat) => {
+              const count = cat === '全部' ? visible.length : visible.filter((g) => g.category === cat).length
               return (
                 <button
                   key={cat}
@@ -564,7 +569,8 @@ export default function GuestManagementPage() {
                   )}
                 </button>
               )
-            })}
+            })
+            })()}
           </div>
 
           {/* Category color picker */}
@@ -592,6 +598,33 @@ export default function GuestManagementPage() {
               {RSVP_LABELS[rsvpFilter] || rsvpFilter} <X size={12} />
             </button>
           )}
+
+          <label
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 13, fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)',
+              cursor: 'pointer', userSelect: 'none',
+            }}
+          >
+            <div
+              onClick={() => setShowDeclined((v) => !v)}
+              style={{
+                width: 32, height: 18, borderRadius: 9, position: 'relative',
+                background: showDeclined ? 'var(--accent)' : 'var(--border)',
+                transition: 'background 0.2s',
+                cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              <div style={{
+                width: 14, height: 14, borderRadius: '50%', background: '#fff',
+                position: 'absolute', top: 2,
+                left: showDeclined ? 16 : 2,
+                transition: 'left 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }} />
+            </div>
+            顯示婉拒
+          </label>
 
           {/* Right: Stats */}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
