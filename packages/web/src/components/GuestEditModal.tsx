@@ -13,13 +13,12 @@ interface GuestEditModalProps {
   guests: Guest[]
   avoidPairs: AvoidPair[]
   categories: string[]
-  allTags: string[]
+  subcategories: Array<{ id: string; name: string; category: string }>
   categoryColors: Record<string, CategoryColor>
   onSave: (guestId: string, patch: Partial<Guest>) => Promise<boolean | void>
   onMoveToTable: (guestId: string, tableId: string | null) => void
   onUpdatePreferences: (guestId: string, prefs: Array<{ preferredGuestId: string; rank: number }>) => Promise<boolean>
-  onAddTag: (guestId: string, tagName: string) => Promise<any>
-  onRemoveTag: (guestId: string, tagId: string) => Promise<boolean>
+  onSetSubcategory: (guestId: string, subcategoryId: string | null) => Promise<boolean>
   onAddAvoidPair: (guestAId: string, guestBId: string) => Promise<void>
   onRemoveAvoidPair: (pairId: string) => Promise<void>
   onRsvpToggle: (guestId: string) => void
@@ -124,10 +123,10 @@ function AddPickerButton({ guests, excludeIds, onSelect, categoryColors, placeho
     return sorted.map((cat) => {
       let catGuests = confirmed.filter((g) => (g.category ?? '其他') === cat)
       if (q) catGuests = catGuests.filter((g) => g.name.toLowerCase().includes(q) || g.aliases.some((a) => a.toLowerCase().includes(q)))
-      const tagNames = Array.from(new Set(catGuests.flatMap((g) => g.guestTags.map((gt) => gt.tag.name))))
+      const subcatNames = Array.from(new Set(catGuests.map((g) => g.subcategory?.name).filter(Boolean))) as string[]
       const subGroups = [
-        ...tagNames.map((tn) => ({ tagName: tn, guests: catGuests.filter((g) => g.guestTags.some((gt) => gt.tag.name === tn)) })),
-        { tagName: null as string | null, guests: catGuests.filter((g) => g.guestTags.length === 0) },
+        ...subcatNames.map((sn) => ({ tagName: sn, guests: catGuests.filter((g) => g.subcategory?.name === sn) })),
+        { tagName: null as string | null, guests: catGuests.filter((g) => !g.subcategory) },
       ].filter((sg) => sg.guests.length > 0)
       return { category: cat, subGroups }
     }).filter((g) => g.subGroups.some((sg) => sg.guests.length > 0))
@@ -243,133 +242,11 @@ function AddPickerButton({ guests, excludeIds, onSelect, categoryColors, placeho
   )
 }
 
-// ─── Tag Search Dropdown ───────────────────────────
-
-function AddTagButton({ allTags, currentNames, onAdd }: {
-  allTags: string[]; currentNames: Set<string>; onAdd: (name: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
-  const [pos, setPos] = useState({ left: 0, top: 0 })
-
-  const q = search.toLowerCase()
-  const filtered = allTags.filter((t) => !currentNames.has(t) && t.toLowerCase().includes(q))
-  const canCreate = search.trim().length > 0 && !allTags.includes(search.trim()) && !currentNames.has(search.trim())
-
-  useEffect(() => {
-    if (open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect()
-      setPos({ left: r.left, top: r.bottom + 4 })
-      setTimeout(() => searchRef.current?.focus(), 50)
-    }
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node) &&
-          btnRef.current && !btnRef.current.contains(e.target as Node)) {
-        setOpen(false); setSearch('')
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  const handleSelect = (name: string) => {
-    onAdd(name)
-    setSearch('')
-  }
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        onClick={() => setOpen(!open)}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 2,
-          padding: '2px 8px', borderRadius: 'var(--radius-sm, 4px)',
-          border: '1px dashed var(--border)', background: 'none',
-          fontSize: 13, fontFamily: 'var(--font-ui)', color: 'var(--accent)',
-          cursor: 'pointer', whiteSpace: 'nowrap',
-        }}
-      >
-        + 新增
-      </button>
-      {open && createPortal(
-        <div
-          ref={panelRef}
-          style={{
-            position: 'fixed', left: pos.left, top: pos.top, width: 220, zIndex: 10000,
-            border: '1px solid var(--border)', borderRadius: 'var(--radius-md, 8px)',
-            padding: 8, background: 'var(--bg-surface)',
-            boxShadow: '0 12px 32px rgba(0,0,0,0.15)',
-          }}
-        >
-          <input
-            ref={searchRef}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && canCreate) handleSelect(search.trim()) }}
-            placeholder="搜尋或新增標籤..."
-            style={{
-              width: '100%', padding: '4px 8px', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm, 4px)', fontSize: 14, fontFamily: 'var(--font-ui)',
-              outline: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)',
-              boxSizing: 'border-box', marginBottom: 4,
-            }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)' }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
-          />
-          <div style={{ maxHeight: 180, overflowY: 'auto' }}>
-            {filtered.map((t) => (
-              <div
-                key={t}
-                onClick={() => handleSelect(t)}
-                style={{
-                  padding: '4px 6px', borderRadius: 'var(--radius-sm, 4px)', cursor: 'pointer',
-                  fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--text-primary)',
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)' }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
-              >
-                {t}
-              </div>
-            ))}
-            {canCreate && (
-              <div
-                onClick={() => handleSelect(search.trim())}
-                style={{
-                  padding: '4px 6px', borderRadius: 'var(--radius-sm, 4px)', cursor: 'pointer',
-                  fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontWeight: 500,
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)' }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
-              >
-                新增「{search.trim()}」
-              </div>
-            )}
-            {filtered.length === 0 && !canCreate && (
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: 4 }}>
-                {search.trim() ? '沒有符合的標籤' : '沒有可選的標籤'}
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body,
-      )}
-    </>
-  )
-}
-
 // ─── Main Modal ────────────────────────────────────
 
 export default function GuestEditModal({
-  guest, tables, guests, avoidPairs, categories, allTags, categoryColors,
-  onSave, onMoveToTable, onUpdatePreferences, onAddTag, onRemoveTag,
+  guest, tables, guests, avoidPairs, categories, subcategories, categoryColors,
+  onSave, onMoveToTable, onUpdatePreferences, onSetSubcategory,
   onAddAvoidPair, onRemoveAvoidPair, onRsvpToggle, onDelete, onClose,
 }: GuestEditModalProps) {
 
@@ -414,7 +291,6 @@ export default function GuestEditModal({
   // Exclude sets
   const prefExcludeIds = new Set([guest.id, ...sortedPrefs.map((p) => p.preferredGuestId)])
   const avoidExcludeIds = new Set([guest.id, ...guestAvoidPairs.map((ap) => ap.otherGuestId)])
-  const tagCurrentNames = new Set(guest.guestTags.map((gt) => gt.tag.name))
 
 
 
@@ -537,21 +413,26 @@ export default function GuestEditModal({
             </div>
           </div>
 
-          {/* 4. 標籤 */}
+          {/* 4. 子分類 */}
           <div style={rowStyle}>
-            <span style={labelStyle}>標籤</span>
+            <span style={labelStyle}>子分類</span>
             <div style={{ flex: 1, paddingTop: 4 }}>
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                {guest.guestTags.map((gt) => (
-                  <span key={gt.tag.id} style={{ ...chipStyle, color: 'var(--text-secondary)' }}>
-                    {gt.tag.name}
-                    <button onClick={() => onRemoveTag(guest.id, gt.tag.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-muted)', fontSize: 10, lineHeight: 1 }}>
-                      <X size={14} />
-                    </button>
-                  </span>
-                ))}
-                <AddTagButton allTags={allTags} currentNames={tagCurrentNames} onAdd={(name) => onAddTag(guest.id, name)} />
-              </div>
+              <select
+                value={guest.subcategory?.id ?? ''}
+                onChange={(e) => onSetSubcategory(guest.id, e.target.value || null)}
+                style={{
+                  ...inputStyle,
+                  width: 'auto', minWidth: 120,
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="">（無子分類）</option>
+                {subcategories
+                  .filter((sc) => !guest.category || sc.category === guest.category)
+                  .map((sc) => (
+                    <option key={sc.id} value={sc.id}>{sc.name}</option>
+                  ))}
+              </select>
             </div>
           </div>
 

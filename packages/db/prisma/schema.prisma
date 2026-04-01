@@ -39,7 +39,7 @@ model Event {
   // user 查詢透過 ownerId 手動 join，不用 Prisma relation
   guests    Guest[]
   tables    Table[]
-  tags      Tag[]
+  subcategories Subcategory[]
   edges     Edge[]
   avoidPairs AvoidPair[]
   snapshots SeatingSnapshot[]
@@ -70,8 +70,10 @@ model Guest {
   // 基本資料（從 Google Sheet 匯入）
   name         String
   aliases      String[]  @default([])
-  category     String?
-  relationScore Int       @default(2) // 1-3
+  category      String?
+  subcategoryId String?
+  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
+  relationScore Int          @default(2) // 1-3
 
   // 賓客填寫
   rsvpStatus    RsvpStatus @default(confirmed)
@@ -95,7 +97,6 @@ model Guest {
   preferredBy     SeatPreference[] @relation("PreferenceTo")
   edgesFrom       Edge[]           @relation("EdgeFrom")
   edgesTo         Edge[]           @relation("EdgeTo")
-  guestTags       GuestTag[]
   avoidPairsA     AvoidPair[]      @relation("AvoidA")
   avoidPairsB     AvoidPair[]      @relation("AvoidB")
 
@@ -160,35 +161,18 @@ enum EdgeType {
   inferred  // 系統推測
 }
 
-// ─── 標籤 ────────────────────────────────────────────
+// ─── 子分類 ──────────────────────────────────────────
 
-model Tag {
+model Subcategory {
   id       String  @id @default(uuid())
   eventId  String
   event    Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
   name     String
-  category String? // 綁定特定分類
+  category String  // 隸屬的分類（男方/女方/共同）— 必填
 
-  guestTags GuestTag[]
+  guests Guest[]
 
   @@unique([eventId, name])
-}
-
-model GuestTag {
-  id      String @id @default(uuid())
-  guestId String
-  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  tagId   String
-  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  assignedBy AssignedBy @default(host)
-
-  @@unique([guestId, tagId])
-}
-
-enum AssignedBy {
-  host
-  guest
 }
 
 // ─── 座位偏好 ────────────────────────────────────────

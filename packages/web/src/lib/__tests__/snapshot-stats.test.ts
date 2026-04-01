@@ -20,7 +20,7 @@ function makeGuest(overrides: Partial<Guest> = {}): Guest {
     isOverflow: false,
     isIsolated: false,
     seatPreferences: [],
-    guestTags: [],
+    subcategory: null,
     ...overrides,
   }
 }

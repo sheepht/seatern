@@ -295,8 +295,8 @@ export default function GuestManagementPage() {
   const addGuest = useSeatingStore((s) => s.addGuest)
   const moveGuest = useSeatingStore((s) => s.moveGuest)
   const updateGuestPreferences = useSeatingStore((s) => s.updateGuestPreferences)
-  const addGuestTag = useSeatingStore((s) => s.addGuestTag)
-  const removeGuestTag = useSeatingStore((s) => s.removeGuestTag)
+  const setGuestSubcategory = useSeatingStore((s) => s.setGuestSubcategory)
+  const subcategories = useSeatingStore((s) => s.subcategories)
   const addAvoidPair = useSeatingStore((s) => s.addAvoidPair)
   const removeAvoidPair = useSeatingStore((s) => s.removeAvoidPair)
 
@@ -362,9 +362,6 @@ export default function GuestManagementPage() {
 
   // Get unique categories from event
   const categories = Array.from(new Set(guests.map((g) => g.category).filter(Boolean))) as string[]
-
-  // All unique tag names (for tag autocomplete)
-  const allTags = Array.from(new Set(guests.flatMap((g) => g.guestTags.map((gt) => gt.tag.name))))
 
   // Merge preview color into effective colors
   const effectiveColors = previewColor
@@ -650,7 +647,7 @@ export default function GuestManagementPage() {
               <tr style={{ borderBottom: '2px solid var(--border)' }}>
                 <th onClick={() => handleSort('name')} style={thStyle}>姓名{sortArrow('name')}</th>
                 <th onClick={() => handleSort('category')} style={thStyle}>分類{sortArrow('category')}</th>
-                <th style={thStyle}>標籤</th>
+                <th style={thStyle}>子分類</th>
                 <th onClick={() => handleSort('assignedTableId')} style={thStyle}>桌次{sortArrow('assignedTableId')}</th>
                 <th onClick={() => handleSort('satisfactionScore')} style={{ ...thStyle, textAlign: 'right' }}>滿意度{sortArrow('satisfactionScore')}</th>
                 <th onClick={() => handleSort('rsvpStatus')} style={{ ...thStyle, textAlign: 'center' }}>出席{sortArrow('rsvpStatus')}</th>
@@ -666,7 +663,7 @@ export default function GuestManagementPage() {
               {filtered.map((guest) => {
                 const tableName = guest.assignedTableId ? tableNameMap.get(guest.assignedTableId) || '—' : '未排座'
                 const satColor = guest.assignedTableId ? getSatisfactionColor(guest.satisfactionScore) : 'var(--text-muted)'
-                const tags = guest.guestTags.map((gt) => gt.tag.name)
+                const subcatName = guest.subcategory?.name ?? ''
 
                 // Compute dynamic max attendeeCount based on table capacity
                 let maxAttendee = 10
@@ -706,7 +703,7 @@ export default function GuestManagementPage() {
                     guest={guest}
                     tableName={tableName}
                     satColor={satColor}
-                    tags={tags}
+                    subcatName={subcatName}
                     maxAttendee={maxAttendee}
                     maxAttendeeTooltip={maxAttendeeTooltip}
                     prefGuests={prefGuests}
@@ -793,13 +790,12 @@ export default function GuestManagementPage() {
             guests={guests}
             avoidPairs={avoidPairs}
             categories={categories}
-            allTags={allTags}
+            subcategories={subcategories}
             categoryColors={effectiveColors}
             onSave={async (gid, patch) => { const ok = await updateGuest(gid, patch); if (!ok) setToast({ message: '儲存失敗，已還原' }); return ok }}
             onMoveToTable={(gid, tid) => moveGuest(gid, tid)}
             onUpdatePreferences={(gid, prefs) => updateGuestPreferences(gid, prefs)}
-            onAddTag={(gid, name) => addGuestTag(gid, name)}
-            onRemoveTag={(gid, tid) => removeGuestTag(gid, tid)}
+            onSetSubcategory={(gid, sid) => setGuestSubcategory(gid, sid)}
             onAddAvoidPair={(a, b) => addAvoidPair(a, b)}
             onRemoveAvoidPair={(pid) => removeAvoidPair(pid)}
             onRsvpToggle={(gid) => handleRsvpToggle(guests.find((g) => g.id === gid)!)}
@@ -814,8 +810,8 @@ export default function GuestManagementPage() {
 
 // ─── Guest Row (read-only display + quick edits) ───
 
-const GuestRow = ({ guest, tableName, satColor, tags, maxAttendee, maxAttendeeTooltip, prefGuests, avoidGuests, catColor, categoryColors, onSave, onRsvpToggle, onDelete, onEdit }: {
-  guest: Guest; tableName: string; satColor: string; tags: string[]
+const GuestRow = ({ guest, tableName, satColor, subcatName, maxAttendee, maxAttendeeTooltip, prefGuests, avoidGuests, catColor, categoryColors, onSave, onRsvpToggle, onDelete, onEdit }: {
+  guest: Guest; tableName: string; satColor: string; subcatName: string
   maxAttendee: number; maxAttendeeTooltip?: string
   prefGuests: Guest[]; avoidGuests: Guest[]
   catColor: CategoryColor; categoryColors: Record<string, CategoryColor>
@@ -852,18 +848,17 @@ const GuestRow = ({ guest, tableName, satColor, tags, maxAttendee, maxAttendeeTo
         )}
       </td>
 
-      {/* Tags (read-only chips) */}
+      {/* Subcategory (read-only) */}
       <td style={tdStyle}>
-        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-          {tags.map((t) => (
-            <span key={t} style={{
-              padding: '1px 6px', borderRadius: 'var(--radius-sm, 4px)',
-              border: '1px solid var(--border)', fontSize: 14, color: 'var(--text-secondary)',
-              fontFamily: 'var(--font-ui)',
-            }}>{t}</span>
-          ))}
-          {tags.length === 0 && <span style={{ color: 'var(--text-muted)' }}>—</span>}
-        </div>
+        {subcatName ? (
+          <span style={{
+            padding: '1px 6px', borderRadius: 'var(--radius-sm, 4px)',
+            border: '1px solid var(--border)', fontSize: 14, color: 'var(--text-secondary)',
+            fontFamily: 'var(--font-ui)',
+          }}>{subcatName}</span>
+        ) : (
+          <span style={{ color: 'var(--text-muted)' }}>—</span>
+        )}
       </td>
 
       {/* Table (read-only) */}

@@ -26,6 +26,7 @@ interface SeatingState {
   eventName: string
   guests: Guest[]
   tables: Table[]
+  subcategories: Array<{ id: string; name: string; category: string }>
   avoidPairs: AvoidPair[]
   snapshots: SeatingSnapshot[]
 
@@ -147,8 +148,7 @@ interface SeatingState {
 
   // Per-guest preference & tag management
   updateGuestPreferences: (guestId: string, preferences: Array<{ preferredGuestId: string; rank: number }>) => Promise<boolean>
-  addGuestTag: (guestId: string, tagName: string, category?: string) => Promise<{ tag: { id: string; name: string } } | null>
-  removeGuestTag: (guestId: string, tagId: string) => Promise<boolean>
+  setGuestSubcategory: (guestId: string, subcategoryId: string | null) => Promise<boolean>
 
   // Computed helpers
   getTableGuests: (tableId: string) => Guest[]
@@ -163,6 +163,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   eventName: '',
   guests: [],
   tables: [],
+  subcategories: [],
   avoidPairs: [],
   snapshots: [],
   selectedTableId: null,
@@ -214,9 +215,10 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         isOverflow: g.isOverflow,
         isIsolated: g.isIsolated,
         seatPreferences: g.seatPreferences || [],
-        guestTags: g.guestTags || [],
+        subcategory: g.subcategory || null,
       }))
       const tables = data.tables as Table[]
+      const subcategories = (data.subcategories || []) as Array<{ id: string; name: string; category: string }>
 
       // 初始滿意度計算
       const result = recalculateAll(guests, tables, data.avoidPairs || [])
@@ -266,6 +268,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         eventName: data.name,
         guests,
         tables,
+        subcategories,
         avoidPairs: data.avoidPairs || [],
         snapshots: data.snapshots || [],
         loading: false,
@@ -506,7 +509,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       const tableId = last.tableId
       const tableGuests = guests.filter((g) => g.assignedTableId === tableId)
       const updatedGuests = guests.map((g) =>
-        g.assignedTableId === tableId ? { ...g, assignedTableId: undefined as string | undefined, seatIndex: null } : g,
+        g.assignedTableId === tableId ? { ...g, assignedTableId: null as string | null, seatIndex: null } : g,
       )
       set({
         tables: tables.filter((t) => t.id !== tableId),
@@ -677,7 +680,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       const synced = new Set<string>()
       const batchAssignments: Array<{ guestId: string; tableId: string | null; seatIndex: number | null }> = []
       for (const entry of entriesToUndo) {
-        if (entry.type === 'add-table') continue
+        if (entry.type === 'add-table' || !('guestId' in entry)) continue
         // 被拖的賓客
         if (!synced.has(entry.guestId)) {
           synced.add(entry.guestId)
@@ -712,7 +715,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     // 先把所有桌上的賓客移回未安排
     const tableGuests = guests.filter((g) => g.assignedTableId === tableId)
     const updatedGuests = guests.map((g) =>
-      g.assignedTableId === tableId ? { ...g, assignedTableId: undefined } : g,
+      g.assignedTableId === tableId ? { ...g, assignedTableId: null } : g,
     )
 
     set({
@@ -768,7 +771,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     }))
 
     const updatedGuests = guests.map((g) =>
-      g.assignedTableId === tableId ? { ...g, assignedTableId: null as string | undefined | null, seatIndex: null, satisfactionScore: g.rsvpStatus === 'confirmed' ? 55 : 0 } : g,
+      g.assignedTableId === tableId ? { ...g, assignedTableId: null as string | null, seatIndex: null, satisfactionScore: g.rsvpStatus === 'confirmed' ? 55 : 0 } : g,
     )
     const result = recalculateAll(updatedGuests, tables, avoidPairs)
     const finalGuests = updatedGuests.map((g) => {
@@ -811,7 +814,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     const updatedGuests = guests.map((g) => ({
       ...g,
-      assignedTableId: null as string | undefined | null,
+      assignedTableId: null as string | null,
       seatIndex: null,
       satisfactionScore: g.rsvpStatus === 'confirmed' ? 55 : 0,
     }))
@@ -1429,63 +1432,32 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     }
   },
 
-  addGuestTag: async (guestId, tagName, category) => {
-    const { eventId, guests } = get()
-    if (!eventId) return null
-
-    try {
-      const res = await fetch(`/api/events/${eventId}/guests/${guestId}/tags`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ tagName, category }),
-      })
-      if (!res.ok) return null
-      const guestTag = await res.json() as { tag: { id: string; name: string } }
-
-      // Add to guest's guestTags array on success
-      const idx = guests.findIndex((g) => g.id === guestId)
-      if (idx >= 0) {
-        const nextGuests = [...guests]
-        nextGuests[idx] = {
-          ...nextGuests[idx],
-          guestTags: [...nextGuests[idx].guestTags, guestTag],
-        }
-        set({ guests: nextGuests })
-      }
-      return guestTag
-    } catch {
-      return null
-    }
-  },
-
-  removeGuestTag: async (guestId, tagId) => {
+  setGuestSubcategory: async (guestId, subcategoryId) => {
     const { eventId, guests } = get()
     if (!eventId) return false
 
-    // Optimistic: remove tag from guest
     const prevGuests = guests
     const idx = guests.findIndex((g) => g.id === guestId)
     if (idx < 0) return false
-    const nextGuests = [...guests]
-    nextGuests[idx] = {
-      ...nextGuests[idx],
-      guestTags: nextGuests[idx].guestTags.filter((gt) => gt.tag.id !== tagId),
-    }
-    set({ guests: nextGuests })
 
     try {
-      const res = await fetch(`/api/events/${eventId}/guests/${guestId}/tags/${tagId}`, {
-        method: 'DELETE',
+      const res = await fetch(`/api/events/${eventId}/guests/${guestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ subcategoryId }),
       })
-      if (!res.ok) {
-        set({ guests: prevGuests })
-        return false
+      if (!res.ok) return false
+      const updated = await res.json()
+
+      const nextGuests = [...guests]
+      nextGuests[idx] = {
+        ...nextGuests[idx],
+        subcategory: updated.subcategory || null,
       }
+      set({ guests: nextGuests })
       return true
     } catch {
-      set({ guests: prevGuests })
       return false
     }
   },

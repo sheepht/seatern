@@ -15,7 +15,7 @@ export interface Guest {
   isOverflow: boolean
   isIsolated: boolean
   seatPreferences: Array<{ preferredGuestId: string; rank: number }>
-  guestTags: Array<{ tag: { id: string; name: string } }>
+  subcategory: { id: string; name: string } | null
 }
 
 export interface Table {

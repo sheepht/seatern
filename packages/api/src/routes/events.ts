@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { prisma } from '@seatern/db'
+import type { OwnerType } from '@prisma/client'
 import type { SessionEnv } from '../middleware/session'
 
 const events = new Hono<SessionEnv>()
@@ -11,7 +12,7 @@ async function findEventWithDevFallback(
   ownerType: string,
 ) {
   const event = await prisma.event.findFirst({
-    where: { id: eventId, ownerId, ownerType },
+    where: { id: eventId, ownerId, ownerType: ownerType as OwnerType },
   })
   if (event) return event
 
@@ -43,12 +44,12 @@ events.get('/:id', async (c) => {
     guests: {
       include: {
         seatPreferences: true,
-        guestTags: { include: { tag: true } },
+        subcategory: true,
       },
       orderBy: { name: 'asc' } as const,
     },
     tables: { orderBy: { name: 'asc' } as const },
-    tags: { orderBy: { name: 'asc' } as const },
+    subcategories: { orderBy: { name: 'asc' } as const },
     edges: true,
     avoidPairs: true,
     snapshots: { orderBy: { createdAt: 'desc' } as const },
@@ -248,7 +249,7 @@ events.post('/:eventId/guests', async (c) => {
     },
     include: {
       seatPreferences: true,
-      guestTags: { include: { tag: true } },
+      subcategory: true,
     },
   })
 
@@ -257,7 +258,7 @@ events.post('/:eventId/guests', async (c) => {
 
 // PATCH /events/:eventId/guests/:guestId — 更新單筆賓客（partial update, whitelist）
 const GUEST_UPDATABLE_FIELDS = [
-  'name', 'aliases', 'category',
+  'name', 'aliases', 'category', 'subcategoryId',
   'rsvpStatus', 'attendeeCount', 'dietaryNote', 'specialNote',
 ] as const
 
@@ -289,7 +290,7 @@ events.patch('/:eventId/guests/:guestId', async (c) => {
       data,
       include: {
         seatPreferences: true,
-        guestTags: { include: { tag: true } },
+        subcategory: true,
       },
     })
     return c.json(guest)
@@ -299,7 +300,7 @@ events.patch('/:eventId/guests/:guestId', async (c) => {
   }
 })
 
-// DELETE /events/:eventId/guests/:guestId — 刪除賓客（cascade: seatPrefs, guestTags, avoidPairs, edges）
+// DELETE /events/:eventId/guests/:guestId — 刪除賓客（cascade: seatPrefs, avoidPairs, edges）
 events.delete('/:eventId/guests/:guestId', async (c) => {
   const ownerId = c.get('ownerId')
   const ownerType = c.get('ownerType')
@@ -459,10 +460,10 @@ events.put('/:eventId/guests/:guestId/preferences', async (c) => {
   return c.json(created)
 })
 
-// ─── 標籤 ─────────────────────────────────────────────
+// ─── 子分類 ─────────────────────────────────────────────
 
-// POST /events/:id/tags/batch — 批次建立標籤並關聯賓客
-events.post('/:id/tags/batch', async (c) => {
+// POST /events/:id/subcategories/batch — 批次建立子分類並關聯賓客
+events.post('/:id/subcategories/batch', async (c) => {
   const ownerId = c.get('ownerId')
   const ownerType = c.get('ownerType')
   const eventId = c.req.param('id')
@@ -471,94 +472,35 @@ events.post('/:id/tags/batch', async (c) => {
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
   const body = await c.req.json<{
-    assignments: Array<{ guestId: string; tagName: string; category?: string }>
+    assignments: Array<{ guestId: string; subcategoryName: string; category: string }>
   }>()
 
-  // 收集所有唯一標籤名
-  const tagNames = [...new Set(body.assignments.map((a) => a.tagName))]
-
-  // upsert 標籤（同名不重複建立）
-  const tagMap = new Map<string, string>()
-  for (const name of tagNames) {
-    const category = body.assignments.find((a) => a.tagName === name)?.category
-    const tag = await prisma.tag.upsert({
+  // Upsert subcategories
+  const subcatMap = new Map<string, string>()
+  const uniqueNames = [...new Set(body.assignments.map((a) => a.subcategoryName))]
+  for (const name of uniqueNames) {
+    const category = body.assignments.find((a) => a.subcategoryName === name)!.category
+    const subcat = await prisma.subcategory.upsert({
       where: { eventId_name: { eventId, name } },
-      create: { eventId, name, category: category || null },
+      create: { eventId, name, category },
       update: {},
     })
-    tagMap.set(name, tag.id)
+    subcatMap.set(name, subcat.id)
   }
 
-  // 批次建立 guestTag（跳過已存在的）
-  let created = 0
+  // Assign subcategory to guests
+  let assigned = 0
   for (const a of body.assignments) {
-    const tagId = tagMap.get(a.tagName)
-    if (!tagId) continue
-    try {
-      await prisma.guestTag.create({
-        data: { guestId: a.guestId, tagId },
-      })
-      created++
-    } catch {
-      // unique constraint violation = 已存在，跳過
-    }
+    const subcategoryId = subcatMap.get(a.subcategoryName)
+    if (!subcategoryId) continue
+    await prisma.guest.update({
+      where: { id: a.guestId },
+      data: { subcategoryId },
+    })
+    assigned++
   }
 
-  return c.json({ tags: tagNames.length, guestTags: created }, 201)
-})
-
-// POST /events/:eventId/guests/:guestId/tags — 為單一賓客新增標籤
-events.post('/:eventId/guests/:guestId/tags', async (c) => {
-  const ownerId = c.get('ownerId')
-  const ownerType = c.get('ownerType')
-  const { eventId, guestId } = c.req.param()
-
-  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
-  if (!event) return c.json({ error: 'Event not found' }, 404)
-
-  const body = await c.req.json<{ tagName: string; category?: string }>()
-
-  if (!body.tagName?.trim()) return c.json({ error: 'tagName is required' }, 400)
-
-  // upsert 標籤（同名不重複建立）
-  const tag = await prisma.tag.upsert({
-    where: { eventId_name: { eventId, name: body.tagName } },
-    create: { eventId, name: body.tagName, category: body.category || null },
-    update: {},
-  })
-
-  // 建立 guestTag，跳過已存在的
-  let guestTag
-  try {
-    guestTag = await prisma.guestTag.create({
-      data: { guestId, tagId: tag.id },
-      include: { tag: true },
-    })
-  } catch {
-    // unique constraint violation = 已存在，直接查出來回傳
-    guestTag = await prisma.guestTag.findFirst({
-      where: { guestId, tagId: tag.id },
-      include: { tag: true },
-    })
-  }
-
-  return c.json(guestTag, 201)
-})
-
-// DELETE /events/:eventId/guests/:guestId/tags/:tagId — 移除賓客的標籤關聯
-events.delete('/:eventId/guests/:guestId/tags/:tagId', async (c) => {
-  const ownerId = c.get('ownerId')
-  const ownerType = c.get('ownerType')
-  const { eventId, guestId, tagId } = c.req.param()
-
-  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
-  if (!event) return c.json({ error: 'Event not found' }, 404)
-
-  await prisma.guestTag.deleteMany({
-    where: { guestId, tagId },
-  })
-
-  return c.json({ ok: true })
+  return c.json({ subcategories: uniqueNames.length, assigned }, 201)
 })
 
 // ─── 避免同桌 ────────────────────────────────────────

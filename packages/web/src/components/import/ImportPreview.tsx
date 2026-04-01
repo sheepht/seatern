@@ -112,7 +112,7 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>姓名</th>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>外號</th>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>分類</th>
-                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>群組</th>
+                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>子分類</th>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>出席</th>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>人數</th>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>葷素</th>
@@ -127,7 +127,7 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
                   <td className="px-3 py-2 font-medium" style={{ color: 'var(--text-primary)' }}>{g.name}</td>
                   <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{g.aliases.join(', ') || '—'}</td>
                   <td className="px-3 py-2" style={{ color: 'var(--text-primary)' }}>{g.category || '—'}</td>
-                  <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{g.rawTags.join(', ') || '—'}</td>
+                  <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{g.rawSubcategory || '—'}</td>
                   <td className="px-3 py-2">
                     <span style={{ color: g.rsvpStatus === 'confirmed' ? 'var(--success)' : g.rsvpStatus === 'declined' ? 'var(--error)' : 'var(--text-muted)' }}>
                       {g.rsvpStatus === 'confirmed' ? '出席' : g.rsvpStatus === 'declined' ? '婉拒' : '待定'}

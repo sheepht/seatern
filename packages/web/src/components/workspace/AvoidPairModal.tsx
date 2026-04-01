@@ -14,7 +14,7 @@ const CATEGORY_ORDER = ['男方', '女方', '共同']
 
 function TagLabel({ guest, categoryColors }: { guest: Guest; categoryColors: Record<string, CategoryColor> }) {
   const catColor = getCategoryColor(guest.category, categoryColors)
-  const tagName = guest.guestTags.length > 0 ? guest.guestTags[0].tag.name : (guest.category ?? '共同')
+  const tagName = guest.subcategory?.name ?? (guest.category ?? '共同')
   return (
     <span className="whitespace-nowrap shrink-0" style={{
       fontSize: 12, fontWeight: 600, padding: '1px 5px', borderRadius: 3,
@@ -138,13 +138,13 @@ export function AvoidPairModal({ onClose }: Props) {
           g.aliases.some((a) => a.toLowerCase().includes(q))
         )
       }
-      const tagNames = Array.from(new Set(catGuests.flatMap((g) => g.guestTags.map((gt) => gt.tag.name))))
+      const subcatNames = Array.from(new Set(catGuests.map((g) => g.subcategory?.name).filter(Boolean))) as string[]
       const subGroups = [
-        ...tagNames.map((tagName) => ({
+        ...subcatNames.map((tagName) => ({
           tagName,
-          guests: catGuests.filter((g) => g.guestTags.some((gt) => gt.tag.name === tagName)),
+          guests: catGuests.filter((g) => g.subcategory?.name === tagName),
         })),
-        { tagName: null as string | null, guests: catGuests.filter((g) => g.guestTags.length === 0) },
+        { tagName: null as string | null, guests: catGuests.filter((g) => !g.subcategory) },
       ].filter((sg) => sg.guests.length > 0)
       return { category: cat, subGroups }
     }).filter((g) => g.subGroups.some((sg) => sg.guests.length > 0))

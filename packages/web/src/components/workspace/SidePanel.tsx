@@ -421,18 +421,18 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
     .map((cat) => {
       const catGuests = filteredGuests.filter((g) => (g.category ?? '其他') === cat)
       // 收集此分類下所有出現的標籤（依第一個標籤分組；無標籤歸入 null）
-      const tagNames = Array.from(
-        new Set(catGuests.flatMap((g) => g.guestTags.map((gt) => gt.tag.name)))
-      )
+      const subcatNames = Array.from(
+        new Set(catGuests.map((g) => g.subcategory?.name).filter(Boolean))
+      ) as string[]
       const subGroups = [
-        ...tagNames.map((tagName) => ({
+        ...subcatNames.map((tagName) => ({
           tagName,
-          guests: catGuests.filter((g) => g.guestTags.some((gt) => gt.tag.name === tagName)),
+          guests: catGuests.filter((g) => g.subcategory?.name === tagName),
         })),
-        // 無任何標籤的賓客
+        // 無任何子分類的賓客
         {
           tagName: null,
-          guests: catGuests.filter((g) => g.guestTags.length === 0),
+          guests: catGuests.filter((g) => !g.subcategory),
         },
       ].filter((sg) => sg.guests.length > 0)
       return { category: cat, subGroups }

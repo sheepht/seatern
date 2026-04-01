@@ -7,8 +7,6 @@ export interface PendingSubmission {
   dietaryNote?: string
   specialNote?: string
   seatPreferences: Array<{ preferredId: string; preferredName: string; rank: number }>
-  addTagIds: string[]
-  removeTagIds: string[]
 }
 
 export interface Guest {
@@ -16,7 +14,7 @@ export interface Guest {
   eventId: string
   contactId: string
   category?: string
-  tagIds: string[]
+  subcategoryId?: string
   rsvpStatus: RsvpStatus
   attendeeCount: number
   infantCount: number

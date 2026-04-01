@@ -16,16 +16,15 @@ export function calculateGroupScore(
 ): number {
   if (tableGuests.length <= 1) return 0
 
-  const guestTagNames = guest.guestTags.map((gt) => gt.tag.name)
-  if (guestTagNames.length === 0) return 0
+  const guestSubcat = guest.subcategory?.name
+  if (!guestSubcat) return 0
 
   const others = tableGuests.filter((g) => g.id !== guest.id)
   if (others.length === 0) return 0
 
-  const sameGroupCount = others.filter((other) => {
-    const otherTagNames = other.guestTags.map((gt) => gt.tag.name)
-    return guestTagNames.some((tag) => otherTagNames.includes(tag))
-  }).length
+  const sameGroupCount = others.filter(
+    (other) => other.subcategory?.name === guestSubcat,
+  ).length
 
   const ratio = sameGroupCount / others.length
 

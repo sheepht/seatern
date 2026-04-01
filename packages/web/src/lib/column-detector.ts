@@ -10,7 +10,7 @@ export type SystemField =
   | 'aliases'
   | 'rsvpStatus'
   | 'category'
-  | 'tags'
+  | 'subcategory'
   | 'attendeeCount'
   | 'dietaryNote'
   | 'specialNote'
@@ -29,7 +29,7 @@ export const SYSTEM_FIELDS: FieldMapping[] = [
   { field: 'name', label: '姓名', required: true },
   { field: 'aliases', label: '外號/暱稱', required: false },
   { field: 'category', label: '分類（男方/女方）', required: false },
-  { field: 'tags', label: '群組/標籤', required: false },
+  { field: 'subcategory', label: '子分類', required: false },
   { field: 'attendeeCount', label: '帶眷屬', required: false },
   { field: 'dietaryNote', label: '葷素/飲食', required: false },
   { field: 'specialNote', label: '備註/特殊需求', required: false },
@@ -43,7 +43,7 @@ const FIELD_KEYWORDS: Record<SystemField, string[]> = {
   name: ['姓名', '名字', 'name', '全名'],
   aliases: ['外號', '暱稱', '別名', 'alias', 'nickname'],
   category: ['分類', '男方女方', '類別', 'category', '來賓分類'],
-  tags: ['群組', '標籤', '分組', 'group', 'tag', '圈子'],
+  subcategory: ['子分類', '群組', '標籤', '分組', 'group', 'tag', '圈子', 'subcategory'],
   attendeeCount: ['眷屬', '+1', '攜伴', '帶人', 'plus one', 'guest count'],
   dietaryNote: ['葷素', '飲食', 'dietary', '素食', '忌口'],
   specialNote: ['備註', '需求', '特殊', 'note', '其他'],
@@ -77,7 +77,7 @@ export function detectColumns(headers: string[]): DetectionResult {
     aliases: null,
     rsvpStatus: null,
     category: null,
-    tags: null,
+    subcategory: null,
     attendeeCount: null,
     dietaryNote: null,
     specialNote: null,
@@ -90,7 +90,7 @@ export function detectColumns(headers: string[]): DetectionResult {
     aliases: [],
     rsvpStatus: [],
     category: [],
-    tags: [],
+    subcategory: [],
     attendeeCount: [],
     dietaryNote: [],
     specialNote: [],
@@ -153,7 +153,7 @@ export interface RawGuest {
   attendeeCount: number
   dietaryNote: string
   specialNote: string
-  rawTags: string[]        // 群組標籤（大學同學、高中同學等）
+  rawSubcategory: string   // 子分類（大學同學、高中同學等）
   rawPreferences: string[] // 未配對的原始文字
   rawAvoids: string[]      // 避免同桌的人名
 }
@@ -185,11 +185,8 @@ export function normalizeGuest(
     rsvpStatus = 'declined'
   }
 
-  // 解析群組標籤
-  const tagStr = get('tags')
-  const rawTags = tagStr
-    ? tagStr.split(/[,，、\n]/).map((t) => t.trim()).filter(Boolean)
-    : []
+  // 解析子分類
+  const rawSubcategory = (get('subcategory') || '').trim()
 
   // 解析眷屬：Form 填的是額外數（0 或 1），系統 +1
   // 支援多種填法：數字（0, 1, 2）、文字（有、是、帶老婆）、混合（1位、帶1人）
@@ -236,7 +233,7 @@ export function normalizeGuest(
     aliases,
     category: get('category') || '',
     rsvpStatus,
-    rawTags,
+    rawSubcategory,
     attendeeCount,
     dietaryNote: get('dietaryNote'),
     specialNote: get('specialNote'),

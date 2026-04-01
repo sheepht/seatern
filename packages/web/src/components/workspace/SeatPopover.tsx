@@ -96,7 +96,7 @@ export function SeatPopover({ tableId, seatIndex, seatX, seatY, tableCenterX, ta
       g.name.toLowerCase().includes(q) ||
       g.aliases.some((a) => a.toLowerCase().includes(q)) ||
       (g.category ?? '').toLowerCase().includes(q) ||
-      g.guestTags.some((gt) => gt.tag.name.toLowerCase().includes(q))
+      (g.subcategory?.name.toLowerCase().includes(q) ?? false)
     )
   }, [predictions, search])
 
@@ -215,7 +215,7 @@ function GuestRow({ prediction, onClick, highlight, tableId, seatIndex, category
   // 用分類決定顏色（男方藍、女方紅），badge 文字顯示標籤名
   const catColor = getCategoryColor(guest.category, categoryColors)
   const catStyle = { bg: catColor.background, text: catColor.color, border: catColor.border }
-  const tagLabel = guest.guestTags.length > 0 ? guest.guestTags[0].tag.name : (guest.category ?? '其他')
+  const tagLabel = guest.subcategory?.name ?? (guest.category ?? '其他')
   const scoreColor = getSatisfactionColor(predictedScore)
   const deltaColor = tableDelta > 0 ? '#16A34A' : tableDelta < 0 ? '#DC2626' : '#A8A29E'
 

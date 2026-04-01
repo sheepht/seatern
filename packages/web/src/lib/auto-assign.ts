@@ -119,14 +119,14 @@ export async function autoAssignGuests(
     affinityMap.set(g.id, new Map())
   }
 
-  // 同 tag → 親和度 +2（unassigned 與所有 confirmed 之間）
+  // 同 subcategory → 親和度 +2（unassigned 與所有 confirmed 之間）
   for (const a of unassigned) {
-    const aTags = a.guestTags.map((gt) => gt.tag.name)
-    if (aTags.length === 0) continue
+    const aSubcat = a.subcategory?.name
+    if (!aSubcat) continue
     for (const b of confirmed) {
       if (a.id === b.id) continue
-      const bTags = b.guestTags.map((gt) => gt.tag.name)
-      const shared = aTags.some((t) => bTags.includes(t))
+      const bSubcat = b.subcategory?.name
+      const shared = aSubcat && aSubcat === bSubcat
       if (shared) {
         affinityMap.get(a.id)!.set(b.id, (affinityMap.get(a.id)!.get(b.id) || 0) + 2)
         affinityMap.get(b.id)!.set(a.id, (affinityMap.get(b.id)!.get(a.id) || 0) + 2)
@@ -156,10 +156,10 @@ export async function autoAssignGuests(
   const assigned = new Map<string, string>() // guestId → tableId
   const remaining = [...unassigned]
 
-  // 按 tag 數量排序（有群組的先排，散客後排）
+  // 按 subcategory 有無排序（有群組的先排，散客後排）
   remaining.sort((a, b) => {
-    const aScore = a.guestTags.length * 10 + a.seatPreferences.length * 5
-    const bScore = b.guestTags.length * 10 + b.seatPreferences.length * 5
+    const aScore = (a.subcategory ? 10 : 0) + a.seatPreferences.length * 5
+    const bScore = (b.subcategory ? 10 : 0) + b.seatPreferences.length * 5
     return bScore - aScore
   })
 

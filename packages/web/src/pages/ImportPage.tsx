@@ -104,22 +104,24 @@ export default function ImportPage() {
         if (!prefRes.ok) throw new Error('建立座位偏好失敗')
       }
 
-      // 4. 建立群組標籤（如果有）
-      const tagAssignments: Array<{ guestId: string; tagName: string; category?: string }> = []
+      // 4. 建立子分類（如果有）
+      const subcatAssignments: Array<{ guestId: string; subcategoryName: string; category: string }> = []
       guestList.forEach((g, i) => {
-        if (g.rawTags.length === 0) return
+        if (!g.rawSubcategory || !g.category) return
         const guestId = createdGuests[i]?.id
         if (!guestId) return
-        for (const tagName of g.rawTags) {
-          tagAssignments.push({ guestId, tagName, category: g.category || undefined })
-        }
+        subcatAssignments.push({
+          guestId,
+          subcategoryName: g.rawSubcategory,
+          category: g.category || '',
+        })
       })
-      if (tagAssignments.length > 0) {
-        await fetch(`/api/events/${event.id}/tags/batch`, {
+      if (subcatAssignments.length > 0) {
+        await fetch(`/api/events/${event.id}/subcategories/batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ assignments: tagAssignments }),
+          body: JSON.stringify({ assignments: subcatAssignments }),
         })
       }
 

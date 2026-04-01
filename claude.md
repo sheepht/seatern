@@ -126,7 +126,7 @@
 | 別名/暱稱 | | 支援多個，用於賓客搜尋配對 |
 | 分類（category） | | 主分類，由活動定義可用選項（如婚禮：男方/女方/共同） |
 | 關係分數 | ✓ | 1-3 分，代表與主辦人親疏程度 |
-| 所屬標籤 | | 可複選：大學同學、公司同事、家人、自訂...（可綁定分類） |
+| 子分類 | | 單選：大學同學、公司同事、家人、自訂...（隸屬於分類）|
 | 避免同桌 | | 新人標記，賓客不可見 |
 
 #### 3.1.2 別名設計目的
@@ -680,7 +680,7 @@ interface Guest {
   contactId: string               // 連結通訊錄（姓名、別名從 Contact 讀取）
   category?: string               // 主分類（婚禮：男方/女方/共同；企業：部門名等）
   relationScore: number           // 1-3，與主辦人親疏（每次活動可不同）
-  tagIds: string[]                // 所屬標籤 ID
+  subcategoryId?: string          // 所屬子分類 ID
 
   // 賓客填寫
   rsvpStatus: 'pending' | 'confirmed' | 'declined' | 'modified'
@@ -712,22 +712,14 @@ interface Edge {
 }
 ```
 
-### 4.6 標籤（Tag）
+### 4.6 子分類（Subcategory）
 
 ```typescript
-type AssignedBy = 'host' | 'guest'
-
-interface Tag {
+interface Subcategory {
   id: string
   eventId: string                 // 所屬活動
-  name: string                    // 標籤名稱
-  category?: string               // 綁定特定分類（如「男方大學」只出現在男方）
-}
-
-interface GuestTag {
-  guestId: string                 // 賓客 ID
-  tagId: string                   // 標籤 ID
-  assignedBy: AssignedBy          // 由新人或賓客指派
+  name: string                    // 子分類名稱（大學同學、公司同事等）
+  category: string                // 隸屬分類（男方/女方/共同）— 必填
 }
 ```
 
