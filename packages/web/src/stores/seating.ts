@@ -24,6 +24,7 @@ interface SeatingState {
   // Data
   eventId: string | null
   eventName: string
+  eventCategories: string[]
   guests: Guest[]
   tables: Table[]
   subcategories: Array<{ id: string; name: string; category: string }>
@@ -71,6 +72,8 @@ interface SeatingState {
   isResetting: boolean
   /** 正在飛行動畫中的賓客 ID（用於 undo 動畫隱藏個別賓客） */
   flyingGuestIds: Set<string>
+  /** 排位頁面：正在編輯的賓客 ID（開啟 GuestEditModal） */
+  editingGuestId: string | null
   /** 自動分配進度（null = 未執行） */
   autoAssignProgress: AutoAssignProgress | null
   /** 自動分配取消控制器 */
@@ -140,6 +143,7 @@ interface SeatingState {
   checkAvoidViolation: (guestId: string, tableId: string) => AvoidPair | null
   autoArrangeTables: (positions: Array<{ tableId: string; x: number; y: number }>) => Promise<void>
   autoAssignGuests: (mode?: AutoAssignMode) => Promise<void>
+  setEditingGuest: (guestId: string | null) => void
 
   // Guest CRUD (管理頁面用)
   updateGuest: (guestId: string, patch: Partial<Guest>) => Promise<boolean>
@@ -161,12 +165,14 @@ interface SeatingState {
 export const useSeatingStore = create<SeatingState>((set, get) => ({
   eventId: null,
   eventName: '',
+  eventCategories: ['男方', '女方', '共同'],
   guests: [],
   tables: [],
   subcategories: [],
   avoidPairs: [],
   snapshots: [],
   selectedTableId: null,
+  editingGuestId: null,
   hoveredGuestId: null,
   hoveredGuestScreenY: null,
   loading: false,
@@ -267,6 +273,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       set({
         eventId: data.id,
         eventName: data.name,
+        eventCategories: data.categories || ['男方', '女方', '共同'],
         guests,
         tables,
         subcategories,
@@ -284,6 +291,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   },
 
   setSelectedTable: (tableId) => set({ selectedTableId: tableId }),
+  setEditingGuest: (guestId) => set({ editingGuestId: guestId }),
   setHoveredGuest: (guestId, screenY) => set({ hoveredGuestId: guestId, hoveredGuestScreenY: screenY ?? null }),
   setActiveDragGuest: (guestId) => set({
     activeDragGuestId: guestId,
@@ -1275,6 +1283,23 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     if (idx < 0) return false
     const merged = { ...guests[idx], ...patch }
     if ('companionCount' in patch) merged.seatCount = (merged.companionCount ?? 0) + 1
+
+    // When declining, unassign from table
+    if (patch.rsvpStatus === 'declined' && merged.assignedTableId) {
+      const prevTableId = merged.assignedTableId
+      merged.assignedTableId = null
+      merged.seatIndex = null
+      // Also persist the table removal to backend
+      if (eventId) {
+        fetch(`/api/events/${eventId}/guests/${guestId}/table`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ tableId: null, seatIndex: null }),
+        }).catch(console.error)
+      }
+    }
+
     const updated = merged
     let nextGuests = [...guests]
     nextGuests[idx] = updated

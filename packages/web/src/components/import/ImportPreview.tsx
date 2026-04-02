@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { Info } from 'lucide-react'
 import type { ParseResult } from '@/lib/csv-parser'
 import {
   detectColumns,
@@ -9,14 +10,30 @@ import {
   type SystemField,
   type RawGuest,
 } from '@/lib/column-detector'
+import { diffGuests } from '@/lib/guest-diff'
+
+/** 每個欄位的用途說明（tooltip 用） */
+const FIELD_TOOLTIPS: Record<SystemField, string> = {
+  rsvpStatus: '賓客是否確認出席（是/否）',
+  name: '賓客的正式姓名',
+  aliases: '暱稱或外號，用於「想同桌」配對',
+  category: '男方、女方或共同賓客',
+  subcategory: '更細的分組，如大學同學、公司同事',
+  companionCount: '攜帶的額外人數，含大人和小孩（0-4）',
+  dietaryNote: '素食、過敏或忌口需求',
+  specialNote: '嬰兒椅、輪椅等特殊需求',
+  seatPreferences: '希望同桌的人（最多 3 位）',
+  avoidGuests: '不希望同桌的人',
+}
 
 interface Props {
   data: ParseResult
   onConfirm: (guests: RawGuest[]) => void
   onBack: () => void
+  existingGuests?: Array<{ name: string; aliases: string[] }>
 }
 
-export function ImportPreview({ data, onConfirm, onBack }: Props) {
+export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props) {
   const detection = useMemo(() => detectColumns(data.headers), [data.headers])
 
   // 可編輯的欄位對應
@@ -34,6 +51,18 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
       .filter((g): g is RawGuest => g !== null)
   }, [data.rows, mapping, multiMapping])
 
+  // diff 計算（重新匯入時）
+  const diff = useMemo(() => {
+    if (!existingGuests || existingGuests.length === 0) return null
+    return diffGuests(allGuests, existingGuests)
+  }, [allGuests, existingGuests])
+
+  const isReimport = !!diff
+  const newGuestNames = useMemo(() => {
+    if (!diff) return new Set<string>()
+    return new Set(diff.newGuests.map((g) => g.name.trim().toLowerCase()))
+  }, [diff])
+
   const confirmedCount = allGuests.filter((g) => g.rsvpStatus === 'confirmed').length
   const declinedCount = allGuests.filter((g) => g.rsvpStatus === 'declined').length
   const totalSeats = allGuests
@@ -45,31 +74,50 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
     .filter((f) => f.required && !mapping[f.field])
     .map((f) => f.label)
 
-  const canConfirm = missingRequired.length === 0 && allGuests.length > 0
+  const importCount = diff ? diff.newGuests.length : allGuests.length
+  const canConfirm = missingRequired.length === 0 && importCount > 0
 
   return (
     <div className="space-y-6">
       {/* 統計摘要 */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <div className="px-3 py-1.5 text-sm font-medium" style={{ background: '#F0FDF4', color: 'var(--success)', borderRadius: 'var(--radius-sm)' }}>
           偵測到 <span className="font-data">{allGuests.length}</span> 位賓客
         </div>
-        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          確認 <span className="font-data">{confirmedCount}</span> 人 / 婉拒 <span className="font-data">{declinedCount}</span> 人 / 共 <span className="font-data">{totalSeats}</span> 席
-        </span>
+        {isReimport && (
+          <div className="px-3 py-1.5 text-sm font-medium" style={{ background: 'var(--accent-light)', color: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}>
+            新增 <span className="font-data">{diff.newGuests.length}</span> 人 / 已存在 <span className="font-data">{diff.skippedGuests.length}</span> 人（跳過）
+          </div>
+        )}
+        {!isReimport && (
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            確認 <span className="font-data">{confirmedCount}</span> 人 / 婉拒 <span className="font-data">{declinedCount}</span> 人 / 共 <span className="font-data">{totalSeats}</span> 席
+          </span>
+        )}
       </div>
 
       {/* 欄位對應 */}
       <div>
         <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>欄位對應</h3>
         <div className="grid grid-cols-2 gap-3">
-          {SYSTEM_FIELDS.map((sf) => (
+          {SYSTEM_FIELDS.map((sf) => {
+            const isMapped = !!mapping[sf.field] && mapping[sf.field] !== '__multi__'
+            const isMulti = mapping[sf.field] === '__multi__'
+            const isMissing = !mapping[sf.field]
+            return (
             <div key={sf.field} className="flex items-center gap-2">
-              <label className="text-sm w-32 flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+              <label className="text-sm w-32 flex-shrink-0 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
                 {sf.label}
-                {sf.required && <span className="ml-0.5" style={{ color: 'var(--error)' }}>*</span>}
+                {sf.required && <span style={{ color: 'var(--error)' }}>*</span>}
+                <span className="relative group">
+                  <Info size={12} style={{ color: 'var(--text-muted)', cursor: 'help' }} />
+                  <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover:block px-2 py-1 text-xs whitespace-nowrap"
+                    style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', boxShadow: 'var(--shadow-sm)' }}>
+                    {FIELD_TOOLTIPS[sf.field]}
+                  </span>
+                </span>
               </label>
-              {mapping[sf.field] === '__multi__' ? (
+              {isMulti ? (
                 <span className="text-sm" style={{ color: 'var(--accent)' }}>
                   多欄位模式（{multiMapping[sf.field].join(', ')}）
                 </span>
@@ -78,17 +126,21 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
                   className="flex-1 text-sm px-2 py-1"
                   style={{
                     borderRadius: 'var(--radius-sm)',
-                    border: sf.required && !mapping[sf.field]
+                    border: sf.required && isMissing
                       ? '1px solid #DC2626'
+                      : !sf.required && isMissing
+                      ? '1px solid #F59E0B'
                       : '1px solid var(--border)',
-                    background: sf.required && !mapping[sf.field]
+                    background: sf.required && isMissing
                       ? '#FEF2F2'
+                      : !sf.required && isMissing
+                      ? '#FFFBEB'
                       : undefined,
                   }}
                   value={mapping[sf.field] || ''}
                   onChange={(e) => updateMapping(sf.field, e.target.value || null)}
                 >
-                  <option value="">（未對應）</option>
+                  <option value="">{sf.required ? '⚠ 請選擇對應欄位' : '（選填）'}</option>
                   {data.headers.map((h) => (
                     <option key={h} value={h}>
                       {h}
@@ -97,7 +149,8 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
                 </select>
               )}
             </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -121,10 +174,25 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
               </tr>
             </thead>
             <tbody>
-              {allGuests.map((g, i) => (
-                <tr key={i} className={g.rsvpStatus === 'declined' ? 'opacity-50' : ''} style={{ borderTop: '1px solid var(--border)' }}>
+              {allGuests.map((g, i) => {
+                const isNew = !isReimport || newGuestNames.has(g.name.trim().toLowerCase())
+                const isSkipped = isReimport && !isNew
+                return (
+                <tr key={i} style={{ borderTop: '1px solid var(--border)', opacity: isSkipped ? 0.4 : g.rsvpStatus === 'declined' ? 0.5 : 1 }}>
                   <td className="px-3 py-2 text-xs font-data" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
-                  <td className="px-3 py-2 font-medium" style={{ color: 'var(--text-primary)' }}>{g.name}</td>
+                  <td className="px-3 py-2 font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {g.name}
+                    {isReimport && (
+                      <span className="ml-2 text-2xs px-1.5 py-0.5" style={{
+                        borderRadius: 'var(--radius-sm)',
+                        background: isNew ? '#F0FDF4' : 'var(--bg-primary)',
+                        color: isNew ? 'var(--success)' : 'var(--text-muted)',
+                        fontSize: '11px',
+                      }}>
+                        {isNew ? '新' : '已存在'}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{g.aliases.join(', ') || '—'}</td>
                   <td className="px-3 py-2" style={{ color: 'var(--text-primary)' }}>{g.category || '—'}</td>
                   <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{g.rawSubcategory || '—'}</td>
@@ -138,7 +206,8 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
                   <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{g.rawPreferences.join(', ') || '—'}</td>
                   <td className="px-3 py-2" style={{ color: g.rawAvoids.length > 0 ? 'var(--error)' : 'var(--text-secondary)' }}>{g.rawAvoids.join(', ') || '—'}</td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -166,7 +235,7 @@ export function ImportPreview({ data, onConfirm, onBack }: Props) {
           className="px-6 py-2 text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
           style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
         >
-          確認匯入 {allGuests.length} 位賓客
+          {isReimport ? `匯入 ${importCount} 位新賓客` : `確認匯入 ${allGuests.length} 位賓客`}
         </button>
       </div>
     </div>

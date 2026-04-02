@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useCallback, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import type { ParseResult } from '@/lib/csv-parser'
 import type { RawGuest } from '@/lib/column-detector'
 import type { PreferenceMatch as PrefMatch } from '@/lib/preference-matcher'
 import { matchAllPreferences } from '@/lib/preference-matcher'
+import { diffGuests, type DiffResult } from '@/lib/guest-diff'
 import { CsvUpload } from '@/components/import/CsvUpload'
 import { PasteArea } from '@/components/import/PasteArea'
 import { ImportPreview } from '@/components/import/ImportPreview'
@@ -11,8 +12,16 @@ import { PreferenceMatch } from '@/components/import/PreferenceMatch'
 
 type Step = 'input' | 'preview' | 'preferences'
 
+interface ExistingGuest {
+  id: string
+  name: string
+  aliases: string[]
+}
+
 export default function ImportPage() {
   const navigate = useNavigate()
+  const { eventId } = useParams<{ eventId: string }>()
+
   const [step, setStep] = useState<Step>('input')
   const [parseResult, setParseResult] = useState<ParseResult | null>(null)
   const [guests, setGuests] = useState<RawGuest[]>([])
@@ -20,26 +29,62 @@ export default function ImportPage() {
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // 重新匯入：載入現有賓客名單
+  const [existingGuests, setExistingGuests] = useState<ExistingGuest[]>([])
+  const [existingLoading, setExistingLoading] = useState(false)
+  const [diff, setDiff] = useState<DiffResult | null>(null)
+
+  useEffect(() => {
+    if (!eventId) return
+    setExistingLoading(true)
+    fetch(`/api/events/${eventId}`, { credentials: 'include' })
+      .then((res) => {
+        if (!res.ok) throw new Error('載入活動失敗')
+        return res.json()
+      })
+      .then((data) => {
+        setExistingGuests(
+          data.guests.map((g: any) => ({ id: g.id, name: g.name, aliases: g.aliases || [] }))
+        )
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setExistingLoading(false))
+  }, [eventId])
+
   const handleParsed = useCallback((result: ParseResult) => {
     setParseResult(result)
     setStep('preview')
     setError(null)
+    setDiff(null) // reset diff when new data is parsed
   }, [])
 
   const handlePreviewConfirm = useCallback((confirmedGuests: RawGuest[]) => {
-    setGuests(confirmedGuests)
+    const hasExisting = existingGuests.length > 0
+    let guestsToImport = confirmedGuests
 
-    // 檢查是否有偏好需要配對
-    const hasPreferences = confirmedGuests.some((g) => g.rawPreferences.length > 0)
+    if (hasExisting) {
+      const result = diffGuests(confirmedGuests, existingGuests)
+      setDiff(result)
+      guestsToImport = result.newGuests
+    }
+
+    if (guestsToImport.length === 0) {
+      setError('沒有新賓客需要匯入')
+      return
+    }
+
+    setGuests(guestsToImport)
+
+    // 有已存在賓客時，用全部賓客作為搜尋範圍，讓新賓客能配對到已存在的人
+    const hasPreferences = guestsToImport.some((g) => g.rawPreferences.length > 0)
     if (hasPreferences) {
-      const prefMatches = matchAllPreferences(confirmedGuests)
+      const prefMatches = matchAllPreferences(guestsToImport, hasExisting ? confirmedGuests : undefined)
       setMatches(prefMatches)
       setStep('preferences')
     } else {
-      // 沒有偏好，直接匯入
-      doImport(confirmedGuests, [])
+      doImport(guestsToImport, [])
     }
-  }, [])
+  }, [existingGuests])
 
   const handlePreferencesConfirm = useCallback((resolved: PrefMatch[]) => {
     doImport(guests, resolved)
@@ -54,18 +99,10 @@ export default function ImportPage() {
     setError(null)
 
     try {
-      // 1. 建立活動
-      const eventRes = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name: '我的婚禮', type: 'wedding' }),
-      })
-      if (!eventRes.ok) throw new Error('建立活動失敗')
-      const event = await eventRes.json()
+      if (!eventId) throw new Error('缺少活動 ID')
 
-      // 2. 批次匯入賓客
-      const guestRes = await fetch(`/api/events/${event.id}/guests/batch`, {
+      // 批次匯入賓客
+      const guestRes = await fetch(`/api/events/${eventId}/guests/batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -84,27 +121,40 @@ export default function ImportPage() {
       if (!guestRes.ok) throw new Error('匯入賓客失敗')
       const { guests: createdGuests } = await guestRes.json()
 
-      // 3. 建立座位偏好（如果有配對結果）
+      // 建立座位偏好（如果有配對結果）
+      // fromIndex 永遠指向 guestList（新賓客），selectedIndex 可能指向 searchPool（全部賓客）
       const validPrefs = prefMatches.filter(
         (m) => m.selectedIndex !== null && m.selectedIndex >= 0,
       )
       if (validPrefs.length > 0) {
-        const prefRes = await fetch(`/api/events/${event.id}/preferences/batch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            preferences: validPrefs.map((m) => ({
-              guestId: createdGuests[m.fromIndex].id,
-              preferredGuestId: createdGuests[m.selectedIndex!].id,
-              rank: m.rank,
-            })),
-          }),
-        })
-        if (!prefRes.ok) throw new Error('建立座位偏好失敗')
+        // 建立名字 → DB ID 的 lookup（新建的 + 已存在的）
+        const nameToId = new Map<string, string>()
+        createdGuests.forEach((g: any) => nameToId.set(g.name.trim().toLowerCase(), g.id))
+        existingGuests.forEach((g) => nameToId.set(g.name.trim().toLowerCase(), g.id))
+
+        const preferences = validPrefs
+          .map((m) => {
+            const fromId = createdGuests[m.fromIndex]?.id
+            // selectedIndex 指向 searchPool，用候選人的 name 查找 DB ID
+            const preferredName = m.candidates.find((c) => c.guestIndex === m.selectedIndex)?.name
+            const preferredId = preferredName ? nameToId.get(preferredName.trim().toLowerCase()) : undefined
+            if (!fromId || !preferredId) return null
+            return { guestId: fromId, preferredGuestId: preferredId, rank: m.rank }
+          })
+          .filter((p): p is NonNullable<typeof p> => p !== null)
+
+        if (preferences.length > 0) {
+          const prefRes = await fetch(`/api/events/${eventId}/preferences/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ preferences }),
+          })
+          if (!prefRes.ok) throw new Error('建立座位偏好失敗')
+        }
       }
 
-      // 4. 建立子分類（如果有）
+      // 建立子分類（如果有）
       const subcatAssignments: Array<{ guestId: string; subcategoryName: string; category: string }> = []
       guestList.forEach((g, i) => {
         if (!g.rawSubcategory || !g.category) return
@@ -117,7 +167,7 @@ export default function ImportPage() {
         })
       })
       if (subcatAssignments.length > 0) {
-        await fetch(`/api/events/${event.id}/subcategories/batch`, {
+        await fetch(`/api/events/${eventId}/subcategories/batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -125,7 +175,7 @@ export default function ImportPage() {
         })
       }
 
-      // 5. 建立避免同桌（如果有）
+      // 建立避免同桌（如果有）
       const avoidPairs: Array<{ guestAId: string; guestBId: string }> = []
       const seenAvoidPairs = new Set<string>()
       guestList.forEach((g, i) => {
@@ -133,12 +183,10 @@ export default function ImportPage() {
         const guestAId = createdGuests[i]?.id
         if (!guestAId) return
         for (const avoidName of g.rawAvoids) {
-          // 用姓名配對
           const targetIdx = guestList.findIndex((t) => t.name === avoidName)
           if (targetIdx < 0) continue
           const guestBId = createdGuests[targetIdx]?.id
           if (!guestBId) continue
-          // 去重（A-B 和 B-A 只加一次）
           const key = [guestAId, guestBId].sort().join('-')
           if (seenAvoidPairs.has(key)) continue
           seenAvoidPairs.add(key)
@@ -146,7 +194,7 @@ export default function ImportPage() {
         }
       })
       if (avoidPairs.length > 0) {
-        await fetch(`/api/events/${event.id}/avoid-pairs/batch`, {
+        await fetch(`/api/events/${eventId}/avoid-pairs/batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -154,37 +202,39 @@ export default function ImportPage() {
         })
       }
 
-      // 6. 自動產生桌次（根據確認出席的席位數）
-      const confirmedSeats = guestList
+      // 自動補桌次（根據新增的確認出席席位數）
+      const newConfirmedSeats = guestList
         .filter((g) => g.rsvpStatus === 'confirmed')
         .reduce((sum, g) => sum + g.companionCount + 1, 0)
-      const tableCount = Math.max(1, Math.ceil(confirmedSeats / 10))
 
-      for (let i = 0; i < tableCount; i++) {
-        // 排成網格佈局
-        const cols = Math.ceil(Math.sqrt(tableCount))
-        const row = Math.floor(i / cols)
-        const col = i % cols
-        const spacingX = 350
-        const spacingY = 350
-        const startX = 200
-        const startY = 200
-
-        await fetch(`/api/events/${event.id}/tables`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            name: `第${i + 1}桌`,
-            capacity: 10,
-            positionX: startX + col * spacingX,
-            positionY: startY + row * spacingY,
-          }),
-        })
+      if (newConfirmedSeats > 0) {
+        const newTableCount = Math.ceil(newConfirmedSeats / 10)
+        // 取得現有桌次數量來決定新桌的名稱和位置
+        const eventRes = await fetch(`/api/events/${eventId}`, { credentials: 'include' })
+        const eventData = await eventRes.json()
+        const existingTableCount = eventData.tables?.length || 0
+        for (let i = 0; i < newTableCount; i++) {
+          const tableNum = existingTableCount + i + 1
+          const totalTables = existingTableCount + newTableCount
+          const cols = Math.ceil(Math.sqrt(totalTables))
+          const idx = existingTableCount + i
+          const row = Math.floor(idx / cols)
+          const col = idx % cols
+          await fetch(`/api/events/${eventId}/tables`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              name: `第${tableNum}桌`,
+              capacity: 10,
+              positionX: 200 + col * 350,
+              positionY: 200 + row * 350,
+            }),
+          })
+        }
       }
 
-      // 5. 導向工作區
-      navigate(`/workspace/${event.id}`)
+      navigate(`/workspace/${eventId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : '匯入失敗')
     } finally {
@@ -198,35 +248,66 @@ export default function ImportPage() {
         {step === 'input' && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>開始安排座位</h1>
-              <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>匯入你的賓客名單</p>
+              <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+                {existingGuests.length > 0 ? '追加賓客' : '匯入賓客名單'}
+              </h1>
+              <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>
+                {existingGuests.length > 0
+                  ? `已有 ${existingGuests.length} 位賓客，系統會自動跳過已存在的人`
+                  : '上傳 CSV、Excel 或直接貼上表格資料'
+                }
+              </p>
             </div>
 
-            <CsvUpload onParsed={handleParsed} />
+            {existingLoading ? (
+              <div className="text-center py-8" style={{ color: 'var(--text-muted)' }}>載入中...</div>
+            ) : (
+              <>
+                <CsvUpload onParsed={handleParsed} />
 
-            <div className="flex items-center gap-3">
-              <div className="flex-1" style={{ borderTop: '1px solid var(--border)' }} />
-              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>或者直接貼上表格資料</span>
-              <div className="flex-1" style={{ borderTop: '1px solid var(--border)' }} />
-            </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1" style={{ borderTop: '1px solid var(--border)' }} />
+                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>或者直接貼上表格資料</span>
+                  <div className="flex-1" style={{ borderTop: '1px solid var(--border)' }} />
+                </div>
 
-            <PasteArea onParsed={handleParsed} />
+                <PasteArea onParsed={handleParsed} />
 
-            <details className="text-sm">
-              <summary className="cursor-pointer hover:opacity-80" style={{ color: 'var(--text-secondary)' }}>
-                進階：貼上 Google Sheet 網址
-              </summary>
-              <div className="mt-3 p-3 text-xs" style={{ background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)' }}>
-                此功能在 Phase 2 加入。目前請使用 CSV 上傳或複製貼上。
-              </div>
-            </details>
+                <div className="p-4 text-sm" style={{ background: 'var(--accent-light)', borderRadius: 'var(--radius-md)' }}>
+                  <p className="font-medium mb-2" style={{ color: 'var(--text-primary)' }}>還沒有賓客名單？</p>
+                  <p className="mb-3" style={{ color: 'var(--text-secondary)' }}>
+                    下載我們的範本，填入你的賓客資料後再匯入。欄位已預先設定好，系統會自動對應。
+                  </p>
+                  <div className="flex gap-3">
+                    <a
+                      href="/seatern-template.csv"
+                      download="seatern-template.csv"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium hover:opacity-80"
+                      style={{ background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-sm)' }}
+                    >
+                      下載 CSV 範本
+                    </a>
+                    <a
+                      href="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/copy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium hover:opacity-80"
+                      style={{ border: '1px solid var(--accent)', color: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
+                    >
+                      複製 Google Sheet 範本
+                    </a>
+                  </div>
+                </div>
 
-            <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              沒有 Google Sheet？{' '}
-              <span className="cursor-pointer hover:underline" style={{ color: 'var(--accent)' }}>
-                使用我們的範本 →
-              </span>
-            </div>
+                <button
+                  onClick={() => navigate(`/workspace/${eventId}/guests`)}
+                  className="text-sm hover:underline"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  ← 返回賓客名單
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -237,6 +318,7 @@ export default function ImportPage() {
               data={parseResult}
               onConfirm={handlePreviewConfirm}
               onBack={() => setStep('input')}
+              existingGuests={existingGuests.length > 0 ? existingGuests : undefined}
             />
           </div>
         )}

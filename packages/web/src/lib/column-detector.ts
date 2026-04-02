@@ -39,16 +39,16 @@ export const SYSTEM_FIELDS: FieldMapping[] = [
 
 /** 每個系統欄位的關鍵字（用於子字串比對） */
 const FIELD_KEYWORDS: Record<SystemField, string[]> = {
-  rsvpStatus: ['參加', '出席', '是否參加', 'rsvp', 'attend'],
-  name: ['姓名', '名字', 'name', '全名'],
-  aliases: ['外號', '暱稱', '別名', 'alias', 'nickname'],
-  category: ['分類', '男方女方', '類別', 'category', '來賓分類'],
-  subcategory: ['子分類', '群組', '標籤', '分組', 'group', 'tag', '圈子', 'subcategory'],
-  companionCount: ['眷屬', '+1', '攜伴', '帶人', 'plus one', 'guest count', '攜眷'],
-  dietaryNote: ['葷素', '飲食', 'dietary', '素食', '忌口'],
-  specialNote: ['備註', '需求', '特殊', 'note', '其他'],
-  seatPreferences: ['同桌', '想跟誰坐', 'preference', '想坐', '同桌人選'],
-  avoidGuests: ['避免', '避桌', '不同桌', 'avoid', '迴避'],
+  rsvpStatus: ['參加', '出席', '是否參加', 'rsvp', 'attend', '你要參加嗎', '是否出席', '要來嗎', '會來嗎', '能來嗎', '出不出席'],
+  name: ['姓名', '名字', 'name', '全名', '大名', '稱呼'],
+  aliases: ['外號', '暱稱', '別名', 'alias', 'nickname', '綽號', '小名'],
+  category: ['分類', '男方女方', '類別', 'category', '來賓分類', '哪一方'],
+  subcategory: ['子分類', '群組', '標籤', '分組', 'group', 'tag', '圈子', 'subcategory', '關係'],
+  companionCount: ['眷屬', '+1', '攜伴', '帶人', 'plus one', 'guest count', '攜眷', '帶幾位', '帶人嗎', '幾位大人', '大人人數', '加一', '攜帶'],
+  dietaryNote: ['葷素', '飲食', 'dietary', '素食', '忌口', '吃素', '有沒有忌口', '餐食', '葷或素', '飲食需求'],
+  specialNote: ['備註', '需求', '特殊', 'note', '其他', '補充', '特殊需求', '嬰兒椅', '輪椅'],
+  seatPreferences: ['同桌', '想跟誰坐', 'preference', '想坐', '同桌人選', '希望同桌', '想坐旁邊', '想跟誰'],
+  avoidGuests: ['避免', '避桌', '不同桌', 'avoid', '迴避', '不想同桌'],
 }
 
 /** 想同桌的多欄位模式（「想同桌 1」「想同桌 2」「想同桌 3」） */
@@ -188,7 +188,7 @@ export function normalizeGuest(
   // 解析子分類
   const rawSubcategory = (get('subcategory') || '').trim()
 
-  // 解析攜眷：0 表示沒帶人，1 表示帶一位
+  // 解析攜眷：0-4，代表額外攜帶的人數（含大人和小孩）
   // 支援多種填法：數字（0, 1, 2）、文字（有、是、帶老婆）、混合（1位、帶1人）
   const extraRaw = get('companionCount').toLowerCase()
   let extra: number
@@ -202,7 +202,7 @@ export function normalizeGuest(
   } else {
     extra = 0
   }
-  const companionCount = Math.max(0, extra)
+  const companionCount = Math.min(4, Math.max(0, extra))
 
   // 解析想同桌人選
   let rawPreferences: string[] = []

@@ -25,11 +25,11 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 
-            {/* Import + Workspace（Phase 1 不需要登入） */}
-            <Route path="/import" element={<ImportPage />} />
+            {/* Workspace（Phase 1 不需要登入） */}
             <Route path="/workspace/:eventId" element={<WorkspaceLayout />}>
               <Route index element={<WorkspacePage />} />
               <Route path="guests" element={<GuestManagementPage />} />
+              <Route path="import" element={<ImportPage />} />
             </Route>
 
             {/* Protected routes */}

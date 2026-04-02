@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronRight } from 'lucide-react'
 import {
@@ -16,6 +16,8 @@ import { FloorPlan, type FloorPlanHandle } from '@/components/workspace/FloorPla
 import { SidePanel } from '@/components/workspace/SidePanel'
 import { DragOverlayContent } from '@/components/workspace/DragOverlayContent'
 import { ViolationModal } from '@/components/workspace/ViolationModal'
+import GuestFormModal from '@/components/GuestFormModal'
+import { loadCategoryColors, getCategoryColor, type CategoryColor } from '@/lib/category-colors'
 
 function ExpandButton({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
   const [show, setShow] = useState(false)
@@ -65,16 +67,34 @@ function ExpandButton({ collapsed, onClick }: { collapsed: boolean; onClick: () 
 
 export default function WorkspacePage() {
   const guests = useSeatingStore((s) => s.guests)
+  const tables = useSeatingStore((s) => s.tables)
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs)
+  const subcategories = useSeatingStore((s) => s.subcategories)
+  const eventId = useSeatingStore((s) => s.eventId)
   const moveGuest = useSeatingStore((s) => s.moveGuest)
   const moveGuestToSeat = useSeatingStore((s) => s.moveGuestToSeat)
   const setActiveDragGuest = useSeatingStore((s) => s.setActiveDragGuest)
   const setDragPreview = useSeatingStore((s) => s.setDragPreview)
   const checkAvoidViolation = useSeatingStore((s) => s.checkAvoidViolation)
   const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress)
+  const editingGuestId = useSeatingStore((s) => s.editingGuestId)
+  const setEditingGuest = useSeatingStore((s) => s.setEditingGuest)
+  const updateGuest = useSeatingStore((s) => s.updateGuest)
+  const deleteGuest = useSeatingStore((s) => s.deleteGuest)
+  const updateGuestPreferences = useSeatingStore((s) => s.updateGuestPreferences)
+  const setGuestSubcategory = useSeatingStore((s) => s.setGuestSubcategory)
+  const addAvoidPair = useSeatingStore((s) => s.addAvoidPair)
+  const removeAvoidPair = useSeatingStore((s) => s.removeAvoidPair)
 
   const [activeGuest, setActiveGuest] = useState<Guest | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const floorPlanRef = useRef<FloorPlanHandle>(null)
+
+  // GuestFormModal 需要的衍生資料
+  const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId])
+  const eventCategories = useSeatingStore((s) => s.eventCategories)
+  const categories = eventCategories.length > 0 ? eventCategories : ['男方', '女方', '共同']
+  const editGuest = editingGuestId ? guests.find((g) => g.id === editingGuestId) : null
 
   // 快捷鍵 [ 或 ] toggle 待排區
   useEffect(() => {
@@ -286,6 +306,62 @@ export default function WorkspacePage() {
           reason={pendingMove.violation.reason}
           onConfirm={handleViolationConfirm}
           onCancel={() => setPendingMove(null)}
+        />
+      )}
+
+      {/* 賓客編輯 modal（點擊桌上賓客或待排區賓客觸發） */}
+      {editGuest && (
+        <GuestFormModal
+          mode="edit"
+          guest={editGuest}
+          tables={tables}
+          guests={guests}
+          avoidPairs={avoidPairs}
+          categories={categories}
+          subcategories={subcategories}
+          categoryColors={categoryColors}
+          onSubmit={async (data) => {
+            await updateGuest(editGuest.id, {
+              name: data.name,
+              aliases: data.aliases,
+              category: data.category,
+              rsvpStatus: data.rsvpStatus,
+              companionCount: data.companionCount,
+              dietaryNote: data.dietaryNote,
+              specialNote: data.specialNote,
+            })
+            if (data.assignedTableId !== (editGuest.assignedTableId || null)) {
+              moveGuest(editGuest.id, data.assignedTableId)
+            }
+            const prefs = data.preferredGuestIds.map((gid, i) => ({ preferredGuestId: gid, rank: i + 1 }))
+            await updateGuestPreferences(editGuest.id, prefs)
+            const oldAvoidIds = avoidPairs
+              .filter((ap) => ap.guestAId === editGuest.id || ap.guestBId === editGuest.id)
+              .map((ap) => ({ pairId: ap.id, otherId: ap.guestAId === editGuest.id ? ap.guestBId : ap.guestAId }))
+            for (const old of oldAvoidIds) {
+              if (!data.avoidGuestIds.includes(old.otherId)) await removeAvoidPair(old.pairId)
+            }
+            for (const gid of data.avoidGuestIds) {
+              if (!oldAvoidIds.some((o) => o.otherId === gid)) await addAvoidPair(editGuest.id, gid)
+            }
+            if (data.subcategoryName) {
+              try {
+                await fetch(`/api/events/${eventId}/subcategories/batch`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ assignments: [{ guestId: editGuest.id, subcategoryName: data.subcategoryName, category: data.category }] }),
+                })
+              } catch {}
+            } else if (editGuest.subcategory) {
+              await setGuestSubcategory(editGuest.id, null)
+            }
+            const { loadEvent } = useSeatingStore.getState()
+            if (eventId) await loadEvent(eventId)
+            setEditingGuest(null)
+          }}
+          onDelete={(gid) => { setEditingGuest(null); deleteGuest(gid) }}
+          onClose={() => setEditingGuest(null)}
         />
       )}
     </DndContext>

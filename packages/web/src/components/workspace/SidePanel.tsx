@@ -515,7 +515,18 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
 
         {/* 賓客列表 */}
         <div className="flex-1 overflow-y-auto px-4 pb-4">
-          {unassignedGuests.length === 0 ? (
+          {guests.length === 0 ? (
+            <div className="text-center py-8 space-y-3">
+              <p className="text-base" style={{ color: 'var(--text-muted)' }}>尚無賓客資料</p>
+              <button
+                onClick={() => navigate(`/workspace/${eventId}/import`)}
+                className="px-4 py-2 text-sm font-medium hover:opacity-80"
+                style={{ background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-sm)' }}
+              >
+                匯入賓客名單
+              </button>
+            </div>
+          ) : unassignedGuests.length === 0 ? (
             <p className="text-base py-1" style={{ color: '#16A34A' }}>所有賓客都已安排完畢</p>
           ) : grouped.length === 0 ? (
             <p className="text-base py-1" style={{ color: 'var(--text-muted)' }}>找不到「{search}」</p>

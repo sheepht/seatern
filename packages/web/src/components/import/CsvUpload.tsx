@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import type { ParseResult } from '@/lib/csv-parser'
-import { parseCSV, readFileAsText } from '@/lib/csv-parser'
+import { parseCSV, parseXLSX, readFileAsText } from '@/lib/csv-parser'
 
 interface Props {
   onParsed: (result: ParseResult) => void
@@ -16,15 +16,22 @@ export function CsvUpload({ onParsed }: Props) {
     setError(null)
     setLoading(true)
 
-    if (!file.name.endsWith('.csv') && !file.name.endsWith('.tsv') && !file.name.endsWith('.txt')) {
-      setError('檔案格式不支援，請使用 CSV 檔案')
+    const isXlsx = file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
+    const isCsv = file.name.endsWith('.csv') || file.name.endsWith('.tsv') || file.name.endsWith('.txt')
+    if (!isXlsx && !isCsv) {
+      setError('檔案格式不支援，請使用 CSV 或 Excel (.xlsx) 檔案')
       setLoading(false)
       return
     }
 
     try {
-      const text = await readFileAsText(file)
-      const result = parseCSV(text)
+      let result
+      if (isXlsx) {
+        result = await parseXLSX(file)
+      } else {
+        const text = await readFileAsText(file)
+        result = parseCSV(text)
+      }
       if (result.rows.length === 0) {
         setError('檔案內容為空')
         setLoading(false)
@@ -62,7 +69,7 @@ export function CsvUpload({ onParsed }: Props) {
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,.tsv,.txt"
+          accept=".csv,.tsv,.txt,.xlsx,.xls"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
@@ -73,8 +80,8 @@ export function CsvUpload({ onParsed }: Props) {
           <p style={{ color: 'var(--text-secondary)' }}>解析中...</p>
         ) : (
           <>
-            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>上傳 CSV 檔案</p>
-            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>拖曳檔案到此處或點擊選擇</p>
+            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>上傳 CSV 或 Excel 檔案</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>支援 .csv、.xlsx — 拖曳或點擊選擇</p>
           </>
         )}
       </div>

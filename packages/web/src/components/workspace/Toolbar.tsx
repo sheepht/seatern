@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid, Trash2, Dices, Users } from 'lucide-react'
+import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid, Trash2, Dices, Users, FileDown } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction'
 import { calculateGridLayout, findFreePosition } from '@/lib/viewport'
@@ -48,6 +48,8 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
   const [renameEventValue, setRenameEventValue] = useState('')
   const [showMenu, setShowMenu] = useState(false)
   const [showArrangeConfirm, setShowArrangeConfirm] = useState(false)
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false)
+  const [clearingAll, setClearingAll] = useState(false)
   const [arranging, setArranging] = useState(false)
   const autoArrangeTables = useSeatingStore((s) => s.autoArrangeTables)
   const removeTable = useSeatingStore((s) => s.removeTable)
@@ -578,6 +580,29 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                     boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
                   }}
                 >
+                  {/* 匯入名單 */}
+                  <button
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
+                    style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
+                    onClick={() => { setShowMenu(false); navigate(`/workspace/${eid}/import`) }}
+                  >
+                    <FileDown size={16} className="shrink-0" />
+                    <span>匯入名單</span>
+                  </button>
+                  {/* 清除所有資料 */}
+                  <button
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-[#FEF2F2] disabled:hover:bg-transparent disabled:opacity-40 disabled:cursor-default"
+                    style={{ color: '#DC2626', fontFamily: 'var(--font-body)', cursor: guests.length === 0 && tables.length === 0 ? 'default' : 'pointer' }}
+                    disabled={guests.length === 0 && tables.length === 0}
+                    onClick={() => { setShowMenu(false); setShowClearAllConfirm(true) }}
+                  >
+                    <Trash2 size={16} className="shrink-0" />
+                    <span>清除所有資料</span>
+                  </button>
+
+                  {/* 分隔線 */}
+                  <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+
                   {/* 登入（未來擴充） */}
                   <button
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
@@ -753,6 +778,54 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
           </div>
         )
       })()}
+      {showClearAllConfirm && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowClearAllConfirm(false)} />
+          <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '24px', width: '360px', border: '1px solid var(--border)' }}>
+            <p style={{ fontSize: '16px', fontWeight: 600, color: '#DC2626', marginBottom: '8px' }}>清除所有資料</p>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+              將刪除此活動的所有賓客（{guests.length} 位）和所有桌次（{tables.length} 桌）。
+            </p>
+            <p style={{ fontSize: '13px', color: '#DC2626', marginBottom: '16px', fontWeight: 500 }}>
+              此操作無法復原。
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                onClick={() => setShowClearAllConfirm(false)}
+                style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-surface)', cursor: 'pointer', fontSize: '14px', color: 'var(--text-secondary)' }}
+              >
+                取消
+              </button>
+              <button
+                disabled={clearingAll}
+                onClick={async () => {
+                  setClearingAll(true)
+                  try {
+                    // 刪除所有賓客
+                    for (const g of guests) {
+                      await fetch(`/api/events/${eid}/guests/${g.id}`, { method: 'DELETE', credentials: 'include' })
+                    }
+                    // 刪除所有桌次
+                    for (const t of tables) {
+                      await fetch(`/api/events/${eid}/tables/${t.id}`, { method: 'DELETE', credentials: 'include' })
+                    }
+                    // 重新載入空活動
+                    const { loadEvent } = useSeatingStore.getState()
+                    if (eid) await loadEvent(eid)
+                  } finally {
+                    setClearingAll(false)
+                    setShowClearAllConfirm(false)
+                  }
+                }}
+                style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#DC2626', color: '#fff', cursor: clearingAll ? 'wait' : 'pointer', fontSize: '14px', fontWeight: 500, opacity: clearingAll ? 0.6 : 1 }}
+              >
+                {clearingAll ? '清除中...' : '確定清除'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </>
   )
 }

@@ -43,6 +43,32 @@ export function parsePaste(text: string): ParseResult {
 }
 
 /**
+ * 解析 XLSX 檔案（使用 SheetJS）
+ */
+export async function parseXLSX(file: File): Promise<ParseResult> {
+  const { read, utils } = await import('xlsx')
+  const buffer = await file.arrayBuffer()
+  const workbook = read(buffer, { type: 'array' })
+  const sheetName = workbook.SheetNames[0]
+  if (!sheetName) return { headers: [], rows: [] }
+
+  const sheet = workbook.Sheets[sheetName]
+  const jsonRows = utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
+  if (jsonRows.length === 0) return { headers: [], rows: [] }
+
+  const headers = Object.keys(jsonRows[0])
+  const rows = jsonRows.map((row) => {
+    const record: Record<string, string> = {}
+    for (const key of headers) {
+      record[key] = String(row[key] ?? '')
+    }
+    return record
+  })
+
+  return { headers, rows }
+}
+
+/**
  * 從 File 物件讀取文字內容
  */
 export function readFileAsText(file: File): Promise<string> {

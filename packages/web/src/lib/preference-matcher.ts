@@ -24,13 +24,18 @@ export interface PreferenceMatch {
 
 /**
  * 對所有賓客的「想同桌」偏好進行配對
+ *
+ * @param guests - 要處理偏好的賓客（新匯入的）
+ * @param searchPool - 可搜尋的完整賓客名單（含已存在賓客），用於 name index。
+ *                     未提供時預設為 guests 本身。
  */
-export function matchAllPreferences(guests: RawGuest[]): PreferenceMatch[] {
+export function matchAllPreferences(guests: RawGuest[], searchPool?: RawGuest[]): PreferenceMatch[] {
   const results: PreferenceMatch[] = []
+  const pool = searchPool ?? guests
 
-  // 建立名字索引：name + aliases → guestIndex
+  // 建立名字索引：name + aliases → guestIndex（從完整名單建立）
   const nameIndex: Array<{ text: string; guestIndex: number; isAlias: boolean }> = []
-  guests.forEach((g, i) => {
+  pool.forEach((g, i) => {
     if (g.rsvpStatus === 'declined') return
     nameIndex.push({ text: g.name, guestIndex: i, isAlias: false })
     g.aliases.forEach((a) => {
@@ -46,7 +51,7 @@ export function matchAllPreferences(guests: RawGuest[]): PreferenceMatch[] {
       const rawText = guest.rawPreferences[rank]
       if (!rawText) continue
 
-      const match = findMatch(rawText, fromIdx, nameIndex, guests)
+      const match = findMatch(rawText, guest.name, nameIndex, pool)
       results.push({
         fromIndex: fromIdx,
         fromName: guest.name,
@@ -62,20 +67,21 @@ export function matchAllPreferences(guests: RawGuest[]): PreferenceMatch[] {
 
 function findMatch(
   rawText: string,
-  fromIndex: number,
+  fromName: string,
   nameIndex: Array<{ text: string; guestIndex: number; isAlias: boolean }>,
-  guests: RawGuest[],
+  pool: RawGuest[],
 ): { status: 'exact' | 'fuzzy' | 'unmatched'; candidates: MatchCandidate[]; selectedIndex: number | null } {
   const query = rawText.trim().toLowerCase()
+  const fromNameLower = fromName.trim().toLowerCase()
 
-  // 1. 完全匹配
+  // 1. 完全匹配（排除自己：用名字比對）
   const exactMatches = nameIndex.filter(
-    (n) => n.text.toLowerCase() === query && n.guestIndex !== fromIndex,
+    (n) => n.text.toLowerCase() === query && pool[n.guestIndex].name.toLowerCase() !== fromNameLower,
   )
   if (exactMatches.length === 1) {
     return {
       status: 'exact',
-      candidates: [{ guestIndex: exactMatches[0].guestIndex, name: guests[exactMatches[0].guestIndex].name, score: 1 }],
+      candidates: [{ guestIndex: exactMatches[0].guestIndex, name: pool[exactMatches[0].guestIndex].name, score: 1 }],
       selectedIndex: exactMatches[0].guestIndex,
     }
   }
@@ -85,7 +91,7 @@ function findMatch(
   const seen = new Set<number>()
 
   for (const entry of nameIndex) {
-    if (entry.guestIndex === fromIndex) continue
+    if (pool[entry.guestIndex].name.toLowerCase() === fromNameLower) continue
     if (seen.has(entry.guestIndex)) continue
 
     const entryLower = entry.text.toLowerCase()
@@ -102,7 +108,7 @@ function findMatch(
       seen.add(entry.guestIndex)
       fuzzyMatches.push({
         guestIndex: entry.guestIndex,
-        name: guests[entry.guestIndex].name,
+        name: pool[entry.guestIndex].name,
         score,
       })
     }
@@ -112,7 +118,7 @@ function findMatch(
   if (exactMatches.length > 1) {
     const candidates = exactMatches.map((m) => ({
       guestIndex: m.guestIndex,
-      name: guests[m.guestIndex].name,
+      name: pool[m.guestIndex].name,
       score: 1,
     }))
     return { status: 'fuzzy', candidates: candidates.slice(0, 5), selectedIndex: null }

@@ -5,7 +5,7 @@ import { Plus, Trash2, Search, X } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
 import { loadCategoryColors, saveCategoryColors, getCategoryColor, COLOR_PRESETS, PALETTE_HUES, PALETTE_SATS, FALLBACK_COLOR, type CategoryColor } from '@/lib/category-colors'
-import GuestEditModal from '@/components/GuestEditModal'
+import GuestFormModal, { type GuestFormData } from '@/components/GuestFormModal'
 import { AvoidPairModal } from '@/components/workspace/AvoidPairModal'
 import type { Guest } from '@/lib/types'
 
@@ -287,12 +287,10 @@ export default function GuestManagementPage() {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ guestId: string; guestName: string; tableName: string } | null>(null)
-  const [addingGuest, setAddingGuest] = useState(false)
-  const [newGuestName, setNewGuestName] = useState('')
-  const newGuestRef = useRef<HTMLInputElement>(null)
   const deleteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const [editingGuestId, setEditingGuestId] = useState<string | null>(null)
   const [showAvoidModal, setShowAvoidModal] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
 
   // Cleanup delete timers on unmount / navigate away
   useEffect(() => {
@@ -309,13 +307,9 @@ export default function GuestManagementPage() {
     }
   }, [])
 
-  // Focus new guest input
-  useEffect(() => {
-    if (addingGuest) newGuestRef.current?.focus()
-  }, [addingGuest])
-
   // Get unique categories from event
-  const categories = Array.from(new Set(guests.map((g) => g.category).filter(Boolean))) as string[]
+  const eventCategories = useSeatingStore((s) => s.eventCategories)
+  const categories = eventCategories.length > 0 ? eventCategories : ['男方', '女方', '共同']
 
   // Merge preview color into effective colors
   const effectiveColors = previewColor
@@ -367,13 +361,28 @@ export default function GuestManagementPage() {
       const tableName = tableNameMap.get(guest.assignedTableId) || '未知桌'
       setDeleteConfirm({ guestId: guest.id, guestName: guest.name, tableName })
     } else {
-      // Soft delete with undo timer
-      const prevGuests = useSeatingStore.getState().guests
-      deleteGuest(guest.id)
+      // Soft delete: 先從 local state 移除，延遲刪 DB。Undo 時恢復 state 並取消 API call。
+      const state = useSeatingStore.getState()
+      const prevGuests = state.guests
+      const prevAvoidPairs = state.avoidPairs
 
-      const timer = setTimeout(() => {
+      // 從 local state 移除（不呼叫 deleteGuest，避免立即刪 DB）
+      const nextGuests = prevGuests.filter((g) => g.id !== guest.id)
+      const nextAvoidPairs = prevAvoidPairs.filter(
+        (ap) => ap.guestAId !== guest.id && ap.guestBId !== guest.id,
+      )
+      useSeatingStore.setState({ guests: nextGuests, avoidPairs: nextAvoidPairs })
+
+      const timer = setTimeout(async () => {
         deleteTimers.current.delete(guest.id)
         setToast(null)
+        // Timer 到了才真正刪 DB
+        try {
+          await fetch(`/api/events/${eventId}/guests/${guest.id}`, {
+            method: 'DELETE',
+            credentials: 'include',
+          })
+        } catch { /* ignore */ }
       }, 5000)
       deleteTimers.current.set(guest.id, timer)
 
@@ -382,34 +391,52 @@ export default function GuestManagementPage() {
         onUndo: () => {
           clearTimeout(timer)
           deleteTimers.current.delete(guest.id)
-          // Restore by re-loading event data
-          const { loadEvent: reload } = useSeatingStore.getState()
-          if (eventId) reload(eventId)
+          // 恢復 local state（DB 還沒刪，不需要重建）
+          useSeatingStore.setState({ guests: prevGuests, avoidPairs: prevAvoidPairs })
           setToast(null)
         },
       })
     }
-  }, [deleteGuest, eventId, tableNameMap])
+  }, [eventId, tableNameMap])
 
-  const handleConfirmDelete = useCallback(async () => {
+  const handleConfirmDelete = useCallback(() => {
     if (!deleteConfirm) return
-    await deleteGuest(deleteConfirm.guestId)
+    const { guestId, guestName } = deleteConfirm
     setDeleteConfirm(null)
-    setToast({ message: `已刪除 ${deleteConfirm.guestName}` })
-  }, [deleteConfirm, deleteGuest])
 
-  const handleAddGuest = useCallback(async () => {
-    const name = newGuestName.trim()
-    if (!name) return
-    const guest = await addGuest({ name })
-    if (guest) {
-      setNewGuestName('')
-      setAddingGuest(false)
-      setToast({ message: `已新增 ${name}` })
-    } else {
-      setToast({ message: '新增失敗' })
-    }
-  }, [newGuestName, addGuest])
+    // Soft delete：同未入座邏輯，先移 local state，延遲刪 DB
+    const state = useSeatingStore.getState()
+    const prevGuests = state.guests
+    const prevAvoidPairs = state.avoidPairs
+
+    const nextGuests = prevGuests.filter((g) => g.id !== guestId)
+    const nextAvoidPairs = prevAvoidPairs.filter(
+      (ap) => ap.guestAId !== guestId && ap.guestBId !== guestId,
+    )
+    useSeatingStore.setState({ guests: nextGuests, avoidPairs: nextAvoidPairs })
+
+    const timer = setTimeout(async () => {
+      deleteTimers.current.delete(guestId)
+      setToast(null)
+      try {
+        await fetch(`/api/events/${eventId}/guests/${guestId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+      } catch { /* ignore */ }
+    }, 5000)
+    deleteTimers.current.set(guestId, timer)
+
+    setToast({
+      message: `已刪除 ${guestName}`,
+      onUndo: () => {
+        clearTimeout(timer)
+        deleteTimers.current.delete(guestId)
+        useSeatingStore.setState({ guests: prevGuests, avoidPairs: prevAvoidPairs })
+        setToast(null)
+      },
+    })
+  }, [deleteConfirm, eventId])
 
   const handleRsvpToggle = useCallback((guest: Guest) => {
     const idx = RSVP_CYCLE.indexOf(guest.rsvpStatus)
@@ -427,28 +454,6 @@ export default function GuestManagementPage() {
   const handleRsvpFilterClick = (status: string) => {
     setRsvpFilter((prev) => prev === status ? null : status)
     if (status === 'declined') setShowDeclined(true)
-  }
-
-  // ─── Empty state ────────────────────────────────────
-  if (guests.length === 0 && !addingGuest) {
-    return (
-      <div style={{ flex: 1, background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ maxWidth: 1440, margin: '0 auto', padding: '32px 24px', width: '100%' }}>
-          <div style={{ textAlign: 'center', padding: '80px 24px' }}>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>尚無賓客</h2>
-            <p style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text-secondary)', marginBottom: 24 }}>點擊下方新增或返回匯入名單</p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-              <button onClick={() => setAddingGuest(true)} style={{ padding: '8px 20px', borderRadius: 'var(--radius-sm, 4px)', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500 }}>
-                <Plus size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> 新增賓客
-              </button>
-              <button onClick={() => navigate('/import')} style={{ padding: '8px 20px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', background: 'var(--bg-surface)', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)' }}>
-                匯入名單
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   // ─── Main table view ────────────────────────────────
@@ -602,6 +607,19 @@ export default function GuestManagementPage() {
             避桌 {avoidPairs.length > 0 && <span style={{ fontWeight: 600 }}>{avoidPairs.length}</span>}
           </button>
 
+          {/* 追加匯入 */}
+          <button
+            onClick={() => navigate(`/workspace/${eventId}/import`)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px',
+              borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
+              background: 'var(--bg-surface)', fontSize: 13, fontFamily: 'var(--font-ui)',
+              cursor: 'pointer', color: 'var(--text-secondary)',
+            }}
+          >
+            追加匯入
+          </button>
+
           {/* Right: Stats */}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
             <StatsBar guests={guests} onFilterClick={handleRsvpFilterClick} />
@@ -693,45 +711,43 @@ export default function GuestManagementPage() {
                 </td></tr>
               )}
 
-              {/* Add guest row */}
-              {addingGuest && (
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td colSpan={12} style={{ padding: '8px 12px' }}>
-                    <input
-                      ref={newGuestRef}
-                      value={newGuestName}
-                      onChange={(e) => setNewGuestName(e.target.value.slice(0, 50))}
-                      onBlur={() => { if (newGuestName.trim()) handleAddGuest(); else setAddingGuest(false) }}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddGuest(); if (e.key === 'Escape') { setNewGuestName(''); setAddingGuest(false) } }}
-                      placeholder="輸入賓客姓名..."
-                      style={{
-                        width: '100%', padding: '4px 8px', border: 'none',
-                        borderBottom: '2px solid var(--accent)', background: 'var(--accent-light)',
-                        fontSize: 14, fontFamily: 'var(--font-body)', outline: 'none',
-                        borderRadius: 2, color: 'var(--text-primary)',
-                      }}
-                    />
-                  </td>
-                  <td style={{ width: 36 }} />
-                </tr>
+              {/* No guests at all */}
+              {guests.length === 0 && (
+                <tr><td colSpan={12} style={{ textAlign: 'center', padding: '60px 24px' }}>
+                  <p style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>尚無賓客</p>
+                  <p style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>點擊下方新增或匯入名單</p>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      style={{ padding: '8px 20px', borderRadius: 'var(--radius-sm, 4px)', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500 }}
+                    >
+                      <Plus size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> 新增賓客
+                    </button>
+                    <button onClick={() => navigate(`/workspace/${eventId}/import`)} style={{ padding: '8px 20px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', background: 'var(--bg-surface)', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)' }}>
+                      匯入名單
+                    </button>
+                  </div>
+                </td></tr>
               )}
+
             </tbody>
           </table>
         </div>
 
-        {/* Add button */}
-        {!addingGuest && (
-          <button
-            onClick={() => setAddingGuest(true)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4, marginTop: 12, padding: '8px 16px',
-              background: 'none', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm, 4px)',
-              cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500, color: 'var(--accent)',
-            }}
-          >
-            <Plus size={14} /> 新增賓客
-          </button>
-        )}
+        {/* Floating add button */}
+        <button
+          onClick={() => setShowAddModal(true)}
+          style={{
+            position: 'fixed', right: 32, bottom: 32, zIndex: 50,
+            display: 'flex', alignItems: 'center', gap: 6, padding: '12px 20px',
+            background: 'var(--accent)', color: '#fff', border: 'none',
+            borderRadius: 'var(--radius-md, 8px)', cursor: 'pointer',
+            fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 600,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+          }}
+        >
+          <Plus size={16} /> 新增賓客
+        </button>
       </div>
 
       {/* Toast */}
@@ -752,27 +768,113 @@ export default function GuestManagementPage() {
         const editGuest = guests.find((g) => g.id === editingGuestId)
         if (!editGuest) return null
         return (
-          <GuestEditModal
+          <GuestFormModal
+            mode="edit"
             guest={editGuest}
+            categories={categories}
+            subcategories={subcategories}
             tables={tables}
             guests={guests}
             avoidPairs={avoidPairs}
-            categories={categories}
-            subcategories={subcategories}
             categoryColors={effectiveColors}
-            onSave={async (gid, patch) => { const ok = await updateGuest(gid, patch); if (!ok) setToast({ message: '儲存失敗，已還原' }); return ok }}
-            onMoveToTable={(gid, tid) => moveGuest(gid, tid)}
-            onUpdatePreferences={(gid, prefs) => updateGuestPreferences(gid, prefs)}
-            onSetSubcategory={(gid, sid) => setGuestSubcategory(gid, sid)}
-            onAddAvoidPair={(a, b) => addAvoidPair(a, b)}
-            onRemoveAvoidPair={(pid) => removeAvoidPair(pid)}
-            onRsvpToggle={(gid) => handleRsvpToggle(guests.find((g) => g.id === gid)!)}
+            onSubmit={async (data) => {
+              // Update basic fields
+              await updateGuest(editGuest.id, {
+                name: data.name,
+                aliases: data.aliases,
+                category: data.category,
+                rsvpStatus: data.rsvpStatus,
+                companionCount: data.companionCount,
+                dietaryNote: data.dietaryNote,
+                specialNote: data.specialNote,
+              })
+              // Move table if changed
+              if (data.assignedTableId !== (editGuest.assignedTableId || null)) {
+                moveGuest(editGuest.id, data.assignedTableId)
+              }
+              // Update preferences
+              const prefs = data.preferredGuestIds.map((gid, i) => ({ preferredGuestId: gid, rank: i + 1 }))
+              await updateGuestPreferences(editGuest.id, prefs)
+              // Handle avoid pairs: remove old ones not in new list, add new ones not in old list
+              const oldAvoidIds = avoidPairs
+                .filter((ap) => ap.guestAId === editGuest.id || ap.guestBId === editGuest.id)
+                .map((ap) => ({ pairId: ap.id, otherId: ap.guestAId === editGuest.id ? ap.guestBId : ap.guestAId }))
+              for (const old of oldAvoidIds) {
+                if (!data.avoidGuestIds.includes(old.otherId)) {
+                  await removeAvoidPair(old.pairId)
+                }
+              }
+              for (const gid of data.avoidGuestIds) {
+                if (!oldAvoidIds.some((o) => o.otherId === gid)) {
+                  await addAvoidPair(editGuest.id, gid)
+                }
+              }
+              // Handle subcategory
+              if (data.subcategoryName) {
+                try {
+                  await fetch(`/api/events/${eventId}/subcategories/batch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ assignments: [{ guestId: editGuest.id, subcategoryName: data.subcategoryName, category: data.category }] }),
+                  })
+                } catch {}
+              } else if (editGuest.subcategory) {
+                await setGuestSubcategory(editGuest.id, null)
+              }
+              // Reload to get fresh data
+              const { loadEvent } = useSeatingStore.getState()
+              if (eventId) await loadEvent(eventId)
+              setEditingGuestId(null)
+            }}
             onDelete={(gid) => { setEditingGuestId(null); handleDelete(guests.find((g) => g.id === gid)!) }}
             onClose={() => setEditingGuestId(null)}
           />
         )
       })()}
       {showAvoidModal && <AvoidPairModal onClose={() => setShowAvoidModal(false)} />}
+
+      {/* Add guest modal */}
+      {showAddModal && (
+        <GuestFormModal
+          mode="add"
+          categories={categories}
+          subcategories={subcategories}
+          tables={tables}
+          guests={guests}
+          avoidPairs={avoidPairs}
+          categoryColors={effectiveColors}
+          onSubmit={async (data) => {
+            const { subcategoryName, assignedTableId, preferredGuestIds, avoidGuestIds, ...guestData } = data
+            const guest = await addGuest(guestData)
+            if (guest) {
+              if (assignedTableId) moveGuest(guest.id, assignedTableId)
+              if (preferredGuestIds.length > 0) {
+                const prefs = preferredGuestIds.map((gid, i) => ({ preferredGuestId: gid, rank: i + 1 }))
+                await updateGuestPreferences(guest.id, prefs)
+              }
+              for (const gid of avoidGuestIds) {
+                await addAvoidPair(guest.id, gid)
+              }
+              if (subcategoryName && data.category) {
+                try {
+                  await fetch(`/api/events/${eventId}/subcategories/batch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ assignments: [{ guestId: guest.id, subcategoryName, category: data.category }] }),
+                  })
+                } catch {}
+              }
+              const { loadEvent } = useSeatingStore.getState()
+              if (eventId) await loadEvent(eventId)
+              setShowAddModal(false)
+              setToast({ message: `已新增 ${data.name}` })
+            }
+          }}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
     </div>
   )
 }
@@ -840,9 +942,19 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxCompanion, maxCom
       {/* Satisfaction */}
       <td style={{ ...tdStyle, textAlign: 'right' }}>
         {guest.assignedTableId ? (
-          <span style={{ color: satColor, fontFamily: 'var(--font-data)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-            {guest.satisfactionScore.toFixed(0)}
-          </span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: 36, height: 36 }}>
+            <svg width={36} height={36} style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
+              <circle cx={18} cy={18} r={15} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
+              <circle cx={18} cy={18} r={15} fill="none" stroke={satColor} strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 15 * Math.min(guest.satisfactionScore / 100, 1)} ${2 * Math.PI * 15}`}
+                style={{ transition: 'stroke-dasharray 400ms ease-out, stroke 400ms ease-out' }}
+              />
+            </svg>
+            <span style={{ position: 'relative', color: satColor, fontFamily: 'var(--font-data)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>
+              {guest.satisfactionScore.toFixed(0)}
+            </span>
+          </div>
         ) : (
           <span style={{ color: 'var(--text-muted)' }}>—</span>
         )}
