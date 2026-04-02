@@ -3,7 +3,11 @@ import { useSeatingStore, type Guest } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
 import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors'
 
-function getDisplayName(name: string): string {
+function getDisplayName(name: string, aliases?: string[]): string {
+  if (aliases && aliases.length > 0) {
+    const nick = aliases[0]
+    return nick.length <= 3 ? nick : nick.slice(0, 3)
+  }
   if (name.length <= 2) return name
   return name.slice(-2)
 }
@@ -21,7 +25,7 @@ export function DragOverlayContent({ guest }: Props) {
   const colors = useMemo(() => loadCategoryColors(eventId || ''), [eventId])
   const catColor = getCategoryColor(guest.category, colors)
   const catStyle = { background: catColor.background, borderColor: catColor.border, color: catColor.color }
-  const displayName = getDisplayName(guest.name)
+  const displayName = getDisplayName(guest.name, guest.aliases)
 
   // 預覽分數：hover 到座位時即時計算的分數
   const previewScore = dragPreview?.previewScores?.get(guest.id)
@@ -101,8 +105,10 @@ export function DragOverlayContent({ guest }: Props) {
           height: size,
           borderRadius: '50%',
           fontFamily: 'var(--font-body)',
-          fontSize: '16px',
+          fontSize: displayName.length > 3 ? '13px' : '16px',
           fontWeight: 500,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
           border: `2px solid ${catStyle.borderColor}`,
           backgroundColor: catStyle.background,
           color: catStyle.color,

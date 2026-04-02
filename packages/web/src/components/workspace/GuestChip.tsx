@@ -17,6 +17,7 @@ export function GuestChip({ guest, animIndex }: Props) {
   const setHoveredGuest = useSeatingStore((s) => s.setHoveredGuest)
   const bestSwapTableId = useSeatingStore((s) => s.bestSwapTableId)
   const moveGuestToSeat = useSeatingStore((s) => s.moveGuestToSeat)
+  const setEditingGuest = useSeatingStore((s) => s.setEditingGuest)
   const eventId = useSeatingStore((s) => s.eventId)
 
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -85,6 +86,7 @@ export function GuestChip({ guest, animIndex }: Props) {
         listeners?.onPointerDown?.(e as any)
       }}
       onPointerUp={() => cancelLongPress()}
+      onClick={() => { if (!isDragging) setEditingGuest(guest.id) }}
       onMouseEnter={(e) => {
         const rect = e.currentTarget.getBoundingClientRect()
         setHoveredGuest(guest.id, rect.top + rect.height / 2)

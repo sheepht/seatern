@@ -30,12 +30,14 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
   const setHoveredGuest = useSeatingStore((s) => s.setHoveredGuest)
   const hoverSuppressedUntil = useSeatingStore((s) => s.hoverSuppressedUntil)
   const moveGuest = useSeatingStore((s) => s.moveGuest)
+  const setEditingGuest = useSeatingStore((s) => s.setEditingGuest)
   const guestsWithRecommendations = useSeatingStore((s) => s.guestsWithRecommendations)
   const bestSwapTableId = useSeatingStore((s) => s.bestSwapTableId)
   const moveGuestToSeat = useSeatingStore((s) => s.moveGuestToSeat)
   const hasSwapRec = guestsWithRecommendations.has(guest.id)
   const delayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [tooltip, setTooltip] = useState<{ x: number; y: number; r: number } | null>(null)
   const [longPressProgress, setLongPressProgress] = useState(false)
   const elRef = useRef<HTMLDivElement | null>(null)
@@ -97,11 +99,23 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         setLongPressProgress(false)
         useSeatingStore.setState({ longPressActive: false })
       }}
-      onDoubleClick={(e) => {
+      onClick={(e) => {
         e.stopPropagation()
-        setHoveredGuest(null)
-        setTooltip(null)
-        moveGuest(guest.id, null)
+        if (isDragging) return
+        if (clickTimerRef.current) {
+          // 第二次點擊 → 雙擊：移除賓客
+          clearTimeout(clickTimerRef.current)
+          clickTimerRef.current = null
+          setHoveredGuest(null)
+          setTooltip(null)
+          moveGuest(guest.id, null)
+        } else {
+          // 第一次點擊 → 延遲判斷，等看有沒有雙擊
+          clickTimerRef.current = setTimeout(() => {
+            clickTimerRef.current = null
+            setEditingGuest(guest.id)
+          }, 250)
+        }
       }}
       onMouseEnter={(e) => {
         if (isDragging) return
