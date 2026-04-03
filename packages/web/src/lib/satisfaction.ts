@@ -96,9 +96,9 @@ export function calculatePreferenceScore(
 }
 
 // ─── 鄰桌判定 ───────────────────────────────────────
-// 邏輯座標，閾值 = 桌次直徑的 2 倍（約 250 邏輯單位）
+// 邏輯座標，閾值 = 桌次直徑的 2 倍（約 450 邏輯單位）
 
-const NEIGHBOR_THRESHOLD = 350
+const NEIGHBOR_THRESHOLD = 450
 
 export function isNeighborTable(a: Table, b: Table): boolean {
   const dx = a.positionX - b.positionX
