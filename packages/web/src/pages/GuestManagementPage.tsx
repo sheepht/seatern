@@ -339,7 +339,13 @@ export default function GuestManagementPage() {
       case 'name': cmp = a.name.localeCompare(b.name, 'zh-Hant'); break
       case 'category': cmp = (a.category || '').localeCompare(b.category || '', 'zh-Hant'); break
       case 'rsvpStatus': cmp = a.rsvpStatus.localeCompare(b.rsvpStatus); break
-      case 'satisfactionScore': cmp = a.satisfactionScore - b.satisfactionScore; break
+      case 'satisfactionScore': {
+        // 未排桌的賓客視為 -1 分，確保排序能區分已排/未排
+        const aScore = a.assignedTableId ? a.satisfactionScore : -1
+        const bScore = b.assignedTableId ? b.satisfactionScore : -1
+        cmp = aScore - bScore
+        break
+      }
       case 'assignedTableId': cmp = (a.assignedTableId || '').localeCompare(b.assignedTableId || ''); break
       case 'companionCount': cmp = a.companionCount - b.companionCount; break
       case 'prefCount': cmp = a.seatPreferences.length - b.seatPreferences.length; break
