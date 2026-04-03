@@ -146,6 +146,32 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
     />
     {tooltip && createPortal(
       <>
+        {/* 上方：賓客基本資訊 */}
+        <div style={{
+          position: 'fixed',
+          left: tooltip.x,
+          top: Math.max(8, tooltip.y - tooltip.r - 8),
+          transform: 'translate(-50%, -100%)',
+          background: 'var(--bg-surface, #fff)',
+          border: '1px solid var(--border, #E7E5E4)',
+          padding: '5px 10px',
+          borderRadius: 6,
+          pointerEvents: 'none',
+          zIndex: 9999,
+          fontFamily: 'var(--font-body)',
+          boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
+          textAlign: 'center',
+          maxWidth: 200,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: '#1C1917', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {guest.name}{guest.subcategory ? ` (${guest.subcategory.name})` : ''}
+          </div>
+          {(guest.dietaryNote || guest.specialNote) && (
+            <div style={{ fontSize: 11, color: '#A8A29E', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {[guest.dietaryNote, guest.specialNote].filter(Boolean).join(' · ')}
+            </div>
+          )}
+        </div>
         {/* 右側：雙擊移除 */}
         <div style={{
           position: 'fixed',
