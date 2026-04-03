@@ -900,6 +900,20 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       set({ undoStack: [...undoStack, { type: 'move-table' as const, tableId, fromX, fromY, toX: table.positionX, toY: table.positionY }] })
     }
 
+    // 鄰桌關係可能改變，重算滿意度
+    const { guests, avoidPairs } = get()
+    const result = recalculateAll(guests, tables, avoidPairs)
+    set({
+      guests: guests.map((g) => {
+        const s = result.guests.find((gs) => gs.id === g.id)
+        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
+      }),
+      tables: tables.map((t) => {
+        const s = result.tables.find((ts) => ts.id === t.id)
+        return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t
+      }),
+    })
+
     fetch(`/api/events/${eventId}/tables/${tableId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
