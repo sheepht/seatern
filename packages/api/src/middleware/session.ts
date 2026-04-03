@@ -1,16 +1,15 @@
 import { createMiddleware } from 'hono/factory'
 import { getCookie, setCookie } from 'hono/cookie'
 import { randomUUID } from 'crypto'
+import { verifyToken, ensureUser } from '../lib/auth-utils'
 
 /**
  * Session middleware：處理匿名 session 和登入用戶
  *
  * 優先順序：
- * 1. Authorization header → 已登入用戶（走 auth middleware）
- * 2. x-session-id cookie → 匿名 session
+ * 1. Authorization: Bearer <token> → JWT 驗證 → ownerType='user'
+ * 2. seatern-session cookie → ownerType='anonymous'
  * 3. 都沒有 → 自動產生新的 anonymous session UUID
- *
- * 設定 c.get('ownerId') 和 c.get('ownerType')
  */
 
 export type SessionEnv = {
@@ -23,11 +22,12 @@ export type SessionEnv = {
 const SESSION_COOKIE = 'seatern-session'
 
 export const sessionMiddleware = createMiddleware<SessionEnv>(async (c, next) => {
-  // 如果有 Authorization header，讓 auth middleware 處理
+  // 如果有 Authorization header，嘗試驗證 JWT
   const authHeader = c.req.header('Authorization')
   if (authHeader?.startsWith('Bearer ')) {
-    // Dev bypass
     const token = authHeader.slice(7)
+
+    // Dev bypass：非 production 環境允許 dev-bypass-<userId> 格式的 token
     if (process.env.NODE_ENV !== 'production' && token.startsWith('dev-bypass-')) {
       const userId = token.slice('dev-bypass-'.length)
       if (userId) {
@@ -37,8 +37,18 @@ export const sessionMiddleware = createMiddleware<SessionEnv>(async (c, next) =>
         return
       }
     }
-    // TODO: JWT verification for production auth
-    // For now, fall through to anonymous
+
+    // 驗證真正的 JWT
+    try {
+      const payload = await verifyToken(token)
+      const userId = await ensureUser(payload)
+      c.set('ownerId', userId)
+      c.set('ownerType', 'user')
+      await next()
+      return
+    } catch {
+      // JWT 驗證失敗，降級為匿名模式（不中斷使用者體驗）
+    }
   }
 
   // 匿名 session

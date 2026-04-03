@@ -74,6 +74,10 @@ interface SeatingState {
   flyingGuestIds: Set<string>
   /** 排位頁面：正在編輯的賓客 ID（開啟 GuestEditModal） */
   editingGuestId: string | null
+  /** 桌數上限已達到（顯示 TableLimitModal） */
+  tableLimitReached: boolean
+  /** 用戶已點「稍後再說」關閉上限 modal */
+  tableLimitDismissed: boolean
   /** 自動分配進度（null = 未執行） */
   autoAssignProgress: AutoAssignProgress | null
   /** 自動分配取消控制器 */
@@ -192,6 +196,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   lastResetAt: 0,
   isResetting: false,
   flyingGuestIds: new Set(),
+  tableLimitReached: false,
+  tableLimitDismissed: false,
   autoAssignProgress: null,
   autoAssignAbort: null,
   cancelAutoAssign: () => {
@@ -764,6 +770,14 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       credentials: 'include',
       body: JSON.stringify({ name, positionX, positionY }),
     })
+
+    if (res.status === 403) {
+      const data = await res.json()
+      if (data.code === 'TABLE_LIMIT_REACHED') {
+        set({ tableLimitReached: true })
+        return
+      }
+    }
     if (!res.ok) return
 
     const table = await res.json()

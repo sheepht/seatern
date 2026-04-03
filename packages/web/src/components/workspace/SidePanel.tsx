@@ -4,6 +4,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Wand2, Scale, Star, Plus, Save, Undo2, Redo2, Ban, Shuffle, LayoutGrid, Download, Trash2, Dices, History } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
+import TableLimitBanner from './TableLimitBanner'
 import { estimateAutoAssignTimeInWorker } from '@/lib/auto-assign-client'
 import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction'
 import { computeSnapshotStats, computeCurrentStats } from '@/lib/snapshot-stats'
@@ -444,7 +445,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
   return (
     <div className="h-full flex flex-col" style={{ background: 'var(--bg-primary)' }}>
 
-
+      <TableLimitBanner />
 
       {/* 未安排賓客 — 佔滿剩餘高度 */}
       <div

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid, Trash2, Dices, Users, FileDown } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
+import { useAuthStore } from '@/stores/auth'
 import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction'
 import { calculateGridLayout, findFreePosition } from '@/lib/viewport'
 import { AvoidPairModal } from './AvoidPairModal'
@@ -437,6 +438,11 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
 
   const isResetting = useSeatingStore((s) => s.isResetting)
 
+  const authUser = useAuthStore((s) => s.user)
+  const signOut = useAuthStore((s) => s.signOut)
+  const tableLimit = authUser ? 20 : 10
+  const tableCountPct = tables.length / tableLimit
+
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
   const liveAssigned = getTotalAssignedSeats()
   const liveTotal = getTotalConfirmedSeats()
@@ -495,6 +501,9 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
               />
             </div>
             <span className="text-sm font-data font-semibold" style={{ color: 'var(--text-secondary)' }}>{assigned}/{total} 席</span>
+            <span className="text-sm font-data font-semibold" style={{
+              color: tableCountPct >= 0.8 ? '#DC2626' : tableCountPct >= 0.6 ? '#CA8A04' : '#16A34A',
+            }}>{tables.length}/{tableLimit} 桌</span>
           </div>
           {t > 0 && <>
             <span style={{ color: 'var(--border-strong)' }}>|</span>
@@ -591,16 +600,27 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                   {/* 分隔線 */}
                   <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
 
-                  {/* 登入（未來擴充） */}
-                  <button
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
-                    style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}
-                    disabled
-                  >
-                    <Lock size={16} className="shrink-0" />
-                    <span>登入</span>
-                    <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>即將推出</span>
-                  </button>
+                  {/* 登入 / 用戶資訊 */}
+                  {authUser ? (
+                    <button
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
+                      style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
+                      onClick={async () => { setShowMenu(false); await signOut(); navigate('/') }}
+                    >
+                      <Users size={16} className="shrink-0" />
+                      <span className="truncate">{authUser.user_metadata?.name || authUser.email}</span>
+                      <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>登出</span>
+                    </button>
+                  ) : (
+                    <button
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
+                      style={{ color: 'var(--accent)', fontFamily: 'var(--font-body)' }}
+                      onClick={() => { setShowMenu(false); navigate('/login') }}
+                    >
+                      <Lock size={16} className="shrink-0" />
+                      <span>登入</span>
+                    </button>
+                  )}
                 </div>
               </>
             )}

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { api } from '@/lib/api'
 
 interface AuthState {
   user: User | null
@@ -11,6 +12,7 @@ interface AuthState {
   signUpWithEmail: (email: string, password: string) => Promise<void>
   signInWithGoogle: () => Promise<void>
   signInWithLINE: () => Promise<void>
+  claimEvent: () => Promise<{ migrated: boolean; message?: string }>
   devSignIn: (userId: string, name: string, email: string) => void
   signOut: () => Promise<void>
 }
@@ -37,7 +39,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   signInWithGoogle: async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/events` },
+      options: { redirectTo: `${window.location.origin}/workspace` },
     })
     if (error) throw error
   },
@@ -46,6 +48,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     // LINE OAuth 由後端處理（Supabase 沒有內建 LINE provider）
     // 跳轉到 API 發起 LINE OAuth 流程
     window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/line`
+  },
+
+  claimEvent: async () => {
+    try {
+      const res = await api.post('/auth/claim-event')
+      return res.data
+    } catch {
+      return { migrated: false }
+    }
   },
 
   devSignIn: (userId, name, email) => {

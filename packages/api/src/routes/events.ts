@@ -359,6 +359,13 @@ events.post('/:id/tables', async (c) => {
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
   if (!event) return c.json({ error: 'Event not found' }, 404)
 
+  // Table limit: anonymous = 10, user = 20
+  const tableLimit = ownerType === 'anonymous' ? 10 : 20
+  const tableCount = await prisma.table.count({ where: { eventId } })
+  if (tableCount >= tableLimit) {
+    return c.json({ code: 'TABLE_LIMIT_REACHED', limit: tableLimit }, 403)
+  }
+
   const body = await c.req.json<{ id?: string; name: string; capacity?: number; positionX?: number; positionY?: number }>()
 
   const table = await prisma.table.create({

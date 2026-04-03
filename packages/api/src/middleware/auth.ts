@@ -1,34 +1,10 @@
 import { createMiddleware } from 'hono/factory'
-import { jwtVerify, createRemoteJWKSet } from 'jose'
-import { prisma } from '@seatern/db'
+import { verifyToken, ensureUser } from '../lib/auth-utils'
 
 export type AuthEnv = {
   Variables: {
     userId: string
   }
-}
-
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL
-
-let jwks: ReturnType<typeof createRemoteJWKSet> | null = null
-
-function getJWKS() {
-  if (!jwks) {
-    if (!SUPABASE_URL) {
-      throw new Error('SUPABASE_URL is not configured')
-    }
-    jwks = createRemoteJWKSet(
-      new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
-    )
-  }
-  return jwks
-}
-
-async function verifyToken(token: string) {
-  const { payload } = await jwtVerify(token, getJWKS(), {
-    issuer: `${SUPABASE_URL}/auth/v1`,
-  })
-  return payload
 }
 
 export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
@@ -52,28 +28,7 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
 
   try {
     const payload = await verifyToken(token)
-    const userId = payload.sub
-    if (!userId) {
-      return c.json({ error: 'Invalid token: missing sub claim' }, 401)
-    }
-
-    // Auto-create user on first request
-    const existingUser = await prisma.user.findUnique({ where: { id: userId } })
-    if (!existingUser) {
-      const email = (payload.email as string) || `${userId}@unknown`
-      const name =
-        (payload.user_metadata as Record<string, unknown>)?.full_name as string ||
-        (payload.user_metadata as Record<string, unknown>)?.name as string ||
-        email.split('@')[0]
-      const avatarUrl =
-        (payload.user_metadata as Record<string, unknown>)?.avatar_url as string ||
-        undefined
-
-      await prisma.user.create({
-        data: { id: userId, email, name, avatarUrl },
-      })
-    }
-
+    const userId = await ensureUser(payload)
     c.set('userId', userId)
     await next()
   } catch (err) {

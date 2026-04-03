@@ -9,6 +9,7 @@ import ImportPage from '@/pages/ImportPage'
 import WorkspaceLayout from '@/pages/WorkspaceLayout'
 import WorkspacePage from '@/pages/WorkspacePage'
 import GuestManagementPage from '@/pages/GuestManagementPage'
+import AuthCallbackPage from '@/pages/AuthCallbackPage'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -24,6 +25,7 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
             {/* Workspace（Phase 1 不需要登入） */}
             <Route path="/workspace" element={<WorkspaceLayout />}>

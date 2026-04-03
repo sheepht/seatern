@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import { useSeatingStore } from '@/stores/seating'
 import { Toolbar } from '@/components/workspace/Toolbar'
+import TableLimitModal from '@/components/workspace/TableLimitModal'
 
 export default function WorkspaceLayout() {
   const location = useLocation()
@@ -33,6 +34,7 @@ export default function WorkspaceLayout() {
     <div className="h-screen flex flex-col" style={{ background: 'var(--bg-primary)' }}>
       <Toolbar page={page} />
       <Outlet />
+      <TableLimitModal />
     </div>
   )
 }

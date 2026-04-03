@@ -6,10 +6,22 @@ const DEV_ACCOUNTS = [
   { userId: '00000000-0000-0000-0000-000000000001', name: '測試用戶', email: 'test@example.com', label: '測試' },
 ]
 
+async function ensureEventExists() {
+  const res = await fetch('/api/events/mine', { credentials: 'include' })
+  if (res.status === 404) {
+    await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ name: '我的婚禮', type: 'wedding' }),
+    })
+  }
+}
+
 export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { signInWithEmail, signInWithGoogle, signInWithLINE, devSignIn } = useAuthStore()
+  const { signInWithEmail, signInWithGoogle, signInWithLINE, claimEvent, devSignIn } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -29,7 +41,9 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await signInWithEmail(email, password)
-      navigate('/dashboard')
+      await claimEvent()
+      await ensureEventExists()
+      navigate('/workspace')
     } catch (err: any) {
       setError(err.message || '登入失敗')
     } finally {
@@ -53,9 +67,11 @@ export default function LoginPage() {
     }
   }
 
-  const handleDevSignIn = (userId: string, name: string, email: string) => {
+  const handleDevSignIn = async (userId: string, name: string, email: string) => {
     devSignIn(userId, name, email)
-    navigate('/dashboard')
+    await claimEvent()
+    await ensureEventExists()
+    navigate('/workspace')
   }
 
   return (

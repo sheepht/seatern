@@ -4,6 +4,7 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { healthRoute } from './routes/health'
 import { events } from './routes/events'
+import { auth } from './routes/auth'
 import { sessionMiddleware } from './middleware/session'
 
 const app = new Hono()
@@ -20,6 +21,10 @@ app.use(
 // Public routes
 app.route('/api/health', healthRoute)
 app.get('/', (c) => c.json({ name: 'Seatern API', version: '0.1.0' }))
+
+// Auth routes（LINE OAuth + claim-event）
+app.use('/api/auth/*', sessionMiddleware)
+app.route('/api/auth', auth)
 
 // Session-aware routes（匿名 + 登入都能用）
 app.use('/api/events/*', sessionMiddleware)
