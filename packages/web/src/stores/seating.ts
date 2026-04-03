@@ -880,12 +880,22 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   },
 
   updateTablePosition: (tableId, x, y) => {
-    const { tables } = get()
-    // 只更新本地狀態，不打 API（拖曳中會頻繁呼叫）
+    const { guests, tables, avoidPairs } = get()
+    // 更新位置（拖曳中頻繁呼叫，不打 API）
+    const updatedTables = tables.map((t) =>
+      t.id === tableId ? { ...t, positionX: x, positionY: y } : t,
+    )
+    // 即時重算滿意度（鄰桌關係隨位置改變）
+    const result = recalculateAll(guests, updatedTables, avoidPairs)
     set({
-      tables: tables.map((t) =>
-        t.id === tableId ? { ...t, positionX: x, positionY: y } : t,
-      ),
+      tables: updatedTables.map((t) => {
+        const s = result.tables.find((ts) => ts.id === t.id)
+        return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t
+      }),
+      guests: guests.map((g) => {
+        const s = result.guests.find((gs) => gs.id === g.id)
+        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
+      }),
     })
   },
 
