@@ -137,6 +137,7 @@ export function calculateTableAverage(
   tableId: string,
   allGuests: Guest[],
   tables: Table[],
+  avoidPairs: AvoidPair[] = [],
 ): number {
   const tableGuests = allGuests.filter(
     (g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed',
@@ -144,7 +145,7 @@ export function calculateTableAverage(
   if (tableGuests.length === 0) return 0
 
   const total = tableGuests.reduce(
-    (sum, g) => sum + calculateSatisfaction(g, allGuests, tables),
+    (sum, g) => sum + calculateSatisfaction(g, allGuests, tables, avoidPairs),
     0,
   )
   return Math.round((total / tableGuests.length) * 10) / 10
@@ -173,7 +174,7 @@ export function recalculateAll(
 
   const tableScores = tables.map((t) => ({
     id: t.id,
-    averageSatisfaction: calculateTableAverage(t.id, guests, tables),
+    averageSatisfaction: calculateTableAverage(t.id, guests, tables, avoidPairs),
   }))
 
   const assignedScores = guestScores.filter((g) => {
