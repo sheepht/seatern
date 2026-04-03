@@ -538,6 +538,11 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     return () => window.removeEventListener('resize', updateScreenPositions)
   }, [updateScreenPositions])
 
+  // 拖曳開始時強制重算 screenSeats（頁面切換後 CTM 可能過期）
+  useLayoutEffect(() => {
+    if (activeDragGuestId) updateScreenPositions()
+  }, [activeDragGuestId, updateScreenPositions])
+
   // 開始 pan（共用邏輯）
   const startPan = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
