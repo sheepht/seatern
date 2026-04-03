@@ -384,6 +384,28 @@ events.delete('/:eventId/tables/:tableId', async (c) => {
   return c.json({ ok: true })
 })
 
+// DELETE /events/:eventId/reset — 清除活動所有資料（賓客、桌次、偏好、避桌、子分類、快照）
+events.delete('/:eventId/reset', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const { eventId } = c.req.param()
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  await prisma.$transaction([
+    prisma.seatPreference.deleteMany({ where: { guest: { eventId } } }),
+    prisma.avoidPair.deleteMany({ where: { eventId } }),
+    prisma.edge.deleteMany({ where: { eventId } }),
+    prisma.seatingSnapshot.deleteMany({ where: { eventId } }),
+    prisma.guest.deleteMany({ where: { eventId } }),
+    prisma.table.deleteMany({ where: { eventId } }),
+    prisma.subcategory.deleteMany({ where: { eventId } }),
+  ])
+
+  return c.json({ ok: true })
+})
+
 // ─── 座位偏好 ────────────────────────────────────────
 
 // POST /events/:id/preferences/batch — 批次建立座位偏好

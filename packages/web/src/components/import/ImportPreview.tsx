@@ -78,88 +78,111 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
   const canConfirm = missingRequired.length === 0 && importCount > 0
 
   return (
-    <div className="space-y-6">
-      {/* 統計摘要 */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="px-3 py-1.5 text-sm font-medium" style={{ background: '#F0FDF4', color: 'var(--success)', borderRadius: 'var(--radius-sm)' }}>
-          偵測到 <span className="font-data">{allGuests.length}</span> 位賓客
-        </div>
-        {isReimport && (
-          <div className="px-3 py-1.5 text-sm font-medium" style={{ background: 'var(--accent-light)', color: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}>
-            新增 <span className="font-data">{diff.newGuests.length}</span> 人 / 已存在 <span className="font-data">{diff.skippedGuests.length}</span> 人（跳過）
+    <div className="flex flex-col" style={{ height: '100%' }}>
+      {/* 頂部：統計摘要 + 操作按鈕 */}
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>確認匯入資料</h2>
+          <div className="px-3 py-1 text-sm font-medium" style={{ background: '#F0FDF4', color: 'var(--success)', borderRadius: 'var(--radius-sm)' }}>
+            偵測到 <span className="font-data">{allGuests.length}</span> 位賓客
           </div>
-        )}
-        {!isReimport && (
-          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            確認 <span className="font-data">{confirmedCount}</span> 人 / 婉拒 <span className="font-data">{declinedCount}</span> 人 / 共 <span className="font-data">{totalSeats}</span> 席
-          </span>
-        )}
-      </div>
-
-      {/* 欄位對應 */}
-      <div>
-        <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>欄位對應</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {SYSTEM_FIELDS.map((sf) => {
-            const isMapped = !!mapping[sf.field] && mapping[sf.field] !== '__multi__'
-            const isMulti = mapping[sf.field] === '__multi__'
-            const isMissing = !mapping[sf.field]
-            return (
-            <div key={sf.field} className="flex items-center gap-2">
-              <label className="text-sm w-32 flex-shrink-0 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
-                {sf.label}
-                {sf.required && <span style={{ color: 'var(--error)' }}>*</span>}
-                <span className="relative group">
-                  <Info size={12} style={{ color: 'var(--text-muted)', cursor: 'help' }} />
-                  <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover:block px-2 py-1 text-xs whitespace-nowrap"
-                    style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', boxShadow: 'var(--shadow-sm)' }}>
-                    {FIELD_TOOLTIPS[sf.field]}
-                  </span>
-                </span>
-              </label>
-              {isMulti ? (
-                <span className="text-sm" style={{ color: 'var(--accent)' }}>
-                  多欄位模式（{multiMapping[sf.field].join(', ')}）
-                </span>
-              ) : (
-                <select
-                  className="flex-1 text-sm px-2 py-1"
-                  style={{
-                    borderRadius: 'var(--radius-sm)',
-                    border: sf.required && isMissing
-                      ? '1px solid #DC2626'
-                      : !sf.required && isMissing
-                      ? '1px solid #F59E0B'
-                      : '1px solid var(--border)',
-                    background: sf.required && isMissing
-                      ? '#FEF2F2'
-                      : !sf.required && isMissing
-                      ? '#FFFBEB'
-                      : undefined,
-                  }}
-                  value={mapping[sf.field] || ''}
-                  onChange={(e) => updateMapping(sf.field, e.target.value || null)}
-                >
-                  <option value="">{sf.required ? '⚠ 請選擇對應欄位' : '（選填）'}</option>
-                  {data.headers.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
-              )}
+          {isReimport && (
+            <div className="px-3 py-1 text-sm font-medium" style={{ background: 'var(--accent-light)', color: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}>
+              新增 <span className="font-data">{diff.newGuests.length}</span> 人 / 已存在 <span className="font-data">{diff.skippedGuests.length}</span> 人（跳過）
             </div>
-            )
-          })}
+          )}
+          {!isReimport && (
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              確認 <span className="font-data">{confirmedCount}</span> 人 / 婉拒 <span className="font-data">{declinedCount}</span> 人 / 共 <span className="font-data">{totalSeats}</span> 席
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="px-4 py-2 text-sm hover:opacity-80" style={{ color: 'var(--text-secondary)' }}>
+            返回
+          </button>
+          <button
+            onClick={() => onConfirm(allGuests)}
+            disabled={!canConfirm}
+            className="px-6 py-2 text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+            style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
+          >
+            {isReimport ? `匯入 ${importCount} 位新賓客` : `確認匯入 ${allGuests.length} 位賓客`}
+          </button>
         </div>
       </div>
 
-      {/* 資料預覽 */}
-      <div>
-        <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>資料預覽（共 <span className="font-data">{allGuests.length}</span> 筆）</h3>
-        <div className="overflow-x-auto max-h-80 overflow-y-auto" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+      {/* 錯誤提示 */}
+      {missingRequired.length > 0 && (
+        <div className="p-3 text-sm mb-4" style={{ background: '#FEF2F2', color: 'var(--error)', borderRadius: 'var(--radius-sm)' }}>
+          以下必填欄位未對應：{missingRequired.join('、')}
+        </div>
+      )}
+
+      {/* 左右佈局：欄位對應 | 資料預覽 */}
+      <div className="flex gap-6 flex-1 min-h-0">
+
+        {/* 左側：欄位對應 */}
+        <div className="flex-shrink-0" style={{ width: 340 }}>
+          <div className="p-4" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', height: '100%' }}>
+            <h3 className="text-sm font-medium mb-4" style={{ color: 'var(--text-primary)' }}>欄位對應</h3>
+            <div className="space-y-2">
+              {SYSTEM_FIELDS.map((sf) => {
+                const isMulti = mapping[sf.field] === '__multi__'
+                const isMissing = !mapping[sf.field]
+                return (
+                  <div key={sf.field} className="flex items-center gap-2">
+                    <label className="text-sm flex-shrink-0 flex items-center gap-1" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                      {sf.label}
+                      {sf.required && <span style={{ color: 'var(--error)' }}>*</span>}
+                      <span className="relative group">
+                        <Info size={11} style={{ color: 'var(--text-muted)', cursor: 'help' }} />
+                        <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover:block px-2 py-1 text-xs whitespace-nowrap"
+                          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', boxShadow: 'var(--shadow-sm)' }}>
+                          {FIELD_TOOLTIPS[sf.field]}
+                        </span>
+                      </span>
+                    </label>
+                    {isMulti ? (
+                      <span className="text-xs" style={{ color: 'var(--accent)' }}>
+                        多欄位（{multiMapping[sf.field].join(', ')}）
+                      </span>
+                    ) : (
+                      <select
+                        className="flex-1 text-sm px-2 py-1"
+                        style={{
+                          borderRadius: 'var(--radius-sm)',
+                          border: sf.required && isMissing
+                            ? '1px solid #DC2626'
+                            : !sf.required && isMissing
+                            ? '1px solid #F59E0B'
+                            : '1px solid var(--border)',
+                          background: sf.required && isMissing
+                            ? '#FEF2F2'
+                            : !sf.required && isMissing
+                            ? '#FFFBEB'
+                            : undefined,
+                        }}
+                        value={mapping[sf.field] || ''}
+                        onChange={(e) => updateMapping(sf.field, e.target.value || null)}
+                      >
+                        <option value="">{sf.required ? '⚠ 請選擇' : '（選填）'}</option>
+                        {data.headers.map((h) => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* 右側：資料預覽表格 */}
+        <div className="flex-1 min-w-0 overflow-auto" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)' }}>
           <table className="min-w-full text-sm" style={{ whiteSpace: 'nowrap' }}>
-            <thead className="sticky top-0" style={{ background: 'var(--bg-primary)' }}>
+            <thead className="sticky top-0 z-10" style={{ background: 'var(--bg-surface)' }}>
               <tr>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>#</th>
                 <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>姓名</th>
@@ -183,7 +206,7 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
                   <td className="px-3 py-2 font-medium" style={{ color: 'var(--text-primary)' }}>
                     {g.name}
                     {isReimport && (
-                      <span className="ml-2 text-2xs px-1.5 py-0.5" style={{
+                      <span className="ml-2 px-1.5 py-0.5" style={{
                         borderRadius: 'var(--radius-sm)',
                         background: isNew ? '#F0FDF4' : 'var(--bg-primary)',
                         color: isNew ? 'var(--success)' : 'var(--text-muted)',
@@ -211,32 +234,6 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* 錯誤提示 */}
-      {missingRequired.length > 0 && (
-        <div className="p-3 text-sm" style={{ background: '#FEF2F2', color: 'var(--error)', borderRadius: 'var(--radius-sm)' }}>
-          以下必填欄位未對應：{missingRequired.join('、')}
-        </div>
-      )}
-
-      {/* 操作按鈕 */}
-      <div className="flex justify-between">
-        <button
-          onClick={onBack}
-          className="px-4 py-2 text-sm hover:opacity-80"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          返回
-        </button>
-        <button
-          onClick={() => onConfirm(allGuests)}
-          disabled={!canConfirm}
-          className="px-6 py-2 text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-          style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
-        >
-          {isReimport ? `匯入 ${importCount} 位新賓客` : `確認匯入 ${allGuests.length} 位賓客`}
-        </button>
       </div>
     </div>
   )

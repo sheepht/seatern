@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { ParseResult } from '@/lib/csv-parser'
+import { parseCSV } from '@/lib/csv-parser'
 import type { RawGuest } from '@/lib/column-detector'
 import type { PreferenceMatch as PrefMatch } from '@/lib/preference-matcher'
 import { matchAllPreferences } from '@/lib/preference-matcher'
 import { diffGuests, type DiffResult } from '@/lib/guest-diff'
 import { CsvUpload } from '@/components/import/CsvUpload'
-import { PasteArea } from '@/components/import/PasteArea'
 import { ImportPreview } from '@/components/import/ImportPreview'
 import { PreferenceMatch } from '@/components/import/PreferenceMatch'
 
@@ -28,6 +28,10 @@ export default function ImportPage() {
   const [matches, setMatches] = useState<PrefMatch[]>([])
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Google Sheet URL 匯入
+  const [sheetUrl, setSheetUrl] = useState('')
+  const [sheetLoading, setSheetLoading] = useState(false)
 
   // 重新匯入：載入現有賓客名單
   const [existingGuests, setExistingGuests] = useState<ExistingGuest[]>([])
@@ -55,8 +59,41 @@ export default function ImportPage() {
     setParseResult(result)
     setStep('preview')
     setError(null)
-    setDiff(null) // reset diff when new data is parsed
+    setDiff(null)
   }, [])
+
+  // Google Sheet URL → CSV export → parse
+  const handleSheetImport = useCallback(async () => {
+    const url = sheetUrl.trim()
+    if (!url) return
+
+    // 從 URL 中提取 spreadsheet ID
+    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)
+    if (!match) {
+      setError('無法辨識 Google Sheet 網址，請確認格式正確')
+      return
+    }
+    const sheetId = match[1]
+    setSheetLoading(true)
+    setError(null)
+
+    try {
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`
+      const res = await fetch(csvUrl)
+      if (!res.ok) throw new Error('無法存取此 Google Sheet，請確認已設為「任何人都可以檢視」')
+      const text = await res.text()
+      const result = parseCSV(text)
+      if (result.rows.length === 0) {
+        setError('Sheet 內容為空')
+        return
+      }
+      handleParsed(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '匯入 Google Sheet 失敗')
+    } finally {
+      setSheetLoading(false)
+    }
+  }, [sheetUrl, handleParsed])
 
   const handlePreviewConfirm = useCallback((confirmedGuests: RawGuest[]) => {
     const hasExisting = existingGuests.length > 0
@@ -234,6 +271,9 @@ export default function ImportPage() {
         }
       }
 
+      // 重新載入 store 再導頁，避免畫布/名單頁看不到新資料
+      const { useSeatingStore } = await import('@/stores/seating')
+      if (eventId) await useSeatingStore.getState().loadEvent(eventId)
       navigate(`/workspace/${eventId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : '匯入失敗')
@@ -243,9 +283,12 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg-primary)' }}>
-      <div className="w-full max-w-2xl p-8" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
-        {step === 'input' && (
+    <div className="flex-1 overflow-hidden flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+      {/* input 步驟：居中卡片 */}
+      {step === 'input' && (
+      <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+      <div className="w-full max-w-3xl p-8" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
+        {(
           <div className="space-y-6">
             <div>
               <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
@@ -254,7 +297,7 @@ export default function ImportPage() {
               <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>
                 {existingGuests.length > 0
                   ? `已有 ${existingGuests.length} 位賓客，系統會自動跳過已存在的人`
-                  : '上傳 CSV、Excel 或直接貼上表格資料'
+                  : '選擇匯入方式'
                 }
               </p>
             </div>
@@ -262,89 +305,132 @@ export default function ImportPage() {
             {existingLoading ? (
               <div className="text-center py-8" style={{ color: 'var(--text-muted)' }}>載入中...</div>
             ) : (
-              <>
-                <CsvUpload onParsed={handleParsed} />
-
-                <div className="flex items-center gap-3">
-                  <div className="flex-1" style={{ borderTop: '1px solid var(--border)' }} />
-                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>或者直接貼上表格資料</span>
-                  <div className="flex-1" style={{ borderTop: '1px solid var(--border)' }} />
-                </div>
-
-                <PasteArea onParsed={handleParsed} />
-
-                <div className="p-4 text-sm" style={{ background: 'var(--accent-light)', borderRadius: 'var(--radius-md)' }}>
-                  <p className="font-medium mb-2" style={{ color: 'var(--text-primary)' }}>還沒有賓客名單？</p>
-                  <p className="mb-3" style={{ color: 'var(--text-secondary)' }}>
-                    下載我們的範本，填入你的賓客資料後再匯入。欄位已預先設定好，系統會自動對應。
+              <div className="grid grid-cols-2 gap-4">
+                {/* 左卡：Google Sheet 網址匯入 */}
+                <div className="p-5 flex flex-col" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)' }}>
+                  <div className="text-base font-medium mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+                    Google Sheet
+                  </div>
+                  <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+                    貼上公開的 Google Sheet 網址
                   </p>
-                  <div className="flex gap-3">
+
+                  <input
+                    value={sheetUrl}
+                    onChange={(e) => setSheetUrl(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSheetImport() }}
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    className="text-sm mb-3"
+                    style={{
+                      width: '100%', padding: '8px 10px',
+                      border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                      background: 'var(--bg-surface)', color: 'var(--text-primary)',
+                      fontFamily: 'var(--font-body)', outline: 'none', boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)' }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                  />
+
+                  <button
+                    onClick={handleSheetImport}
+                    disabled={!sheetUrl.trim() || sheetLoading}
+                    className="text-sm font-medium mb-4 hover:opacity-80 disabled:opacity-40"
+                    style={{
+                      padding: '8px 0', width: '100%',
+                      background: 'var(--accent)', color: '#fff',
+                      border: 'none', borderRadius: 'var(--radius-sm)',
+                      cursor: !sheetUrl.trim() || sheetLoading ? 'default' : 'pointer',
+                    }}
+                  >
+                    {sheetLoading ? '匯入中...' : '匯入'}
+                  </button>
+
+                  <div className="mt-auto text-sm" style={{ color: 'var(--text-muted)' }}>
+                    還沒有 Sheet？{' '}
                     <a
-                      href="/seatern-template.csv"
-                      download="seatern-template.csv"
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium hover:opacity-80"
-                      style={{ background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-sm)' }}
-                    >
-                      下載 CSV 範本
-                    </a>
-                    <a
-                      href="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/copy"
+                      href="https://docs.google.com/spreadsheets/d/1GkBJ7pmVsIDWQjJvelQRISrWEhMv8CERN8Vy9ZfpctQ/copy"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium hover:opacity-80"
-                      style={{ border: '1px solid var(--accent)', color: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
+                      className="hover:underline"
+                      style={{ color: 'var(--accent)' }}
                     >
-                      複製 Google Sheet 範本
+                      複製我們的範本 →
                     </a>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => navigate(`/workspace/${eventId}/guests`)}
-                  className="text-sm hover:underline"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  ← 返回賓客名單
-                </button>
-              </>
+                {/* 右卡：本機上傳 */}
+                <div className="p-5 flex flex-col" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)' }}>
+                  <div className="text-base font-medium mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+                    本機上傳
+                  </div>
+                  <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+                    上傳 CSV 或 Excel 檔案
+                  </p>
+
+                  <div className="flex-1 mb-4">
+                    <CsvUpload onParsed={handleParsed} />
+                  </div>
+
+                  <div className="mt-auto text-sm" style={{ color: 'var(--text-muted)' }}>
+                    還沒有檔案？{' '}
+                    <a
+                      href="/seatern-template.csv"
+                      download="seatern-template.csv"
+                      className="hover:underline"
+                      style={{ color: 'var(--accent)' }}
+                    >
+                      下載 CSV 範本 →
+                    </a>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
-        )}
-
-        {step === 'preview' && parseResult && (
-          <div>
-            <h1 className="text-2xl font-bold mb-6" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>確認匯入資料</h1>
-            <ImportPreview
-              data={parseResult}
-              onConfirm={handlePreviewConfirm}
-              onBack={() => setStep('input')}
-              existingGuests={existingGuests.length > 0 ? existingGuests : undefined}
-            />
-          </div>
-        )}
-
-        {step === 'preferences' && (
-          <div>
-            <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>確認「想同桌」配對</h1>
-            <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
-              系統已自動比對賓客填寫的「想同桌人選」，以下需要你確認
-            </p>
-            <PreferenceMatch
-              matches={matches}
-              onConfirm={handlePreferencesConfirm}
-              onSkipAll={handleSkipAll}
-              onBack={() => setStep('preview')}
-            />
-          </div>
-        )}
-
-        {importing && (
-          <div className="mt-4 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>匯入中...</div>
         )}
         {error && (
           <div className="mt-4 p-3 text-sm" style={{ background: '#FEF2F2', color: 'var(--error)', borderRadius: 'var(--radius-sm)' }}>{error}</div>
         )}
       </div>
+      </div>
+      )}
+
+      {/* preview 步驟：全版面 */}
+      {step === 'preview' && parseResult && (
+        <div className="p-6 flex-1 flex flex-col min-h-0" style={{ maxWidth: 1440, margin: '0 auto', width: '100%' }}>
+          <ImportPreview
+            data={parseResult}
+            onConfirm={handlePreviewConfirm}
+            onBack={() => setStep('input')}
+            existingGuests={existingGuests.length > 0 ? existingGuests : undefined}
+          />
+          {error && (
+            <div className="mt-4 p-3 text-sm" style={{ background: '#FEF2F2', color: 'var(--error)', borderRadius: 'var(--radius-sm)' }}>{error}</div>
+          )}
+        </div>
+      )}
+
+      {/* preferences 步驟：居中卡片 */}
+      {step === 'preferences' && (
+        <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+        <div className="w-full max-w-3xl p-8" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
+          <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>確認「想同桌」配對</h1>
+          <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
+            系統已自動比對賓客填寫的「想同桌人選」，以下需要你確認
+          </p>
+          <PreferenceMatch
+            matches={matches}
+            onConfirm={handlePreferencesConfirm}
+            onSkipAll={handleSkipAll}
+            onBack={() => setStep('preview')}
+          />
+        </div>
+        </div>
+      )}
+
+      {importing && (
+        <div className="text-center py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>匯入中...</div>
+      )}
     </div>
   )
 }

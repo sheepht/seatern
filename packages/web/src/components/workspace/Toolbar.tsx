@@ -12,7 +12,7 @@ import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors'
 interface ToolbarProps {
   onFitAll?: () => void
   onPanToTable?: (x: number, y: number) => void
-  page?: 'workspace' | 'guests'
+  page?: 'workspace' | 'guests' | 'import'
 }
 
 export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarProps = {}) {
@@ -528,33 +528,30 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
         <div className="flex items-stretch gap-2">
           {/* 頁面 Tab — 左上右有邊框，active tab 底部開口連接內容區 */}
           <div className="flex self-stretch items-end" style={{ marginBottom: -1 }}>
-            <button
-              onClick={() => { if (!isWorkspace) navigate(`/workspace/${eid}`) }}
-              style={{
-                padding: '10px 16px', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500,
-                cursor: isWorkspace ? 'default' : 'pointer',
-                background: isWorkspace ? 'var(--bg-primary)' : 'transparent',
-                color: isWorkspace ? 'var(--text-primary)' : 'var(--text-muted)',
-                border: isWorkspace ? '1px solid var(--border)' : '1px solid transparent',
-                borderBottom: isWorkspace ? '1px solid var(--bg-primary)' : '1px solid transparent',
-                borderRadius: '6px 6px 0 0',
-                marginRight: -1,
-                transition: 'color 150ms',
-              }}
-            >排位畫布</button>
-            <button
-              onClick={() => { if (isWorkspace) navigate(`/workspace/${eid}/guests`) }}
-              style={{
-                padding: '10px 16px', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500,
-                cursor: isWorkspace ? 'pointer' : 'default',
-                background: !isWorkspace ? 'var(--bg-primary)' : 'transparent',
-                color: !isWorkspace ? 'var(--text-primary)' : 'var(--text-muted)',
-                border: !isWorkspace ? '1px solid var(--border)' : '1px solid transparent',
-                borderBottom: !isWorkspace ? '1px solid var(--bg-primary)' : '1px solid transparent',
-                borderRadius: '6px 6px 0 0',
-                transition: 'color 150ms',
-              }}
-            >賓客名單</button>
+            {([
+              { key: 'workspace', label: '排位畫布', path: `/workspace/${eid}` },
+              { key: 'guests', label: '賓客名單', path: `/workspace/${eid}/guests` },
+              { key: 'import', label: '匯入資料', path: `/workspace/${eid}/import` },
+            ] as const).map((tab) => {
+              const active = page === tab.key
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => { if (!active) navigate(tab.path) }}
+                  style={{
+                    padding: '10px 16px', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500,
+                    cursor: active ? 'default' : 'pointer',
+                    background: active ? 'var(--bg-primary)' : 'transparent',
+                    color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                    border: active ? '1px solid var(--border)' : '1px solid transparent',
+                    borderBottom: active ? '1px solid var(--bg-primary)' : '1px solid transparent',
+                    borderRadius: '6px 6px 0 0',
+                    marginRight: -1,
+                    transition: 'color 150ms',
+                  }}
+                >{tab.label}</button>
+              )
+            })}
           </div>
 
           {/* ☰ 選單按鈕 */}
@@ -580,15 +577,6 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                     boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
                   }}
                 >
-                  {/* 匯入名單 */}
-                  <button
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
-                    style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
-                    onClick={() => { setShowMenu(false); navigate(`/workspace/${eid}/import`) }}
-                  >
-                    <FileDown size={16} className="shrink-0" />
-                    <span>匯入名單</span>
-                  </button>
                   {/* 清除所有資料 */}
                   <button
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-[#FEF2F2] disabled:hover:bg-transparent disabled:opacity-40 disabled:cursor-default"
@@ -801,15 +789,7 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                 onClick={async () => {
                   setClearingAll(true)
                   try {
-                    // 刪除所有賓客
-                    for (const g of guests) {
-                      await fetch(`/api/events/${eid}/guests/${g.id}`, { method: 'DELETE', credentials: 'include' })
-                    }
-                    // 刪除所有桌次
-                    for (const t of tables) {
-                      await fetch(`/api/events/${eid}/tables/${t.id}`, { method: 'DELETE', credentials: 'include' })
-                    }
-                    // 重新載入空活動
+                    await fetch(`/api/events/${eid}/reset`, { method: 'DELETE', credentials: 'include' })
                     const { loadEvent } = useSeatingStore.getState()
                     if (eid) await loadEvent(eid)
                   } finally {

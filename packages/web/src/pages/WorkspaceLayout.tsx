@@ -9,7 +9,9 @@ export default function WorkspaceLayout() {
   const loadEvent = useSeatingStore((s) => s.loadEvent)
   const loading = useSeatingStore((s) => s.loading)
 
-  const page = location.pathname.endsWith('/guests') ? 'guests' as const : 'workspace' as const
+  const page = location.pathname.endsWith('/import') ? 'import' as const
+    : location.pathname.endsWith('/guests') ? 'guests' as const
+    : 'workspace' as const
 
   useEffect(() => {
     if (eventId) loadEvent(eventId)

@@ -607,18 +607,6 @@ export default function GuestManagementPage() {
             避桌 {avoidPairs.length > 0 && <span style={{ fontWeight: 600 }}>{avoidPairs.length}</span>}
           </button>
 
-          {/* 追加匯入 */}
-          <button
-            onClick={() => navigate(`/workspace/${eventId}/import`)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px',
-              borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
-              background: 'var(--bg-surface)', fontSize: 13, fontFamily: 'var(--font-ui)',
-              cursor: 'pointer', color: 'var(--text-secondary)',
-            }}
-          >
-            追加匯入
-          </button>
 
           {/* Right: Stats */}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
