@@ -13,26 +13,44 @@ import type { Guest, Table, AvoidPair } from './types'
 export function calculateGroupScore(
   guest: Guest,
   tableGuests: Guest[],
+  allGuests: Guest[] = [],
+  tables: Table[] = [],
 ): number {
-  if (tableGuests.length <= 1) return 0
-
   const guestSubcat = guest.subcategory?.name
   if (!guestSubcat) return 0
 
   const others = tableGuests.filter((g) => g.id !== guest.id)
-  if (others.length === 0) return 0
 
   const sameGroupCount = others.filter(
     (other) => other.subcategory?.name === guestSubcat,
   ).length
 
-  const ratio = sameGroupCount / others.length
+  // 同桌群組比例基礎分
+  let base = 0
+  if (others.length > 0) {
+    const ratio = sameGroupCount / others.length
+    if (ratio >= 0.5) base = 20
+    else if (ratio >= 0.3) base = 15
+    else if (ratio >= 0.1) base = 10
+    else if (sameGroupCount >= 1) base = 5
+  }
 
-  if (ratio >= 0.5) return 20
-  if (ratio >= 0.3) return 15
-  if (ratio >= 0.1) return 10
-  if (sameGroupCount >= 1) return 5
-  return 0
+  // 鄰桌同子分類補償：同群組的人在鄰桌 → +5（溢出安排補償）
+  if (base < 20 && guest.assignedTableId && tables.length > 0) {
+    const currentTable = tables.find((t) => t.id === guest.assignedTableId)
+    if (currentTable) {
+      const hasNeighborGroup = allGuests.some((g) => {
+        if (g.id === guest.id || g.assignedTableId === guest.assignedTableId) return false
+        if (g.subcategory?.name !== guestSubcat) return false
+        if (g.rsvpStatus !== 'confirmed' || !g.assignedTableId) return false
+        const gTable = tables.find((t) => t.id === g.assignedTableId)
+        return gTable ? isNeighborTable(currentTable, gTable) : false
+      })
+      if (hasNeighborGroup) base = Math.min(20, base + 5)
+    }
+  }
+
+  return base
 }
 
 // ─── 偏好分（0-25）──────────────────────────────────
@@ -52,26 +70,29 @@ export function calculatePreferenceScore(
   const matchedCount = preferredIds.filter((id) => tableGuestIds.has(id)).length
   const totalPrefs = preferredIds.length
 
-  if (totalPrefs >= 3 && matchedCount >= 3) return 25
-  if (matchedCount >= 2) return 18
-  if (matchedCount >= 1) return 10
+  // 同桌配對基礎分
+  let base = 0
+  if (totalPrefs >= 3 && matchedCount >= 3) base = 25
+  else if (matchedCount >= 2) base = 18
+  else if (matchedCount >= 1) base = 10
 
-  // 0 配對：檢查是否有人在鄰桌
-  if (matchedCount === 0 && guest.assignedTableId) {
+  // 鄰桌加分：每位想同桌的人在鄰桌 +3（與同桌配對疊加，總分上限 25）
+  if (base < 25 && guest.assignedTableId) {
     const currentTable = tables.find((t) => t.id === guest.assignedTableId)
     if (currentTable) {
-      const hasNeighbor = preferredIds.some((prefId) => {
+      let neighborBonus = 0
+      for (const prefId of preferredIds) {
+        if (tableGuestIds.has(prefId)) continue // 已在同桌，不重複計算
         const prefGuest = allGuests.find((g) => g.id === prefId)
-        if (!prefGuest?.assignedTableId || prefGuest.assignedTableId === guest.assignedTableId) return false
+        if (!prefGuest?.assignedTableId || prefGuest.assignedTableId === guest.assignedTableId) continue
         const prefTable = tables.find((t) => t.id === prefGuest.assignedTableId)
-        if (!prefTable) return false
-        return isNeighborTable(currentTable, prefTable)
-      })
-      if (hasNeighbor) return 5
+        if (prefTable && isNeighborTable(currentTable, prefTable)) neighborBonus += 3
+      }
+      base = Math.min(25, base + neighborBonus)
     }
   }
 
-  return 0
+  return base
 }
 
 // ─── 鄰桌判定 ───────────────────────────────────────
@@ -123,7 +144,7 @@ export function calculateSatisfaction(
   )
 
   const base = 50
-  const groupScore = calculateGroupScore(guest, tableGuests)
+  const groupScore = calculateGroupScore(guest, tableGuests, allGuests, tables)
   const prefScore = calculatePreferenceScore(guest, tableGuests, allGuests, tables)
   const needsScore = 5 // 固定 +5
   const avoidPenalty = calculateAvoidPenalty(guest, tableGuests, avoidPairs)
