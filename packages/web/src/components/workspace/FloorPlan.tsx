@@ -526,11 +526,15 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
   // 桌次位置、大小、或 zoom/pan 改變時更新 overlay
   // useLayoutEffect 確保在 paint 前更新，避免 overlay 閃爍
-  // 額外用 rAF 補一次：zoom/pan 變更後 SVG viewBox 可能延遲一幀才生效
+  // double-rAF：SVG viewBox 在 state 更新後可能需要兩幀才完全生效
   useLayoutEffect(() => {
     updateScreenPositions()
-    const raf = requestAnimationFrame(() => updateScreenPositions())
-    return () => cancelAnimationFrame(raf)
+    let raf2 = 0
+    const raf1 = requestAnimationFrame(() => {
+      updateScreenPositions()
+      raf2 = requestAnimationFrame(() => updateScreenPositions())
+    })
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2) }
   }, [updateScreenPositions, zoom, panX, panY])
 
   useEffect(() => {
