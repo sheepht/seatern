@@ -529,9 +529,9 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
           {/* 頁面 Tab — 左上右有邊框，active tab 底部開口連接內容區 */}
           <div className="flex self-stretch items-end" style={{ marginBottom: -1 }}>
             {([
-              { key: 'workspace', label: '排位畫布', path: `/workspace/${eid}` },
-              { key: 'guests', label: '賓客名單', path: `/workspace/${eid}/guests` },
-              { key: 'import', label: '匯入資料', path: `/workspace/${eid}/import` },
+              { key: 'workspace', label: '排位畫布', path: '/workspace' },
+              { key: 'guests', label: '賓客名單', path: '/workspace/guests' },
+              { key: 'import', label: '匯入資料', path: '/workspace/import' },
             ] as const).map((tab) => {
               const active = page === tab.key
               return (
@@ -791,7 +791,7 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                   try {
                     await fetch(`/api/events/${eid}/reset`, { method: 'DELETE', credentials: 'include' })
                     const { loadEvent } = useSeatingStore.getState()
-                    if (eid) await loadEvent(eid)
+                    if (eid) await loadEvent()
                   } finally {
                     setClearingAll(false)
                     setShowClearAllConfirm(false)

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { useSeatingStore } from '@/stores/seating'
 import type { ParseResult } from '@/lib/csv-parser'
 import { parseCSV } from '@/lib/csv-parser'
 import type { RawGuest } from '@/lib/column-detector'
@@ -20,7 +21,8 @@ interface ExistingGuest {
 
 export default function ImportPage() {
   const navigate = useNavigate()
-  const { eventId } = useParams<{ eventId: string }>()
+  const eventId = useSeatingStore((s) => s.eventId)
+  const storeGuests = useSeatingStore((s) => s.guests)
 
   const [step, setStep] = useState<Step>('input')
   const [parseResult, setParseResult] = useState<ParseResult | null>(null)
@@ -33,27 +35,10 @@ export default function ImportPage() {
   const [sheetUrl, setSheetUrl] = useState('')
   const [sheetLoading, setSheetLoading] = useState(false)
 
-  // 重新匯入：載入現有賓客名單
-  const [existingGuests, setExistingGuests] = useState<ExistingGuest[]>([])
-  const [existingLoading, setExistingLoading] = useState(false)
+  // 重新匯入：從 store 讀取現有賓客名單
+  const existingGuests: ExistingGuest[] = storeGuests.map((g) => ({ id: g.id, name: g.name, aliases: g.aliases || [] }))
+  const existingLoading = false
   const [diff, setDiff] = useState<DiffResult | null>(null)
-
-  useEffect(() => {
-    if (!eventId) return
-    setExistingLoading(true)
-    fetch(`/api/events/${eventId}`, { credentials: 'include' })
-      .then((res) => {
-        if (!res.ok) throw new Error('載入活動失敗')
-        return res.json()
-      })
-      .then((data) => {
-        setExistingGuests(
-          data.guests.map((g: any) => ({ id: g.id, name: g.name, aliases: g.aliases || [] }))
-        )
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setExistingLoading(false))
-  }, [eventId])
 
   const handleParsed = useCallback((result: ParseResult) => {
     setParseResult(result)
@@ -272,9 +257,8 @@ export default function ImportPage() {
       }
 
       // 重新載入 store 再導頁，避免畫布/名單頁看不到新資料
-      const { useSeatingStore } = await import('@/stores/seating')
-      if (eventId) await useSeatingStore.getState().loadEvent(eventId)
-      navigate(`/workspace/${eventId}`)
+      await useSeatingStore.getState().loadEvent()
+      navigate('/workspace')
     } catch (err) {
       setError(err instanceof Error ? err.message : '匯入失敗')
     } finally {

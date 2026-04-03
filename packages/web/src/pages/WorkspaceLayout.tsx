@@ -1,20 +1,21 @@
 import { useEffect } from 'react'
-import { useParams, useLocation, Outlet } from 'react-router-dom'
+import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import { useSeatingStore } from '@/stores/seating'
 import { Toolbar } from '@/components/workspace/Toolbar'
 
 export default function WorkspaceLayout() {
-  const { eventId } = useParams<{ eventId: string }>()
   const location = useLocation()
+  const navigate = useNavigate()
   const loadEvent = useSeatingStore((s) => s.loadEvent)
   const loading = useSeatingStore((s) => s.loading)
+  const eventId = useSeatingStore((s) => s.eventId)
 
   const page = location.pathname.endsWith('/import') ? 'import' as const
     : location.pathname.endsWith('/guests') ? 'guests' as const
     : 'workspace' as const
 
   useEffect(() => {
-    if (eventId) loadEvent(eventId)
+    if (!eventId) loadEvent()
   }, [eventId, loadEvent])
 
   if (loading) {

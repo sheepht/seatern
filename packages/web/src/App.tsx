@@ -26,7 +26,7 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
 
             {/* Workspace（Phase 1 不需要登入） */}
-            <Route path="/workspace/:eventId" element={<WorkspaceLayout />}>
+            <Route path="/workspace" element={<WorkspaceLayout />}>
               <Route index element={<WorkspacePage />} />
               <Route path="guests" element={<GuestManagementPage />} />
               <Route path="import" element={<ImportPage />} />

@@ -519,7 +519,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
             <div className="text-center py-8 space-y-3">
               <p className="text-base" style={{ color: 'var(--text-muted)' }}>尚無賓客資料</p>
               <button
-                onClick={() => navigate(`/workspace/${eventId}/import`)}
+                onClick={() => navigate('/workspace/import')}
                 className="px-4 py-2 text-sm font-medium hover:opacity-80"
                 style={{ background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-sm)' }}
               >

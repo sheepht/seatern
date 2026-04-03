@@ -8,6 +8,14 @@ export default function LandingPage() {
   const handleStart = async () => {
     setCreating(true)
     try {
+      // 先檢查是否已有活動
+      const checkRes = await fetch('/api/events/mine', { credentials: 'include' })
+      if (checkRes.ok) {
+        navigate('/workspace')
+        return
+      }
+
+      // 沒有活動，建立新的
       const res = await fetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -15,8 +23,7 @@ export default function LandingPage() {
         body: JSON.stringify({ name: '我的婚禮', type: 'wedding' }),
       })
       if (!res.ok) throw new Error('建立活動失敗')
-      const event = await res.json()
-      navigate(`/workspace/${event.id}/import`)
+      navigate('/workspace/import')
     } catch {
       setCreating(false)
     }

@@ -120,7 +120,7 @@ interface SeatingState {
   >
 
   // Actions
-  loadEvent: (eventId: string) => Promise<void>
+  loadEvent: () => Promise<void>
   setSelectedTable: (tableId: string | null) => void
   setHoveredGuest: (guestId: string | null, screenY?: number | null) => void
   setActiveDragGuest: (guestId: string | null) => void
@@ -199,10 +199,15 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     if (ctrl) ctrl.abort()
   },
 
-  loadEvent: async (eventId: string) => {
+  loadEvent: async () => {
     set({ loading: true })
     try {
-      const res = await fetch(`/api/events/${eventId}`, { credentials: 'include' })
+      const res = await fetch('/api/events/mine', { credentials: 'include' })
+      if (res.status === 404) {
+        set({ loading: false })
+        window.location.href = '/'
+        return
+      }
       if (!res.ok) throw new Error('Failed to load event')
       const data = await res.json()
 

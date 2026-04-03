@@ -34,6 +34,36 @@ events.get('/', async (c) => {
   return c.json(list)
 })
 
+// GET /events/mine — 取得當前 session 的唯一活動（含賓客、桌次等）
+events.get('/mine', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+
+  const include = {
+    guests: {
+      include: {
+        seatPreferences: true,
+        subcategory: true,
+      },
+      orderBy: { name: 'asc' } as const,
+    },
+    tables: { orderBy: { name: 'asc' } as const },
+    subcategories: { orderBy: { name: 'asc' } as const },
+    edges: true,
+    avoidPairs: true,
+    snapshots: { orderBy: { createdAt: 'desc' } as const },
+  }
+
+  const event = await prisma.event.findFirst({
+    where: { ownerId, ownerType },
+    include,
+    orderBy: { updatedAt: 'desc' },
+  })
+
+  if (!event) return c.json({ error: 'No event found' }, 404)
+  return c.json(event)
+})
+
 // GET /events/:id — 取得單一活動（含賓客、桌次、標籤）
 events.get('/:id', async (c) => {
   const ownerId = c.get('ownerId')

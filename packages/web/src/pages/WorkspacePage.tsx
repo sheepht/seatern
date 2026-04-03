@@ -357,7 +357,7 @@ export default function WorkspacePage() {
               await setGuestSubcategory(editGuest.id, null)
             }
             const { loadEvent } = useSeatingStore.getState()
-            if (eventId) await loadEvent(eventId)
+            if (eventId) await loadEvent()
             setEditingGuest(null)
           }}
           onDelete={(gid) => { setEditingGuest(null); deleteGuest(gid) }}

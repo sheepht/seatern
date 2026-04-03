@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Search, X } from 'lucide-react'
 import { useSeatingStore } from '@/stores/seating'
 import { getSatisfactionColor } from '@/lib/satisfaction'
@@ -237,8 +237,8 @@ function StatsBar({
 // ─── Main Page ──────────────────────────────────────
 
 export default function GuestManagementPage() {
-  const { eventId } = useParams<{ eventId: string }>()
   const navigate = useNavigate()
+  const eventId = useSeatingStore((s) => s.eventId)
   const guests = useSeatingStore((s) => s.guests)
   const tables = useSeatingStore((s) => s.tables)
   const eventName = useSeatingStore((s) => s.eventName)
@@ -711,7 +711,7 @@ export default function GuestManagementPage() {
                     >
                       <Plus size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> 新增賓客
                     </button>
-                    <button onClick={() => navigate(`/workspace/${eventId}/import`)} style={{ padding: '8px 20px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', background: 'var(--bg-surface)', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)' }}>
+                    <button onClick={() => navigate('/workspace/import')} style={{ padding: '8px 20px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', background: 'var(--bg-surface)', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)' }}>
                       匯入名單
                     </button>
                   </div>
@@ -812,7 +812,7 @@ export default function GuestManagementPage() {
               }
               // Reload to get fresh data
               const { loadEvent } = useSeatingStore.getState()
-              if (eventId) await loadEvent(eventId)
+              if (eventId) await loadEvent()
               setEditingGuestId(null)
             }}
             onDelete={(gid) => { setEditingGuestId(null); handleDelete(guests.find((g) => g.id === gid)!) }}
@@ -855,7 +855,7 @@ export default function GuestManagementPage() {
                 } catch {}
               }
               const { loadEvent } = useSeatingStore.getState()
-              if (eventId) await loadEvent(eventId)
+              if (eventId) await loadEvent()
               setShowAddModal(false)
               setToast({ message: `已新增 ${data.name}` })
             }
