@@ -231,8 +231,13 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
   }
 
   const handleDeleteEmptyTables = async () => {
-    const emptyTables = tables.filter((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed'))
-    for (const t of emptyTables) await removeTable(t.id)
+    const eventId = useSeatingStore.getState().eventId
+    if (!eventId) return
+    const res = await authFetch(`/api/events/${eventId}/tables/empty`, { method: 'DELETE' })
+    if (res.ok) {
+      const { loadEvent } = useSeatingStore.getState()
+      await loadEvent()
+    }
   }
 
   const handleAutoArrange = async () => {

@@ -401,6 +401,34 @@ events.patch('/:eventId/tables/:tableId', async (c) => {
   return c.json(table)
 })
 
+// DELETE /events/:eventId/tables/empty — 批次刪除空桌（必須在 :tableId 之前）
+events.delete('/:eventId/tables/empty', async (c) => {
+  const ownerId = c.get('ownerId')
+  const ownerType = c.get('ownerType')
+  const { eventId } = c.req.param()
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType)
+  if (!event) return c.json({ error: 'Event not found' }, 404)
+
+  const allTables = await prisma.table.findMany({ where: { eventId } })
+  const occupiedTableIds = await prisma.guest.groupBy({
+    by: ['assignedTableId'],
+    where: { eventId, assignedTableId: { not: null }, rsvpStatus: 'confirmed' },
+  }).then(rows => rows.map(r => r.assignedTableId).filter(Boolean))
+
+  const emptyTableIds = allTables
+    .filter(t => !occupiedTableIds.includes(t.id))
+    .map(t => t.id)
+
+  if (emptyTableIds.length === 0) return c.json({ deleted: 0 })
+
+  const result = await prisma.table.deleteMany({
+    where: { id: { in: emptyTableIds } },
+  })
+
+  return c.json({ deleted: result.count })
+})
+
 // DELETE /events/:eventId/tables/:tableId — 刪除桌次（同時清除賓客分配）
 events.delete('/:eventId/tables/:tableId', async (c) => {
   const ownerId = c.get('ownerId')
