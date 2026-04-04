@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo } from 'react'
+import { authFetch } from '@/lib/api'
 import { createPortal } from 'react-dom'
 import { useDroppable } from '@dnd-kit/core'
 import { useNavigate } from 'react-router-dom'
@@ -222,8 +223,8 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
     const { eventId } = useSeatingStore.getState()
     if (eventId) {
       const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed')
-      fetch(`/api/events/${eventId}/guests/assign-batch`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      authFetch(`/api/events/${eventId}/guests/assign-batch`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assignments: confirmed.map((g) => ({ guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null })) }),
       }).catch(console.error)
     }

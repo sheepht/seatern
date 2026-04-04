@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { authFetch } from '@/lib/api'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Search, X } from 'lucide-react'
@@ -300,7 +301,7 @@ export default function GuestManagementPage() {
         // Fire pending deletes immediately
         const { eventId } = useSeatingStore.getState()
         if (eventId) {
-          fetch(`/api/events/${eventId}/guests/${guestId}`, { method: 'DELETE', credentials: 'include' })
+          authFetch(`/api/events/${eventId}/guests/${guestId}`, { method: 'DELETE', credentials: 'include' })
         }
       })
       deleteTimers.current.clear()
@@ -384,7 +385,7 @@ export default function GuestManagementPage() {
         setToast(null)
         // Timer 到了才真正刪 DB
         try {
-          await fetch(`/api/events/${eventId}/guests/${guest.id}`, {
+          await authFetch(`/api/events/${eventId}/guests/${guest.id}`, {
             method: 'DELETE',
             credentials: 'include',
           })
@@ -425,7 +426,7 @@ export default function GuestManagementPage() {
       deleteTimers.current.delete(guestId)
       setToast(null)
       try {
-        await fetch(`/api/events/${eventId}/guests/${guestId}`, {
+        await authFetch(`/api/events/${eventId}/guests/${guestId}`, {
           method: 'DELETE',
           credentials: 'include',
         })
@@ -806,7 +807,7 @@ export default function GuestManagementPage() {
               // Handle subcategory
               if (data.subcategoryName) {
                 try {
-                  await fetch(`/api/events/${eventId}/subcategories/batch`, {
+                  await authFetch(`/api/events/${eventId}/subcategories/batch`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
@@ -852,7 +853,7 @@ export default function GuestManagementPage() {
               }
               if (subcategoryName && data.category) {
                 try {
-                  await fetch(`/api/events/${eventId}/subcategories/batch`, {
+                  await authFetch(`/api/events/${eventId}/subcategories/batch`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',

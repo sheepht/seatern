@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { authFetch } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 
 export default function AuthCallbackPage() {
@@ -36,13 +37,11 @@ export default function AuthCallbackPage() {
       await claimEvent()
 
       // Ensure an event exists before navigating to workspace
-      const checkRes = await fetch('/api/events/mine', { credentials: 'include' })
+      const checkRes = await authFetch('/api/events/mine')
       if (checkRes.status === 404) {
-        // No event yet, create one
-        await fetch('/api/events', {
+        await authFetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify({ name: '我的婚禮', type: 'wedding' }),
         })
       }

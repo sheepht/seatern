@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { authFetch } from '@/lib/api'
 import { useNavigate } from 'react-router-dom'
 import { useSeatingStore } from '@/stores/seating'
 import type { ParseResult } from '@/lib/csv-parser'
@@ -124,7 +125,7 @@ export default function ImportPage() {
       if (!eventId) throw new Error('缺少活動 ID')
 
       // 批次匯入賓客
-      const guestRes = await fetch(`/api/events/${eventId}/guests/batch`, {
+      const guestRes = await authFetch(`/api/events/${eventId}/guests/batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -166,7 +167,7 @@ export default function ImportPage() {
           .filter((p): p is NonNullable<typeof p> => p !== null)
 
         if (preferences.length > 0) {
-          const prefRes = await fetch(`/api/events/${eventId}/preferences/batch`, {
+          const prefRes = await authFetch(`/api/events/${eventId}/preferences/batch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -189,7 +190,7 @@ export default function ImportPage() {
         })
       })
       if (subcatAssignments.length > 0) {
-        await fetch(`/api/events/${eventId}/subcategories/batch`, {
+        await authFetch(`/api/events/${eventId}/subcategories/batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -216,7 +217,7 @@ export default function ImportPage() {
         }
       })
       if (avoidPairs.length > 0) {
-        await fetch(`/api/events/${eventId}/avoid-pairs/batch`, {
+        await authFetch(`/api/events/${eventId}/avoid-pairs/batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -232,7 +233,7 @@ export default function ImportPage() {
       if (newConfirmedSeats > 0) {
         const newTableCount = Math.ceil(newConfirmedSeats / 10)
         // 取得現有桌次數量來決定新桌的名稱和位置
-        const eventRes = await fetch(`/api/events/${eventId}`, { credentials: 'include' })
+        const eventRes = await authFetch(`/api/events/${eventId}`, { credentials: 'include' })
         const eventData = await eventRes.json()
         const existingTableCount = eventData.tables?.length || 0
         for (let i = 0; i < newTableCount; i++) {
@@ -242,7 +243,7 @@ export default function ImportPage() {
           const idx = existingTableCount + i
           const row = Math.floor(idx / cols)
           const col = idx % cols
-          await fetch(`/api/events/${eventId}/tables`, {
+          await authFetch(`/api/events/${eventId}/tables`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',

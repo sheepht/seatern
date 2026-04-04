@@ -36,11 +36,20 @@ export async function ensureUser(payload: { sub?: string; email?: unknown; user_
     email.split('@')[0]
   const avatarUrl = (metadata.avatar_url as string) || undefined
 
-  await prisma.user.upsert({
-    where: { id: userId },
-    update: { email, name, avatarUrl },
-    create: { id: userId, email, name, avatarUrl },
-  })
+  // Try by id first, then by email (handles OAuth linking where Supabase id differs)
+  const byId = await prisma.user.findUnique({ where: { id: userId } })
+  if (byId) {
+    await prisma.user.update({ where: { id: userId }, data: { name, avatarUrl } })
+  } else {
+    const byEmail = await prisma.user.findUnique({ where: { email } })
+    if (byEmail) {
+      // Same email, different Supabase id (e.g. LINE + Google same person)
+      // Update the existing record's id to the new Supabase id
+      await prisma.user.update({ where: { email }, data: { id: userId, name, avatarUrl } })
+    } else {
+      await prisma.user.create({ data: { id: userId, email, name, avatarUrl } })
+    }
+  }
 
   return userId
 }

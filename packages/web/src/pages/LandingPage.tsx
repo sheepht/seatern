@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { authFetch } from '@/lib/api'
 
 export default function LandingPage() {
   const navigate = useNavigate()
@@ -9,17 +10,16 @@ export default function LandingPage() {
     setCreating(true)
     try {
       // 先檢查是否已有活動
-      const checkRes = await fetch('/api/events/mine', { credentials: 'include' })
+      const checkRes = await authFetch('/api/events/mine')
       if (checkRes.ok) {
         navigate('/workspace')
         return
       }
 
       // 沒有活動，建立新的
-      const res = await fetch('/api/events', {
+      const res = await authFetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ name: '我的婚禮', type: 'wedding' }),
       })
       if (!res.ok) throw new Error('建立活動失敗')

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { authFetch } from '@/lib/api'
 import { createPortal } from 'react-dom'
 import { ChevronRight } from 'lucide-react'
 import {
@@ -346,7 +347,7 @@ export default function WorkspacePage() {
             }
             if (data.subcategoryName) {
               try {
-                await fetch(`/api/events/${eventId}/subcategories/batch`, {
+                await authFetch(`/api/events/${eventId}/subcategories/batch`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   credentials: 'include',

@@ -6,13 +6,14 @@ const DEV_ACCOUNTS = [
   { userId: '00000000-0000-0000-0000-000000000001', name: '測試用戶', email: 'test@example.com', label: '測試' },
 ]
 
+import { authFetch } from '@/lib/api'
+
 async function ensureEventExists() {
-  const res = await fetch('/api/events/mine', { credentials: 'include' })
+  const res = await authFetch('/api/events/mine')
   if (res.status === 404) {
-    await fetch('/api/events', {
+    await authFetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ name: '我的婚禮', type: 'wedding' }),
     })
   }

@@ -84,6 +84,18 @@ auth.get('/line/callback', async (c) => {
     }
     const tokenData = await tokenRes.json() as { access_token: string; id_token?: string }
 
+    // Decode id_token to extract email (LINE returns email in JWT, not profile API)
+    let lineEmail: string | undefined
+    if (tokenData.id_token) {
+      try {
+        const [, payloadB64] = tokenData.id_token.split('.')
+        const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')))
+        lineEmail = payload.email
+      } catch {
+        // id_token decode failed, proceed without email
+      }
+    }
+
     // Fetch LINE profile
     const profileRes = await fetch('https://api.line.me/v2/profile', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
@@ -100,8 +112,8 @@ auth.get('/line/callback', async (c) => {
       pictureUrl?: string
     }
 
-    // Create or find user via Supabase Admin API
-    const email = `line_${profile.userId}@seatern.app`
+    // Use real email if available, fallback to synthetic email
+    const email = lineEmail || `line_${profile.userId}@seatern.app`
     let supabaseUserId: string
 
     // Try to create first; if email already exists, find the existing user
@@ -121,8 +133,8 @@ auth.get('/line/callback', async (c) => {
       supabaseUserId = newUser.user.id
     } else if (createError?.message?.includes('already been registered')) {
       // User exists, find by email
-      const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ filter: email })
-      const existing = listData?.users?.[0]
+      const { data: listData } = await supabaseAdmin.auth.admin.listUsers()
+      const existing = listData?.users?.find(u => u.email === email)
       if (!existing) {
         console.error('LINE user exists in Supabase but not found by filter:', email)
         return loginError('登入處理失敗')

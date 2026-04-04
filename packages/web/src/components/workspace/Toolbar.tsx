@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid, Trash2, Dices, Users, FileDown } from 'lucide-react'
+import { authFetch } from '@/lib/api'
 import { useSeatingStore } from '@/stores/seating'
 import { useAuthStore } from '@/stores/auth'
 import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction'
@@ -809,7 +810,7 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                 onClick={async () => {
                   setClearingAll(true)
                   try {
-                    await fetch(`/api/events/${eid}/reset`, { method: 'DELETE', credentials: 'include' })
+                    await authFetch(`/api/events/${eid}/reset`, { method: 'DELETE' })
                     const { loadEvent } = useSeatingStore.getState()
                     if (eid) await loadEvent()
                   } finally {

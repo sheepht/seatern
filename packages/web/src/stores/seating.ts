@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { authFetch } from '@/lib/api'
 import { recalculateAll } from '@/lib/satisfaction'
 import { type AutoAssignMode, type AutoAssignProgress } from '@/lib/auto-assign'
 import { runAutoAssignInWorker } from '@/lib/auto-assign-client'
@@ -208,7 +209,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   loadEvent: async () => {
     set({ loading: true })
     try {
-      const res = await fetch('/api/events/mine', { credentials: 'include' })
+      const res = await authFetch('/api/events/mine', { credentials: 'include' })
       if (res.status === 404) {
         set({ loading: false })
         window.location.href = '/'
@@ -754,7 +755,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       ),
     )
 
-    await fetch(`/api/events/${eventId}/tables/${tableId}`, {
+    await authFetch(`/api/events/${eventId}/tables/${tableId}`, {
       method: 'DELETE',
       credentials: 'include',
     }).catch(console.error)
@@ -764,7 +765,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const { eventId, tables } = get()
     if (!eventId) return
 
-    const res = await fetch(`/api/events/${eventId}/tables`, {
+    const res = await authFetch(`/api/events/${eventId}/tables`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -1109,7 +1110,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     // 存 DB（批次一次寫入）
     if (eventId) {
       try {
-        const res = await fetch(`/api/events/${eventId}/guests/assign-batch`, {
+        const res = await authFetch(`/api/events/${eventId}/guests/assign-batch`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -1164,7 +1165,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       })),
     }
 
-    const res = await fetch(`/api/events/${eventId}/snapshots`, {
+    const res = await authFetch(`/api/events/${eventId}/snapshots`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -1280,7 +1281,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const { eventId, avoidPairs } = get()
     if (!eventId) return
 
-    const res = await fetch(`/api/events/${eventId}/avoid-pairs`, {
+    const res = await authFetch(`/api/events/${eventId}/avoid-pairs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -1295,7 +1296,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const { eventId, avoidPairs } = get()
     if (!eventId) return
 
-    await fetch(`/api/events/${eventId}/avoid-pairs/${pairId}`, {
+    await authFetch(`/api/events/${eventId}/avoid-pairs/${pairId}`, {
       method: 'DELETE',
       credentials: 'include',
     })
@@ -1413,7 +1414,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     }
 
     try {
-      const res = await fetch(`/api/events/${eventId}/guests/${guestId}`, {
+      const res = await authFetch(`/api/events/${eventId}/guests/${guestId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -1458,7 +1459,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     set({ guests: recalcedGuests, tables: recalcedTables })
 
     try {
-      const res = await fetch(`/api/events/${eventId}/guests/${guestId}`, {
+      const res = await authFetch(`/api/events/${eventId}/guests/${guestId}`, {
         method: 'DELETE',
         credentials: 'include',
       })
@@ -1473,7 +1474,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     if (!eventId) return null
 
     try {
-      const res = await fetch(`/api/events/${eventId}/guests`, {
+      const res = await authFetch(`/api/events/${eventId}/guests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -1523,7 +1524,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     set({ guests: nextGuests })
 
     try {
-      const res = await fetch(`/api/events/${eventId}/guests/${guestId}/preferences`, {
+      const res = await authFetch(`/api/events/${eventId}/guests/${guestId}/preferences`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -1561,7 +1562,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     if (idx < 0) return false
 
     try {
-      const res = await fetch(`/api/events/${eventId}/guests/${guestId}`, {
+      const res = await authFetch(`/api/events/${eventId}/guests/${guestId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
