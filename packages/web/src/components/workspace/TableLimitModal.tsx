@@ -1,34 +1,87 @@
 import { useSeatingStore } from '@/stores/seating'
+import { useAuthStore } from '@/stores/auth'
 import { useNavigate } from 'react-router-dom'
 
 export default function TableLimitModal() {
   const tableLimitReached = useSeatingStore((s) => s.tableLimitReached)
-  const tableLimitDismissed = useSeatingStore((s) => s.tableLimitDismissed)
+  const tables = useSeatingStore((s) => s.tables)
+  const user = useAuthStore((s) => s.user)
   const navigate = useNavigate()
 
-  if (!tableLimitReached || tableLimitDismissed) return null
+  if (!tableLimitReached) return null
+
+  const isLoggedIn = !!user
+  const limit = isLoggedIn ? 20 : 10
 
   const dismiss = () => {
-    useSeatingStore.setState({ tableLimitReached: false, tableLimitDismissed: true })
+    useSeatingStore.setState({ tableLimitReached: false })
   }
 
-  const goLogin = () => {
-    navigate('/login')
+  // Logged-in user hitting 20-table limit → paid tier prompt
+  if (isLoggedIn) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center sm:items-center">
+        <div className="absolute inset-0 bg-stone-900/40" onClick={dismiss} />
+        <div className="relative w-full sm:max-w-[420px] bg-white sm:rounded-xl rounded-t-2xl sm:mx-4 p-8 shadow-[0_20px_60px_rgba(28,25,23,0.15)] max-sm:fixed max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:rounded-b-none max-sm:pb-10">
+          <div className="sm:hidden flex justify-center mb-4">
+            <div className="w-10 h-1 rounded-full bg-stone-300" />
+          </div>
+
+          <div className="flex justify-center mb-5">
+            <div className="w-12 h-12 rounded-full bg-[#F5F0E6] flex items-center justify-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#B08D57" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
+            </div>
+          </div>
+
+          <h2 className="text-center text-xl font-bold text-stone-900" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+            已達到 {limit} 桌上限
+          </h2>
+
+          <p className="text-center text-sm text-stone-500 mt-2 leading-relaxed">
+            你已經排了 {tables.length} 桌！<br />
+            付費版可解鎖更多桌數和進階功能。
+          </p>
+
+          <div className="mt-5 space-y-2">
+            {['無限桌數', '多活動管理', '優先客服支援'].map((benefit) => (
+              <div key={benefit} className="flex items-center gap-2.5 text-sm text-stone-800">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M3 8l3.5 3.5L13 5" stroke="#16A34A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {benefit}
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6">
+            <button
+              onClick={dismiss}
+              className="w-full h-11 rounded-lg text-sm font-medium text-white flex items-center justify-center"
+              style={{ backgroundColor: '#B08D57' }}
+            >
+              了解付費方案（即將推出）
+            </button>
+          </div>
+
+          <button onClick={dismiss} className="w-full mt-4 text-center text-xs text-stone-400 hover:underline">
+            稍後再說
+          </button>
+        </div>
+      </div>
+    )
   }
 
+  // Anonymous user hitting 10-table limit → login prompt
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center sm:items-center">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-stone-900/40" onClick={dismiss} />
-
-      {/* Modal — bottom sheet on mobile, centered on desktop */}
       <div className="relative w-full sm:max-w-[420px] bg-white sm:rounded-xl rounded-t-2xl sm:mx-4 p-8 shadow-[0_20px_60px_rgba(28,25,23,0.15)] max-sm:fixed max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:rounded-b-none max-sm:pb-10">
-        {/* Mobile drag handle */}
         <div className="sm:hidden flex justify-center mb-4">
           <div className="w-10 h-1 rounded-full bg-stone-300" />
         </div>
 
-        {/* Lock icon */}
         <div className="flex justify-center mb-5">
           <div className="w-12 h-12 rounded-full bg-[#F5F0E6] flex items-center justify-center">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#B08D57" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -38,17 +91,14 @@ export default function TableLimitModal() {
           </div>
         </div>
 
-        {/* Header */}
         <h2 className="text-center text-xl font-bold text-stone-900" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
           解鎖更多桌數
         </h2>
 
-        {/* Subheader */}
         <p className="text-center text-sm text-stone-500 mt-2 leading-relaxed">
-          你已經排了 10 桌！登入即可排到 20 桌，<br />而且資料永遠不會遺失。
+          你已經排了 {tables.length} 桌！登入即可排到 20 桌，<br />而且資料永遠不會遺失。
         </p>
 
-        {/* Benefits */}
         <div className="mt-5 space-y-2">
           {['解鎖 20 桌', '資料雲端儲存', '跨裝置使用'].map((benefit) => (
             <div key={benefit} className="flex items-center gap-2.5 text-sm text-stone-800">
@@ -60,23 +110,22 @@ export default function TableLimitModal() {
           ))}
         </div>
 
-        {/* Login buttons */}
         <div className="mt-6 space-y-2.5">
           <button
-            onClick={goLogin}
+            onClick={() => navigate('/login')}
             className="w-full h-11 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2"
             style={{ backgroundColor: '#06C755' }}
           >
             LINE 登入
           </button>
           <button
-            onClick={goLogin}
+            onClick={() => navigate('/login')}
             className="w-full h-11 rounded-lg text-sm font-medium text-stone-800 border border-stone-200 flex items-center justify-center gap-2 hover:bg-stone-50"
           >
             Google 登入
           </button>
           <button
-            onClick={goLogin}
+            onClick={() => navigate('/login')}
             className="w-full h-11 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2"
             style={{ backgroundColor: '#B08D57' }}
           >
@@ -84,11 +133,7 @@ export default function TableLimitModal() {
           </button>
         </div>
 
-        {/* Dismiss */}
-        <button
-          onClick={dismiss}
-          className="w-full mt-4 text-center text-xs text-stone-400 hover:underline"
-        >
+        <button onClick={dismiss} className="w-full mt-4 text-center text-xs text-stone-400 hover:underline">
           稍後再說
         </button>
       </div>

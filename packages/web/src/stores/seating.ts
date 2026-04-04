@@ -209,11 +209,20 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   loadEvent: async () => {
     set({ loading: true })
     try {
-      const res = await authFetch('/api/events/mine', { credentials: 'include' })
+      let res = await authFetch('/api/events/mine')
       if (res.status === 404) {
-        set({ loading: false })
-        window.location.href = '/'
-        return
+        // 沒有活動，自動建立一個
+        const createRes = await authFetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: '我的婚禮', type: 'wedding' }),
+        })
+        if (!createRes.ok) {
+          set({ loading: false })
+          window.location.href = '/'
+          return
+        }
+        res = await authFetch('/api/events/mine')
       }
       if (!res.ok) throw new Error('Failed to load event')
       const data = await res.json()

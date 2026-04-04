@@ -53,6 +53,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   claimEvent: async () => {
     try {
       const res = await api.post('/auth/claim-event')
+      // Force seating store to reload the user's event
+      const { useSeatingStore } = await import('./seating')
+      useSeatingStore.setState({ eventId: null })
       return res.data
     } catch {
       return { migrated: false }
@@ -83,6 +86,19 @@ export const useAuthStore = create<AuthState>((set) => ({
   signOut: async () => {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
+    // Clear seating store so stale data doesn't leak into anonymous session
+    const { useSeatingStore } = await import('./seating')
+    useSeatingStore.setState({
+      eventId: null,
+      eventName: '',
+      guests: [],
+      tables: [],
+      subcategories: [],
+      avoidPairs: [],
+      snapshots: [],
+      tableLimitReached: false,
+      tableLimitDismissed: false,
+    })
     set({ user: null, session: null })
   },
 }))
