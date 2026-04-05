@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/auth'
 import { useSeatingStore } from '@/stores/seating'
@@ -8,6 +8,13 @@ import { api } from '@/lib/api'
 export default function SettingsPage() {
   const navigate = useNavigate()
   const { user, signOut } = useAuthStore()
+
+  // 進入設定頁時重新取得最新 user（LINE 綁定後 metadata 會更新）
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) useAuthStore.setState({ user: data.user })
+    })
+  }, [])
 
   const tables = useSeatingStore((s) => s.tables)
   const tableLimit = user ? 20 : 10
