@@ -126,6 +126,91 @@ button, a, input, select, textarea {
 .table-btn-delete:hover circle { fill: #FEF2F2; stroke: #FCA5A5; }
 .table-btn-delete:hover g[stroke] { stroke: #B91C1C; }
 
+/* Settings page shared component styles */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  padding: 24px;
+}
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  margin-bottom: 16px;
+}
+.settings-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-family: var(--font-display);
+}
+.settings-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  padding: 8px 12px;
+  font-size: 14px;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  outline: none;
+  box-sizing: border-box;
+}
+.settings-input:focus {
+  border-color: var(--accent);
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font-display);
+  cursor: pointer;
+}
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-danger {
+  background: transparent;
+  color: var(--error);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-sm, 4px);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font-display);
+  cursor: pointer;
+}
+.btn-danger-filled {
+  background: var(--error);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font-display);
+  cursor: pointer;
+}
+.btn-cancel {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-family: var(--font-display);
+  cursor: pointer;
+}
+
 /* Settings page: vertical divider → horizontal when flex-wrap triggers.
    Container query on the parent flex row. Breakpoint = minWidth×2 + gap,
    the exact point where two children can no longer sit side by side. */
