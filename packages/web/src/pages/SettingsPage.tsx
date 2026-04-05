@@ -188,19 +188,6 @@ export default function SettingsPage() {
                         <button onClick={handleSaveName} disabled={savingName} className="btn-primary">{savingName ? '儲存中...' : '儲存變更'}</button>
                         {nameMsg && <span className="text-[13px]" style={{ color: nameMsg.type === 'success' ? 'var(--success)' : 'var(--error)' }}>{nameMsg.text}</span>}
                       </div>
-                      {/* 帳號綁定 */}
-                      <div className="mt-4 flex gap-2 flex-wrap">
-                        <LinkPill icon={<GoogleIcon />} label="Google"
-                          linked={!!linkedGoogle} loading={unlinking === 'google'} canUnlink={linkedCount > 1}
-                          onLink={handleLinkGoogle} onUnlink={() => handleUnlinkGoogle(linkedGoogle)} />
-                        <LinkPill icon={<LineIcon />} label="LINE"
-                          linked={linkedLine} loading={unlinking === 'line'} canUnlink={linkedCount > 1}
-                          onLink={handleLinkLine} onUnlink={handleUnlinkLine} />
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs border border-[var(--border)]">
-                          <EmailIcon /><span>Email</span>
-                          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{linkedEmail ? '已綁定' : '未綁定'}</span>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -230,6 +217,23 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* 帳號綁定 */}
+              <div className="border-t border-[var(--border)] mt-5 pt-5">
+                <h2 className="card-title">帳號綁定</h2>
+                <div className="flex gap-2 flex-wrap">
+                  <LinkPill icon={<GoogleIcon />} label="Google"
+                    linked={!!linkedGoogle} loading={unlinking === 'google'} canUnlink={linkedCount > 1}
+                    onLink={handleLinkGoogle} onUnlink={() => handleUnlinkGoogle(linkedGoogle)} />
+                  <LinkPill icon={<LineIcon />} label="LINE"
+                    linked={linkedLine} loading={unlinking === 'line'} canUnlink={linkedCount > 1}
+                    onLink={handleLinkLine} onUnlink={handleUnlinkLine} />
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs border border-[var(--border)]">
+                    <EmailIcon /><span>Email</span>
+                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{linkedEmail ? '已綁定' : '未綁定'}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
