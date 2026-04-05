@@ -13,6 +13,7 @@ export default function WorkspaceLayout() {
 
   const page = location.pathname.endsWith('/import') ? 'import' as const
     : location.pathname.endsWith('/guests') ? 'guests' as const
+    : location.pathname.endsWith('/settings') ? 'settings' as const
     : 'workspace' as const
 
   useEffect(() => {

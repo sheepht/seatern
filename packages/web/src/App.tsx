@@ -10,6 +10,7 @@ import WorkspaceLayout from '@/pages/WorkspaceLayout'
 import WorkspacePage from '@/pages/WorkspacePage'
 import GuestManagementPage from '@/pages/GuestManagementPage'
 import AuthCallbackPage from '@/pages/AuthCallbackPage'
+import SettingsPage from '@/pages/SettingsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -32,6 +33,7 @@ function App() {
               <Route index element={<WorkspacePage />} />
               <Route path="guests" element={<GuestManagementPage />} />
               <Route path="import" element={<ImportPage />} />
+              <Route path="settings" element={<SettingsPage />} />
             </Route>
 
             {/* Protected routes */}

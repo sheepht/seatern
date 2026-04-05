@@ -125,3 +125,41 @@ button, a, input, select, textarea {
 .table-btn-edit:hover g[stroke] { stroke: #57534E; }
 .table-btn-delete:hover circle { fill: #FEF2F2; stroke: #FCA5A5; }
 .table-btn-delete:hover g[stroke] { stroke: #B91C1C; }
+
+/* Settings page: vertical divider → horizontal when flex-wrap triggers.
+   Container query on the parent flex row. Breakpoint = minWidth×2 + gap,
+   the exact point where two children can no longer sit side by side. */
+.settings-split-profile {
+  container-type: inline-size;
+  container-name: settings-split-profile;
+}
+.settings-split-plan {
+  container-type: inline-size;
+  container-name: settings-split-plan;
+}
+
+/* Default: horizontal (wrapped / narrow) */
+.settings-divider-col {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+/* Profile split: 220×2 + 24 = 464px → side by side → vertical line */
+@container settings-split-profile (min-width: 464px) {
+  .settings-divider-col {
+    border-top: none;
+    padding-top: 0;
+    border-left: 1px solid var(--border);
+    padding-left: 24px;
+  }
+}
+
+/* Plan split: 180×2 + 24 = 384px → side by side → vertical line */
+@container settings-split-plan (min-width: 384px) {
+  .settings-divider-col {
+    border-top: none;
+    padding-top: 0;
+    border-left: 1px solid var(--border);
+    padding-left: 24px;
+  }
+}

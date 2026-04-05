@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid, Trash2, Dices, Users, FileDown } from 'lucide-react'
+import { Pencil, Menu, History, Ban, Shuffle, Download, Lock, Plus, Save, Undo2, LayoutGrid, Trash2, Dices, Users, FileDown, Settings, LogOut } from 'lucide-react'
 import { authFetch } from '@/lib/api'
 import { useSeatingStore } from '@/stores/seating'
 import { useAuthStore } from '@/stores/auth'
@@ -14,7 +14,7 @@ import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors'
 interface ToolbarProps {
   onFitAll?: () => void
   onPanToTable?: (x: number, y: number) => void
-  page?: 'workspace' | 'guests' | 'import'
+  page?: 'workspace' | 'guests' | 'import' | 'settings'
 }
 
 export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarProps = {}) {
@@ -603,15 +603,30 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
 
                   {/* 登入 / 用戶資訊 */}
                   {authUser ? (
-                    <button
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
-                      style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
-                      onClick={async () => { setShowMenu(false); await signOut(); navigate('/') }}
-                    >
-                      <Users size={16} className="shrink-0" />
-                      <span className="truncate">{authUser.user_metadata?.name || authUser.email}</span>
-                      <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>登出</span>
-                    </button>
+                    <>
+                      <div
+                        className="px-3 py-2 text-sm truncate"
+                        style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
+                      >
+                        {authUser.user_metadata?.name || authUser.email}
+                      </div>
+                      <button
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
+                        style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
+                        onClick={() => { setShowMenu(false); navigate('/workspace/settings') }}
+                      >
+                        <Settings size={16} className="shrink-0" />
+                        <span>設定</span>
+                      </button>
+                      <button
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
+                        style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
+                        onClick={async () => { setShowMenu(false); await signOut(); navigate('/') }}
+                      >
+                        <LogOut size={16} className="shrink-0" />
+                        <span>登出</span>
+                      </button>
+                    </>
                   ) : (
                     <button
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
