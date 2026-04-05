@@ -686,7 +686,7 @@ export default function GuestManagementPage() {
                     >
                       <Plus size={14} className="mr-1 align-[-2px] inline" /> 新增賓客
                     </button>
-                    <button onClick={() => navigate('/workspace/import')} className="px-5 py-2 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--bg-surface)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--text-secondary)]">
+                    <button onClick={() => navigate('/import')} className="px-5 py-2 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--bg-surface)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--text-secondary)]">
                       匯入名單
                     </button>
                   </div>

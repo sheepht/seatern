@@ -46,7 +46,7 @@ export default function AuthCallbackPage() {
         })
       }
 
-      navigate('/workspace', { replace: true })
+      navigate('/', { replace: true })
     })()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

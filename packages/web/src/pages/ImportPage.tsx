@@ -259,7 +259,7 @@ export default function ImportPage() {
 
       // 重新載入 store 再導頁，避免畫布/名單頁看不到新資料
       await useSeatingStore.getState().loadEvent()
-      navigate('/workspace')
+      navigate('/')
     } catch (err) {
       setError(err instanceof Error ? err.message : '匯入失敗')
     } finally {

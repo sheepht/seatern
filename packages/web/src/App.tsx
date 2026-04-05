@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from '@/providers/AuthProvider'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
-import LandingPage from '@/pages/LandingPage'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 import ImportPage from '@/pages/ImportPage'
@@ -23,13 +22,12 @@ function App() {
         <AuthProvider>
           <Routes>
             {/* Public routes */}
-            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
             {/* Workspace（Phase 1 不需要登入） */}
-            <Route path="/workspace" element={<WorkspaceLayout />}>
+            <Route path="/" element={<WorkspaceLayout />}>
               <Route index element={<WorkspacePage />} />
               <Route path="guests" element={<GuestManagementPage />} />
               <Route path="import" element={<ImportPage />} />

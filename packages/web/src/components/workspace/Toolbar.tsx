@@ -471,7 +471,7 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
           <span
             className="text-lg font-extrabold tracking-tight font-[family-name:var(--font-display)] text-[var(--accent)]"
           >
-            Seatern
+            排位鷗鷗
           </span>
           <span className="text-[var(--border-strong)]">|</span>
           <span className="text-sm font-medium text-[var(--text-primary)]">
@@ -534,9 +534,9 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
           {/* 頁面 Tab — 左上右有邊框，active tab 底部開口連接內容區 */}
           <div className="flex self-stretch items-end -mb-px">
             {([
-              { key: 'workspace', label: '排位畫布', path: '/workspace' },
-              { key: 'guests', label: '賓客名單', path: '/workspace/guests' },
-              { key: 'import', label: '匯入資料', path: '/workspace/import' },
+              { key: 'workspace', label: '排位畫布', path: '/' },
+              { key: 'guests', label: '賓客名單', path: '/guests' },
+              { key: 'import', label: '匯入資料', path: '/import' },
             ] as const).map((tab) => {
               const active = page === tab.key
               return (
@@ -582,7 +582,7 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                       </div>
                       <button
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)] text-[var(--text-secondary)] font-[family-name:var(--font-body)]"
-                        onClick={() => { setShowMenu(false); navigate('/workspace/settings') }}
+                        onClick={() => { setShowMenu(false); navigate('/settings') }}
                       >
                         <Settings size={16} className="shrink-0" />
                         <span>設定</span>
