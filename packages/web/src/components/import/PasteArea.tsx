@@ -1,42 +1,42 @@
-import { useState, useCallback } from 'react'
-import type { ParseResult } from '@/lib/csv-parser'
-import { parsePaste } from '@/lib/csv-parser'
+import { useState, useCallback } from 'react';
+import type { ParseResult } from '@/lib/csv-parser';
+import { parsePaste } from '@/lib/csv-parser';
 
 interface Props {
   onParsed: (result: ParseResult) => void
 }
 
 export function PasteArea({ onParsed }: Props) {
-  const [text, setText] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [text, setText] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const handleParse = useCallback(() => {
-    setError(null)
+    setError(null);
     if (!text.trim()) {
-      setError('請先貼上資料')
-      return
+      setError('請先貼上資料');
+      return;
     }
 
-    const result = parsePaste(text)
+    const result = parsePaste(text);
     if (result.rows.length === 0) {
-      setError('無法辨識表格格式，請確認是從試算表複製')
-      return
+      setError('無法辨識表格格式，請確認是從試算表複製');
+      return;
     }
 
-    onParsed(result)
-  }, [text, onParsed])
+    onParsed(result);
+  }, [text, onParsed]);
 
   const handlePasteEvent = useCallback((e: React.ClipboardEvent) => {
-    const pasted = e.clipboardData.getData('text')
+    const pasted = e.clipboardData.getData('text');
     if (pasted) {
-      setText(pasted)
+      setText(pasted);
       // 自動嘗試解析
-      const result = parsePaste(pasted)
+      const result = parsePaste(pasted);
       if (result.rows.length > 0) {
-        onParsed(result)
+        onParsed(result);
       }
     }
-  }, [onParsed])
+  }, [onParsed]);
 
   return (
     <div>
@@ -59,5 +59,5 @@ export function PasteArea({ onParsed }: Props) {
         <p className="mt-2 text-sm text-[var(--error)]">{error}</p>
       )}
     </div>
-  )
+  );
 }

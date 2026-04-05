@@ -1,19 +1,19 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AuthProvider } from '@/providers/AuthProvider'
-import { ProtectedRoute } from '@/components/ProtectedRoute'
-import LoginPage from '@/pages/LoginPage'
-import RegisterPage from '@/pages/RegisterPage'
-import ImportPage from '@/pages/ImportPage'
-import WorkspaceLayout from '@/pages/WorkspaceLayout'
-import WorkspacePage from '@/pages/WorkspacePage'
-import GuestManagementPage from '@/pages/GuestManagementPage'
-import AuthCallbackPage from '@/pages/AuthCallbackPage'
-import SettingsPage from '@/pages/SettingsPage'
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from '@/providers/AuthProvider';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import LoginPage from '@/pages/LoginPage';
+import RegisterPage from '@/pages/RegisterPage';
+import ImportPage from '@/pages/ImportPage';
+import WorkspaceLayout from '@/pages/WorkspaceLayout';
+import WorkspacePage from '@/pages/WorkspacePage';
+import GuestManagementPage from '@/pages/GuestManagementPage';
+import AuthCallbackPage from '@/pages/AuthCallbackPage';
+import SettingsPage from '@/pages/SettingsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
-})
+});
 
 function App() {
   return (
@@ -40,7 +40,7 @@ function App() {
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
-  )
+  );
 }
 
 function DashboardPlaceholder() {
@@ -48,7 +48,7 @@ function DashboardPlaceholder() {
     <div className="flex items-center justify-center p-12">
       <p className="text-gray-500 text-lg">Dashboard — 功能開發中</p>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

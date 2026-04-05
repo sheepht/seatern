@@ -1,15 +1,15 @@
-import { useMemo } from 'react'
-import { useSeatingStore, type Guest } from '@/stores/seating'
-import { getSatisfactionColor } from '@/lib/satisfaction'
-import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors'
+import { useMemo } from 'react';
+import { useSeatingStore, type Guest } from '@/stores/seating';
+import { getSatisfactionColor } from '@/lib/satisfaction';
+import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors';
 
 function getDisplayName(name: string, aliases?: string[]): string {
   if (aliases && aliases.length > 0) {
-    const nick = aliases[0]
-    return nick.length <= 3 ? nick : nick.slice(0, 3)
+    const nick = aliases[0];
+    return nick.length <= 3 ? nick : nick.slice(0, 3);
   }
-  if (name.length <= 2) return name
-  return name.slice(-2)
+  if (name.length <= 2) return name;
+  return name.slice(-2);
 }
 
 
@@ -18,41 +18,41 @@ interface Props {
 }
 
 export function DragOverlayContent({ guest }: Props) {
-  const dragPreview = useSeatingStore((s) => s.dragPreview)
-  const avoidPairs = useSeatingStore((s) => s.avoidPairs)
-  const guests = useSeatingStore((s) => s.guests)
-  const eventId = useSeatingStore((s) => s.eventId)
-  const colors = useMemo(() => loadCategoryColors(eventId || ''), [eventId])
-  const catColor = getCategoryColor(guest.category, colors)
-  const catStyle = { background: catColor.background, borderColor: catColor.border, color: catColor.color }
-  const displayName = getDisplayName(guest.name, guest.aliases)
+  const dragPreview = useSeatingStore((s) => s.dragPreview);
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs);
+  const guests = useSeatingStore((s) => s.guests);
+  const eventId = useSeatingStore((s) => s.eventId);
+  const colors = useMemo(() => loadCategoryColors(eventId || ''), [eventId]);
+  const catColor = getCategoryColor(guest.category, colors);
+  const catStyle = { background: catColor.background, borderColor: catColor.border, color: catColor.color };
+  const displayName = getDisplayName(guest.name, guest.aliases);
 
   // 預覽分數：hover 到座位時即時計算的分數
-  const previewScore = dragPreview?.previewScores?.get(guest.id)
+  const previewScore = dragPreview?.previewScores?.get(guest.id);
 
   // 檢查拖曳目標桌是否有避免同桌衝突
   const hasAvoidConflict = (() => {
-    if (!dragPreview) return false
+    if (!dragPreview) return false;
     const tableGuestIds = guests
       .filter((g) => g.assignedTableId === dragPreview.tableId && g.rsvpStatus === 'confirmed' && g.id !== guest.id)
-      .map((g) => g.id)
+      .map((g) => g.id);
     return avoidPairs.some(
       (ap) =>
         (ap.guestAId === guest.id && tableGuestIds.includes(ap.guestBId)) ||
         (ap.guestBId === guest.id && tableGuestIds.includes(ap.guestAId)),
-    )
-  })()
-  const score = previewScore ?? guest.satisfactionScore
-  const satColor = getSatisfactionColor(score)
+    );
+  })();
+  const score = previewScore ?? guest.satisfactionScore;
+  const satColor = getSatisfactionColor(score);
 
   // 分數變化 → 微調大小
-  const delta = previewScore !== undefined ? previewScore - guest.satisfactionScore : 0
-  const scale = delta > 0 ? 1.25 : delta < 0 ? 0.8 : 1
+  const delta = previewScore !== undefined ? previewScore - guest.satisfactionScore : 0;
+  const scale = delta > 0 ? 1.25 : delta < 0 ? 0.8 : 1;
 
-  const size = 48
-  const ringR = size / 2 + 3
-  const circumference = 2 * Math.PI * ringR
-  const progress = Math.min(score / 100, 1)
+  const size = 48;
+  const ringR = size / 2 + 3;
+  const circumference = 2 * Math.PI * ringR;
+  const progress = Math.min(score / 100, 1);
 
   return (
     <div
@@ -160,5 +160,5 @@ export function DragOverlayContent({ guest }: Props) {
         </div>
       )}
     </div>
-  )
+  );
 }

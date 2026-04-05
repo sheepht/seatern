@@ -1,4 +1,4 @@
-import type { RawGuest } from './column-detector'
+import type { RawGuest } from './column-detector';
 
 interface ExistingGuest {
   name: string
@@ -20,25 +20,25 @@ export function diffGuests(
   existing: ExistingGuest[],
 ): DiffResult {
   // 建立現有名稱的 lookup set（含別名）
-  const existingNames = new Set<string>()
+  const existingNames = new Set<string>();
   for (const g of existing) {
-    existingNames.add(g.name.trim().toLowerCase())
+    existingNames.add(g.name.trim().toLowerCase());
     for (const alias of g.aliases) {
-      if (alias) existingNames.add(alias.trim().toLowerCase())
+      if (alias) existingNames.add(alias.trim().toLowerCase());
     }
   }
 
-  const newGuests: RawGuest[] = []
-  const skippedGuests: RawGuest[] = []
+  const newGuests: RawGuest[] = [];
+  const skippedGuests: RawGuest[] = [];
 
   for (const guest of imported) {
-    const normalizedName = guest.name.trim().toLowerCase()
+    const normalizedName = guest.name.trim().toLowerCase();
     if (existingNames.has(normalizedName)) {
-      skippedGuests.push(guest)
+      skippedGuests.push(guest);
     } else {
-      newGuests.push(guest)
+      newGuests.push(guest);
     }
   }
 
-  return { newGuests, skippedGuests }
+  return { newGuests, skippedGuests };
 }

@@ -1,21 +1,21 @@
-import { useSeatingStore } from '@/stores/seating'
-import { useAuthStore } from '@/stores/auth'
-import { useNavigate } from 'react-router-dom'
+import { useSeatingStore } from '@/stores/seating';
+import { useAuthStore } from '@/stores/auth';
+import { useNavigate } from 'react-router-dom';
 
 export default function TableLimitModal() {
-  const tableLimitReached = useSeatingStore((s) => s.tableLimitReached)
-  const tables = useSeatingStore((s) => s.tables)
-  const user = useAuthStore((s) => s.user)
-  const navigate = useNavigate()
+  const tableLimitReached = useSeatingStore((s) => s.tableLimitReached);
+  const tables = useSeatingStore((s) => s.tables);
+  const user = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
 
-  if (!tableLimitReached) return null
+  if (!tableLimitReached) return null;
 
-  const isLoggedIn = !!user
-  const limit = isLoggedIn ? 20 : 10
+  const isLoggedIn = !!user;
+  const limit = isLoggedIn ? 20 : 10;
 
   const dismiss = () => {
-    useSeatingStore.setState({ tableLimitReached: false })
-  }
+    useSeatingStore.setState({ tableLimitReached: false });
+  };
 
   // Logged-in user hitting 20-table limit → paid tier prompt
   if (isLoggedIn) {
@@ -69,7 +69,7 @@ export default function TableLimitModal() {
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   // Anonymous user hitting 10-table limit → login prompt
@@ -135,5 +135,5 @@ export default function TableLimitModal() {
         </button>
       </div>
     </div>
-  )
+  );
 }

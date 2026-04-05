@@ -1,4 +1,4 @@
-import { useDroppable } from '@dnd-kit/core'
+import { useDroppable } from '@dnd-kit/core';
 
 interface Props {
   tableId: string
@@ -22,9 +22,9 @@ export function SeatDropZone({ tableId, seatIndex, x, y, radius, isEmpty, isActi
   const { isOver, setNodeRef } = useDroppable({
     id: `seat-drop-${tableId}-${seatIndex}`,
     data: { type: 'seat', tableId, seatIndex },
-  })
+  });
 
-  const size = radius * 2
+  const size = radius * 2;
   return (
     <div
       ref={setNodeRef}
@@ -40,17 +40,17 @@ export function SeatDropZone({ tableId, seatIndex, x, y, radius, isEmpty, isActi
         border: isActive ? '2px solid #B08D57' : isOver && isEmpty ? '2px dashed #B08D57' : undefined,
       }}
       onClick={isEmpty && onEmptyClick ? (e) => {
-        e.stopPropagation()
-        const rect = e.currentTarget.getBoundingClientRect()
-        const seatScreenX = rect.left + rect.width / 2
-        const seatScreenY = rect.top + rect.height / 2
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const seatScreenX = rect.left + rect.width / 2;
+        const seatScreenY = rect.top + rect.height / 2;
         // tableCenterX/Y 是容器內座標，轉成螢幕座標
-        const container = e.currentTarget.offsetParent as HTMLElement | null
-        const cRect = container?.getBoundingClientRect()
-        const tcScreenX = (cRect?.left ?? 0) + (tableCenterX ?? 0)
-        const tcScreenY = (cRect?.top ?? 0) + (tableCenterY ?? 0)
-        onEmptyClick(tableId, seatIndex, seatScreenX, seatScreenY, tcScreenX, tcScreenY)
+        const container = e.currentTarget.offsetParent as HTMLElement | null;
+        const cRect = container?.getBoundingClientRect();
+        const tcScreenX = (cRect?.left ?? 0) + (tableCenterX ?? 0);
+        const tcScreenY = (cRect?.top ?? 0) + (tableCenterY ?? 0);
+        onEmptyClick(tableId, seatIndex, seatScreenX, seatScreenY, tcScreenX, tcScreenY);
       } : undefined}
     />
-  )
+  );
 }

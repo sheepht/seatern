@@ -35,7 +35,7 @@ export const SYSTEM_FIELDS: FieldMapping[] = [
   { field: 'specialNote', label: '備註/特殊需求', required: false },
   { field: 'seatPreferences', label: '想同桌人選', required: false },
   { field: 'avoidGuests', label: '避免同桌', required: false },
-]
+];
 
 /** 每個系統欄位的關鍵字（用於子字串比對） */
 const FIELD_KEYWORDS: Record<SystemField, string[]> = {
@@ -49,10 +49,10 @@ const FIELD_KEYWORDS: Record<SystemField, string[]> = {
   specialNote: ['備註', '需求', '特殊', 'note', '其他', '補充', '特殊需求', '嬰兒椅', '輪椅'],
   seatPreferences: ['同桌', '想跟誰坐', 'preference', '想坐', '同桌人選', '希望同桌', '想坐旁邊', '想跟誰'],
   avoidGuests: ['避免', '避桌', '不同桌', 'avoid', '迴避', '不想同桌'],
-}
+};
 
 /** 想同桌的多欄位模式（「想同桌 1」「想同桌 2」「想同桌 3」） */
-const SEAT_PREF_MULTI_KEYWORDS = ['想同桌', '同桌人選', 'preference']
+const SEAT_PREF_MULTI_KEYWORDS = ['想同桌', '同桌人選', 'preference'];
 
 export type ColumnMapping = Record<SystemField, string | null>
 export type MultiColumnMapping = Record<SystemField, string[]>
@@ -83,7 +83,7 @@ export function detectColumns(headers: string[]): DetectionResult {
     specialNote: null,
     seatPreferences: null,
     avoidGuests: null,
-  }
+  };
 
   const multiMapping: MultiColumnMapping = {
     name: [],
@@ -96,50 +96,50 @@ export function detectColumns(headers: string[]): DetectionResult {
     specialNote: [],
     seatPreferences: [],
     avoidGuests: [],
-  }
+  };
 
-  const usedHeaders = new Set<string>()
+  const usedHeaders = new Set<string>();
 
   // 先檢查「想同桌」多欄位模式（想同桌 1, 想同桌 2, 想同桌 3）
   const seatPrefHeaders = headers.filter((h) => {
-    const lower = h.toLowerCase()
-    return SEAT_PREF_MULTI_KEYWORDS.some((kw) => lower.includes(kw))
-  })
+    const lower = h.toLowerCase();
+    return SEAT_PREF_MULTI_KEYWORDS.some((kw) => lower.includes(kw));
+  });
 
   if (seatPrefHeaders.length > 1) {
     // 多欄位模式
-    multiMapping.seatPreferences = seatPrefHeaders
-    seatPrefHeaders.forEach((h) => usedHeaders.add(h))
-    mapping.seatPreferences = '__multi__' // 標記為多欄位
+    multiMapping.seatPreferences = seatPrefHeaders;
+    seatPrefHeaders.forEach((h) => usedHeaders.add(h));
+    mapping.seatPreferences = '__multi__'; // 標記為多欄位
   }
 
   // 對每個系統欄位嘗試比對
   for (const sysField of SYSTEM_FIELDS) {
-    if (mapping[sysField.field] !== null) continue // 已被多欄位模式處理
+    if (mapping[sysField.field] !== null) continue; // 已被多欄位模式處理
 
-    const keywords = FIELD_KEYWORDS[sysField.field]
+    const keywords = FIELD_KEYWORDS[sysField.field];
 
     for (const header of headers) {
-      if (usedHeaders.has(header)) continue
+      if (usedHeaders.has(header)) continue;
 
-      const headerLower = header.toLowerCase()
-      const matched = keywords.some((kw) => headerLower.includes(kw.toLowerCase()))
+      const headerLower = header.toLowerCase();
+      const matched = keywords.some((kw) => headerLower.includes(kw.toLowerCase()));
 
       if (matched) {
-        mapping[sysField.field] = header
-        usedHeaders.add(header)
-        break
+        mapping[sysField.field] = header;
+        usedHeaders.add(header);
+        break;
       }
     }
   }
 
   const unmapped = SYSTEM_FIELDS
     .filter((f) => mapping[f.field] === null)
-    .map((f) => f.field)
+    .map((f) => f.field);
 
-  const unusedHeaders = headers.filter((h) => !usedHeaders.has(h))
+  const unusedHeaders = headers.filter((h) => !usedHeaders.has(h));
 
-  return { mapping, multiMapping, unmapped, unusedHeaders }
+  return { mapping, multiMapping, unmapped, unusedHeaders };
 }
 
 /**
@@ -164,69 +164,69 @@ export function normalizeGuest(
   multiMapping: MultiColumnMapping,
 ): RawGuest | null {
   const get = (field: SystemField): string => {
-    const col = mapping[field]
-    if (!col || col === '__multi__') return ''
-    return (row[col] || '').trim()
-  }
+    const col = mapping[field];
+    if (!col || col === '__multi__') return '';
+    return (row[col] || '').trim();
+  };
 
-  const name = get('name')
-  if (!name) return null // 姓名為空，跳過
+  const name = get('name');
+  if (!name) return null; // 姓名為空，跳過
 
   // 解析別名
-  const aliasStr = get('aliases')
+  const aliasStr = get('aliases');
   const aliases = aliasStr
     ? aliasStr.split(/[,，、]/).map((a) => a.trim()).filter(Boolean)
-    : []
+    : [];
 
   // 解析 RSVP
-  const rsvpRaw = get('rsvpStatus').toLowerCase()
-  let rsvpStatus: 'confirmed' | 'declined' = 'confirmed'
+  const rsvpRaw = get('rsvpStatus').toLowerCase();
+  let rsvpStatus: 'confirmed' | 'declined' = 'confirmed';
   if (['否', '不', '婉拒', 'no', 'n', '0', 'false', '不會'].some((k) => rsvpRaw.includes(k))) {
-    rsvpStatus = 'declined'
+    rsvpStatus = 'declined';
   }
 
   // 解析子分類
-  const rawSubcategory = (get('subcategory') || '').trim()
+  const rawSubcategory = (get('subcategory') || '').trim();
 
   // 解析攜眷：0-4，代表額外攜帶的人數（含大人和小孩）
   // 支援多種填法：數字（0, 1, 2）、文字（有、是、帶老婆）、混合（1位、帶1人）
-  const extraRaw = get('companionCount').toLowerCase()
-  let extra: number
-  const numMatch = extraRaw.match(/\d+/)
+  const extraRaw = get('companionCount').toLowerCase();
+  let extra: number;
+  const numMatch = extraRaw.match(/\d+/);
   if (numMatch) {
-    extra = parseInt(numMatch[0], 10)
+    extra = parseInt(numMatch[0], 10);
   } else if (['有', '是', 'yes', 'y', '帶'].some((k) => extraRaw.includes(k))) {
-    extra = 1
+    extra = 1;
   } else if (['無', '否', '沒', 'no', 'n'].some((k) => extraRaw.includes(k)) || extraRaw === '') {
-    extra = 0
+    extra = 0;
   } else {
-    extra = 0
+    extra = 0;
   }
-  const companionCount = Math.min(4, Math.max(0, extra))
+  const companionCount = Math.min(4, Math.max(0, extra));
 
   // 解析想同桌人選
-  let rawPreferences: string[] = []
+  let rawPreferences: string[] = [];
   if (mapping.seatPreferences === '__multi__') {
     // 多欄位模式
     rawPreferences = multiMapping.seatPreferences
       .map((col) => (row[col] || '').trim())
-      .filter(Boolean)
+      .filter(Boolean);
   } else {
-    const prefStr = get('seatPreferences')
+    const prefStr = get('seatPreferences');
     if (prefStr) {
       rawPreferences = prefStr
         .split(/[,，、\n\s]+/)
         .map((p) => p.trim())
         .filter(Boolean)
-        .slice(0, 3) // 最多 3 位
+        .slice(0, 3); // 最多 3 位
     }
   }
 
   // 解析避免同桌
-  const avoidStr = get('avoidGuests')
+  const avoidStr = get('avoidGuests');
   const rawAvoids = avoidStr
     ? avoidStr.split(/[,，、\n\s]+/).map((p) => p.trim()).filter(Boolean)
-    : []
+    : [];
 
   return {
     name,
@@ -239,5 +239,5 @@ export function normalizeGuest(
     specialNote: get('specialNote'),
     rawPreferences,
     rawAvoids,
-  }
+  };
 }

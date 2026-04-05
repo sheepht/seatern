@@ -1,19 +1,19 @@
-import { Navigate, Link, useNavigate } from 'react-router-dom'
-import { useAuthStore } from '@/stores/auth'
+import { Navigate, Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth';
 
 function AppHeader() {
-  const { user, signOut } = useAuthStore()
-  const navigate = useNavigate()
+  const { user, signOut } = useAuthStore();
+  const navigate = useNavigate();
 
   const handleSignOut = async () => {
-    await signOut()
-    navigate('/login')
-  }
+    await signOut();
+    navigate('/login');
+  };
 
   const displayName =
     user?.user_metadata?.name ||
     user?.user_metadata?.full_name ||
-    user?.email
+    user?.email;
 
   return (
     <header className="flex items-center justify-between px-4 py-2 border-b bg-white">
@@ -30,22 +30,22 @@ function AppHeader() {
         </button>
       </div>
     </header>
-  )
+  );
 }
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuthStore()
+  const { user, isLoading } = useAuthStore();
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray-500">載入中...</p>
       </div>
-    )
+    );
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" replace />;
   }
 
   return (
@@ -53,5 +53,5 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
       <AppHeader />
       <main className="flex-1">{children}</main>
     </div>
-  )
+  );
 }

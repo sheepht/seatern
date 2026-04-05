@@ -1,30 +1,30 @@
-import { useState, useRef, useMemo } from 'react'
-import { authFetch } from '@/lib/api'
-import { createPortal } from 'react-dom'
-import { useDroppable } from '@dnd-kit/core'
-import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Wand2, Scale, Star, Plus, Save, Undo2, Redo2, Ban, Shuffle, LayoutGrid, Download, Trash2, Dices, History } from 'lucide-react'
-import { useSeatingStore } from '@/stores/seating'
-import TableLimitBanner from './TableLimitBanner'
-import { estimateAutoAssignTimeInWorker } from '@/lib/auto-assign-client'
-import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction'
-import { computeSnapshotStats, computeCurrentStats } from '@/lib/snapshot-stats'
-import { findFreePosition, calculateGridLayout } from '@/lib/viewport'
-import { GuestChip } from './GuestChip'
-import { AvoidPairModal } from './AvoidPairModal'
-import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors'
-import type { AutoAssignMode } from '@/lib/auto-assign'
+import { useState, useRef, useMemo } from 'react';
+import { authFetch } from '@/lib/api';
+import { createPortal } from 'react-dom';
+import { useDroppable } from '@dnd-kit/core';
+import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, Wand2, Plus, Save, Undo2, Redo2, Shuffle, LayoutGrid, Trash2, Dices, History } from 'lucide-react';
+import { useSeatingStore } from '@/stores/seating';
+import TableLimitBanner from './TableLimitBanner';
+import { estimateAutoAssignTimeInWorker } from '@/lib/auto-assign-client';
+import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction';
+import { computeSnapshotStats, computeCurrentStats } from '@/lib/snapshot-stats';
+import { findFreePosition, calculateGridLayout } from '@/lib/viewport';
+import { GuestChip } from './GuestChip';
+import { AvoidPairModal } from './AvoidPairModal';
+import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors';
+import type { AutoAssignMode } from '@/lib/auto-assign';
 
 function CollapseButton({ onCollapse }: { onCollapse: () => void }) {
-  const [show, setShow] = useState(false)
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const rect = btnRef.current?.getBoundingClientRect()
+  const [show, setShow] = useState(false);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   return (
     <>
       <button
         ref={btnRef}
         onClick={onCollapse}
-        onMouseEnter={() => setShow(true)}
+        onMouseEnter={() => { setRect(btnRef.current?.getBoundingClientRect() ?? null); setShow(true); }}
         onMouseLeave={() => setShow(false)}
         className="flex items-center justify-center w-6 h-6 rounded cursor-pointer hover:bg-[var(--accent-light)] text-[var(--text-muted)] shrink-0"
       >
@@ -40,16 +40,16 @@ function CollapseButton({ onCollapse }: { onCollapse: () => void }) {
         document.body,
       )}
     </>
-  )
+  );
 }
 
 /** Popover tooltip（顯示在按鈕上方） */
 function Tip({ text, children }: { text: string; children: React.ReactElement }) {
-  const [show, setShow] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const rect = ref.current?.getBoundingClientRect()
+  const [show, setShow] = useState(false);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
   return (
-    <div ref={ref} onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)} className="inline-flex">
+    <div ref={ref} onMouseEnter={() => { setRect(ref.current?.getBoundingClientRect() ?? null); setShow(true); }} onMouseLeave={() => setShow(false)} className="inline-flex">
       {children}
       {show && rect && createPortal(
         <div
@@ -61,271 +61,232 @@ function Tip({ text, children }: { text: string; children: React.ReactElement })
         document.body,
       )}
     </div>
-  )
+  );
 }
 
-function TableActions({ tableId, guestCount }: { tableId: string; guestCount: number }) {
-  const moveGuest = useSeatingStore((s) => s.moveGuest)
-  const getTableGuests = useSeatingStore((s) => s.getTableGuests)
-  const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
-  const removeTable = useSeatingStore((s) => s.removeTable)
-
-  const handleClear = () => {
-    const guests = getTableGuests(tableId)
-    for (const g of guests) {
-      moveGuest(g.id, null)
-    }
-    setSelectedTable(null)
-  }
-
-  const handleDelete = () => {
-    removeTable(tableId)
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      {guestCount > 0 && (
-        <button
-          onClick={handleClear}
-          className="text-[10px] hover:opacity-80 text-[var(--text-muted)]"
-        >
-          清空
-        </button>
-      )}
-      <button
-        onClick={handleDelete}
-        className="text-[10px] hover:opacity-80 text-[var(--error)]"
-      >
-        刪除桌
-      </button>
-    </div>
-  )
-}
-
-const CATEGORY_ORDER = ['男方', '女方', '共同']
+const CATEGORY_ORDER = ['男方', '女方', '共同'];
 
 export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => void; onPanToTable?: (x: number, y: number) => void }) {
-  const guests = useSeatingStore((s) => s.guests)
-  const tables = useSeatingStore((s) => s.tables)
-  const eventId = useSeatingStore((s) => s.eventId)
-  const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId])
-  const getUnassignedGuests = useSeatingStore((s) => s.getUnassignedGuests)
-  const autoAssignGuests = useSeatingStore((s) => s.autoAssignGuests)
-  const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress)
-  const addTable = useSeatingStore((s) => s.addTable)
-  const undo = useSeatingStore((s) => s.undo)
-  const undoStack = useSeatingStore((s) => s.undoStack)
-  const saveSnapshot = useSeatingStore((s) => s.saveSnapshot)
-  const snapshots = useSeatingStore((s) => s.snapshots)
-  const resetAllSeats = useSeatingStore((s) => s.resetAllSeats)
-  const removeTable = useSeatingStore((s) => s.removeTable)
-  const autoArrangeTables = useSeatingStore((s) => s.autoArrangeTables)
-  const avoidPairs = useSeatingStore((s) => s.avoidPairs)
-  const restoreSnapshot = useSeatingStore((s) => s.restoreSnapshot)
+  const guests = useSeatingStore((s) => s.guests);
+  const tables = useSeatingStore((s) => s.tables);
+  const eventId = useSeatingStore((s) => s.eventId);
+  const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId]);
+  const getUnassignedGuests = useSeatingStore((s) => s.getUnassignedGuests);
+  const autoAssignGuests = useSeatingStore((s) => s.autoAssignGuests);
 
-  const navigate = useNavigate()
+  const addTable = useSeatingStore((s) => s.addTable);
+  const undo = useSeatingStore((s) => s.undo);
+  const undoStack = useSeatingStore((s) => s.undoStack);
+  const saveSnapshot = useSeatingStore((s) => s.saveSnapshot);
+  const snapshots = useSeatingStore((s) => s.snapshots);
+  const resetAllSeats = useSeatingStore((s) => s.resetAllSeats);
+  const autoArrangeTables = useSeatingStore((s) => s.autoArrangeTables);
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs);
+  const restoreSnapshot = useSeatingStore((s) => s.restoreSnapshot);
 
-  const [search, setSearch] = useState('')
-  const [assigning, setAssigning] = useState(false)
-  const [showModeModal, setShowModeModal] = useState(false)
-  const [estimatedTime, setEstimatedTime] = useState<number | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [showAvoidModal, setShowAvoidModal] = useState(false)
-  const [showResetConfirm, setShowResetConfirm] = useState(false)
-  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
-  const [showArrangeConfirm, setShowArrangeConfirm] = useState(false)
-  const [arranging, setArranging] = useState(false)
-  const [adding, setAdding] = useState(false)
+  const navigate = useNavigate();
+
+  const [search, setSearch] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [showModeModal, setShowModeModal] = useState(false);
+  const [estimatedTime, setEstimatedTime] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [showAvoidModal, setShowAvoidModal] = useState(false);
+  const [_showResetConfirm, _setShowResetConfirm] = useState(false);
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [_showArrangeConfirm, setShowArrangeConfirm] = useState(false);
+  const [arranging, setArranging] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const handleAddTable = async () => {
-    setAdding(true)
-    const num = tables.length + 1
-    const pos = findFreePosition(tables)
-    await addTable(`第${num}桌`, pos.x, pos.y)
-    onPanToTable?.(pos.x, pos.y)
-    setAdding(false)
-  }
+    setAdding(true);
+    const num = tables.length + 1;
+    const pos = findFreePosition(tables);
+    await addTable(`第${num}桌`, pos.x, pos.y);
+    onPanToTable?.(pos.x, pos.y);
+    setAdding(false);
+  };
 
   const handleSave = async () => {
-    setSaving(true)
-    const now = new Date()
-    const name = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-    await saveSnapshot(name)
-    setSaving(false)
-  }
+    setSaving(true);
+    const now = new Date();
+    const name = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    await saveSnapshot(name);
+    setSaving(false);
+  };
 
-  const isDev = import.meta.env.DEV
+  const isDev = import.meta.env.DEV;
 
   const handleRandomAssign = () => {
-    const { avoidPairs, undoStack } = useSeatingStore.getState()
-    const allConfirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
-    const shuffled = [...allConfirmed]
+    const { avoidPairs, undoStack } = useSeatingStore.getState();
+    const allConfirmed = guests.filter((g) => g.rsvpStatus === 'confirmed');
+    const shuffled = [...allConfirmed];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    shuffled.length = Math.ceil(shuffled.length * 0.75)
-    const remaining = new Map<string, number>()
-    const nextSeat = new Map<string, number>()
-    for (const t of tables) { remaining.set(t.id, t.capacity); nextSeat.set(t.id, 0) }
-    const assignments = new Map<string, { tableId: string; seatIndex: number }>()
+    shuffled.length = Math.ceil(shuffled.length * 0.75);
+    const remaining = new Map<string, number>();
+    const nextSeat = new Map<string, number>();
+    for (const t of tables) { remaining.set(t.id, t.capacity); nextSeat.set(t.id, 0); }
+    const assignments = new Map<string, { tableId: string; seatIndex: number }>();
     for (const g of shuffled) {
-      const avail = tables.find((t) => (remaining.get(t.id) || 0) >= g.seatCount)
+      const avail = tables.find((t) => (remaining.get(t.id) || 0) >= g.seatCount);
       if (avail) {
-        const seat = nextSeat.get(avail.id) || 0
-        assignments.set(g.id, { tableId: avail.id, seatIndex: seat })
-        remaining.set(avail.id, (remaining.get(avail.id) || 0) - g.seatCount)
-        nextSeat.set(avail.id, seat + g.seatCount)
+        const seat = nextSeat.get(avail.id) || 0;
+        assignments.set(g.id, { tableId: avail.id, seatIndex: seat });
+        remaining.set(avail.id, (remaining.get(avail.id) || 0) - g.seatCount);
+        nextSeat.set(avail.id, seat + g.seatCount);
       }
     }
-    const updatedGuests = guests.map((g) => {
-      const a = assignments.get(g.id)
-      if (a) return { ...g, assignedTableId: a.tableId, seatIndex: a.seatIndex }
-      if (g.rsvpStatus === 'confirmed') return { ...g, assignedTableId: null as string | null | undefined, seatIndex: null }
-      return g
-    })
-    const result = recalculateAll(updatedGuests, tables, avoidPairs)
-    const finalGuests = updatedGuests.map((g) => { const s = result.guests.find((gs) => gs.id === g.id); return s ? { ...g, satisfactionScore: s.satisfactionScore } : g })
-    const finalTables = tables.map((t) => { const s = result.tables.find((ts) => ts.id === t.id); return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t })
+    const updatedGuests: typeof guests = guests.map((g) => {
+      const a = assignments.get(g.id);
+      if (a) return { ...g, assignedTableId: a.tableId, seatIndex: a.seatIndex };
+      if (g.rsvpStatus === 'confirmed') return { ...g, assignedTableId: null, seatIndex: null };
+      return g;
+    });
+    const result = recalculateAll(updatedGuests, tables, avoidPairs);
+    const finalGuests = updatedGuests.map((g) => { const s = result.guests.find((gs) => gs.id === g.id); return s ? { ...g, satisfactionScore: s.satisfactionScore } : g; });
+    const finalTables = tables.map((t) => { const s = result.tables.find((ts) => ts.id === t.id); return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t; });
     useSeatingStore.setState({
       guests: finalGuests, tables: finalTables,
       undoStack: [...undoStack, { type: 'auto-assign' as const, assignments: allConfirmed.map((g) => ({ guestId: g.id, fromTableId: g.assignedTableId || null, fromSeatIndex: g.seatIndex })), createdTableIds: [] }],
-    })
-    const { eventId } = useSeatingStore.getState()
+    });
+    const { eventId } = useSeatingStore.getState();
     if (eventId) {
-      const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed')
+      const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed');
       authFetch(`/api/events/${eventId}/guests/assign-batch`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assignments: confirmed.map((g) => ({ guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null })) }),
-      }).catch(console.error)
+      }).catch(console.error);
     }
-  }
+  };
 
   const handleDeleteEmptyTables = async () => {
-    const eventId = useSeatingStore.getState().eventId
-    if (!eventId) return
-    const res = await authFetch(`/api/events/${eventId}/tables/empty`, { method: 'DELETE' })
+    const eventId = useSeatingStore.getState().eventId;
+    if (!eventId) return;
+    const res = await authFetch(`/api/events/${eventId}/tables/empty`, { method: 'DELETE' });
     if (res.ok) {
-      const { loadEvent } = useSeatingStore.getState()
-      await loadEvent()
+      const { loadEvent } = useSeatingStore.getState();
+      await loadEvent();
     }
-  }
+  };
 
   const handleAutoArrange = async () => {
-    setArranging(true)
-    setShowArrangeConfirm(false)
+    setArranging(true);
+    setShowArrangeConfirm(false);
     try {
-      const svg = document.getElementById('floorplan-svg') as SVGSVGElement | null
-      const vb = svg?.viewBox.baseVal
-      let positions: ReturnType<typeof calculateGridLayout>
+      const svg = document.getElementById('floorplan-svg') as SVGSVGElement | null;
+      const vb = svg?.viewBox.baseVal;
+      let positions: ReturnType<typeof calculateGridLayout>;
       if (vb && vb.width > 0) {
-        const padding = 100
-        const areaW = vb.width - padding * 2
-        const areaH = vb.height - padding * 2
-        const cols = Math.ceil(Math.sqrt(tables.length))
-        const rows = Math.ceil(tables.length / cols)
-        const spacingX = cols > 1 ? areaW / (cols - 1) : 0
-        const spacingY = rows > 1 ? areaH / (rows - 1) : 0
+        const padding = 100;
+        const areaW = vb.width - padding * 2;
+        const areaH = vb.height - padding * 2;
+        const cols = Math.ceil(Math.sqrt(tables.length));
+        const rows = Math.ceil(tables.length / cols);
+        const spacingX = cols > 1 ? areaW / (cols - 1) : 0;
+        const spacingY = rows > 1 ? areaH / (rows - 1) : 0;
         positions = tables.map((t, i) => ({
           tableId: t.id,
           x: vb.x + padding + (i % cols) * spacingX,
           y: vb.y + padding + Math.floor(i / cols) * spacingY,
-        }))
+        }));
       } else {
-        positions = calculateGridLayout(tables)
+        positions = calculateGridLayout(tables);
       }
-      await autoArrangeTables(positions)
+      await autoArrangeTables(positions);
     } catch (err: any) {
-      alert(err.message || '保存失敗，已恢復原排列')
+      alert(err.message || '保存失敗，已恢復原排列');
     } finally {
-      setArranging(false)
+      setArranging(false);
     }
-  }
+  };
 
   const animateAutoAssign = async (mode: AutoAssignMode = 'balanced') => {
-    setAssigning(true)
-    const svgEl = document.getElementById('floorplan-svg') as SVGSVGElement | null
-    const ctm = svgEl?.getScreenCTM()
+    setAssigning(true);
+    const svgEl = document.getElementById('floorplan-svg') as SVGSVGElement | null;
+    const ctm = svgEl?.getScreenCTM();
 
     // Step 1: 記錄每位待排賓客在側欄的螢幕位置
-    const unassigned = getUnassignedGuests()
-    const chipPositions = new Map<string, { x: number; y: number }>()
+    const unassigned = getUnassignedGuests();
+    const chipPositions = new Map<string, { x: number; y: number }>();
     for (const g of unassigned) {
-      const el = document.querySelector(`[data-guest-id="${g.id}"]`)
+      const el = document.querySelector(`[data-guest-id="${g.id}"]`);
       if (el) {
-        const rect = el.getBoundingClientRect()
-        chipPositions.set(g.id, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+        const rect = el.getBoundingClientRect();
+        chipPositions.set(g.id, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
       }
     }
 
     // Step 2: 隱藏「待排賓客」的桌上圓圈 + 抑制互動
     // 只隱藏即將飛入的賓客，已在桌上的賓客保持可見
-    const flyingIds = new Set(unassigned.map((g) => g.id))
+    const flyingIds = new Set(unassigned.map((g) => g.id));
     useSeatingStore.setState({
       flyingGuestIds: flyingIds,
       hoverSuppressedUntil: Date.now() + 5000, // 足夠長，cleanup 時會自然過期
       hoveredGuestId: null,
-    })
+    });
 
     // Step 3: 執行分配
     try {
-      await autoAssignGuests(mode)
+      await autoAssignGuests(mode);
     } catch (err: any) {
-      useSeatingStore.setState({ flyingGuestIds: new Set() })
-      alert(err.message || '自動分配失敗')
-      setAssigning(false)
-      return
+      useSeatingStore.setState({ flyingGuestIds: new Set() });
+      alert(err.message || '自動分配失敗');
+      setAssigning(false);
+      return;
     }
 
     // Step 4: 計算每位賓客在桌上的目標螢幕位置
     if (!svgEl || !ctm || chipPositions.size === 0) {
-      useSeatingStore.setState({ flyingGuestIds: new Set() })
-      setAssigning(false)
-      return
+      useSeatingStore.setState({ flyingGuestIds: new Set() });
+      setAssigning(false);
+      return;
     }
 
-    const latestGuests = useSeatingStore.getState().guests
-    const latestTables = useSeatingStore.getState().tables
-    const newCtm = svgEl.getScreenCTM()
-    if (!newCtm) { setAssigning(false); return }
+    const latestGuests = useSeatingStore.getState().guests;
+    const latestTables = useSeatingStore.getState().tables;
+    const newCtm = svgEl.getScreenCTM();
+    if (!newCtm) { setAssigning(false); return; }
 
-    const vb = svgEl.viewBox.baseVal
-    const svgRect = svgEl.getBoundingClientRect()
-    const svgScale = svgRect.width / vb.width
-    const circleSize = 40 * svgScale
-    const fontSize = Math.max(10, Math.round(16 * svgScale))
+    const vb = svgEl.viewBox.baseVal;
+    const svgRect = svgEl.getBoundingClientRect();
+    const svgScale = svgRect.width / vb.width;
+    const circleSize = 40 * svgScale;
+    const fontSize = Math.max(10, Math.round(16 * svgScale));
 
     // 建立浮動 overlay
-    const overlay = document.createElement('div')
-    overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999'
-    document.body.appendChild(overlay)
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999';
+    document.body.appendChild(overlay);
 
-    const chips: HTMLDivElement[] = []
-    const targets: Array<{ x: number; y: number }> = []
+    const chips: HTMLDivElement[] = [];
+    const targets: Array<{ x: number; y: number }> = [];
 
     for (const [guestId, fromPos] of chipPositions) {
-      const guest = latestGuests.find((g) => g.id === guestId)
-      if (!guest?.assignedTableId) continue
+      const guest = latestGuests.find((g) => g.id === guestId);
+      if (!guest?.assignedTableId) continue;
 
-      const table = latestTables.find((t) => t.id === guest.assignedTableId)
-      if (!table) continue
+      const table = latestTables.find((t) => t.id === guest.assignedTableId);
+      if (!table) continue;
 
       // 計算目標座位的螢幕位置
-      const radius = Math.max(58 + Math.min(table.capacity, 12) * 7, 88)
-      const seatRadius = radius - 34
-      const seatIndex = guest.seatIndex ?? 0
-      const angle = ((2 * Math.PI) / table.capacity) * seatIndex - Math.PI / 2
-      const seatSvgX = table.positionX + Math.cos(angle) * seatRadius
-      const seatSvgY = table.positionY + Math.sin(angle) * seatRadius
+      const radius = Math.max(58 + Math.min(table.capacity, 12) * 7, 88);
+      const seatRadius = radius - 34;
+      const seatIndex = guest.seatIndex ?? 0;
+      const angle = ((2 * Math.PI) / table.capacity) * seatIndex - Math.PI / 2;
+      const seatSvgX = table.positionX + Math.cos(angle) * seatRadius;
+      const seatSvgY = table.positionY + Math.sin(angle) * seatRadius;
 
-      const pt = svgEl.createSVGPoint()
-      pt.x = seatSvgX
-      pt.y = seatSvgY
-      const screenPt = pt.matrixTransform(newCtm)
+      const pt = svgEl.createSVGPoint();
+      pt.x = seatSvgX;
+      pt.y = seatSvgY;
+      const screenPt = pt.matrixTransform(newCtm);
 
-      const displayName = guest.name.length <= 2 ? guest.name : guest.name.slice(-2)
-      const chip = document.createElement('div')
-      chip.textContent = displayName
+      const displayName = guest.name.length <= 2 ? guest.name : guest.name.slice(-2);
+      const chip = document.createElement('div');
+      chip.textContent = displayName;
       chip.style.cssText = `
         position:fixed;
         left:${fromPos.x}px;
@@ -347,61 +308,59 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
         pointer-events:none;
         transition:all 500ms cubic-bezier(0.4, 0, 0.2, 1);
         z-index:9999;
-      `
-      overlay.appendChild(chip)
-      chips.push(chip)
-      targets.push({ x: screenPt.x, y: screenPt.y })
+      `;
+      overlay.appendChild(chip);
+      chips.push(chip);
+      targets.push({ x: screenPt.x, y: screenPt.y });
     }
 
     // Step 4: 觸發飛行動畫
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         chips.forEach((chip, i) => {
-          chip.style.left = `${targets[i].x}px`
-          chip.style.top = `${targets[i].y}px`
-          chip.style.transitionDelay = `${i * 20}ms`
-        })
-      })
-    })
+          chip.style.left = `${targets[i].x}px`;
+          chip.style.top = `${targets[i].y}px`;
+          chip.style.transitionDelay = `${i * 20}ms`;
+        });
+      });
+    });
 
     // 動畫結束後清理：等最後一個 chip 飛完再顯示
     // 總時間 = 最後一個 chip 的 delay + transition duration + buffer
-    const totalAnimTime = chips.length * 20 + 500 + 100
+    const totalAnimTime = chips.length * 20 + 500 + 100;
     setTimeout(() => {
-      useSeatingStore.setState({ flyingGuestIds: new Set() })
-      setTimeout(() => overlay.remove(), 200)
-      setAssigning(false)
-    }, totalAnimTime)
-  }
+      useSeatingStore.setState({ flyingGuestIds: new Set() });
+      setTimeout(() => overlay.remove(), 200);
+      setAssigning(false);
+    }, totalAnimTime);
+  };
 
-  const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
-
-  const unassignedGuests = getUnassignedGuests()
-  const totalUnassignedSeats = unassignedGuests.reduce((s, g) => s + g.seatCount, 0)
+  const unassignedGuests = getUnassignedGuests();
+  const totalUnassignedSeats = unassignedGuests.reduce((s, g) => s + g.seatCount, 0);
 
   const { isOver, setNodeRef } = useDroppable({
     id: 'unassigned',
     data: { type: 'unassigned' },
-  })
+  });
 
   // 依名字過濾
   const filteredGuests = search.trim()
     ? unassignedGuests.filter((g) => g.name.toLowerCase().includes(search.toLowerCase()))
-    : unassignedGuests
+    : unassignedGuests;
 
   // 依分類 → 標籤 兩層分組
-  const allCategories = Array.from(new Set(unassignedGuests.map((g) => g.category ?? '其他')))
+  const allCategories = Array.from(new Set(unassignedGuests.map((g) => g.category ?? '其他')));
   const sortedCategories = [
     ...CATEGORY_ORDER.filter((c) => allCategories.includes(c)),
     ...allCategories.filter((c) => !CATEGORY_ORDER.includes(c)),
-  ]
+  ];
   const grouped = sortedCategories
     .map((cat) => {
-      const catGuests = filteredGuests.filter((g) => (g.category ?? '其他') === cat)
+      const catGuests = filteredGuests.filter((g) => (g.category ?? '其他') === cat);
       // 收集此分類下所有出現的標籤（依第一個標籤分組；無標籤歸入 null）
       const subcatNames = Array.from(
         new Set(catGuests.map((g) => g.subcategory?.name).filter(Boolean))
-      ) as string[]
+      ) as string[];
       const subGroups = [
         ...subcatNames.map((tagName) => ({
           tagName,
@@ -412,10 +371,10 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
           tagName: null,
           guests: catGuests.filter((g) => !g.subcategory),
         },
-      ].filter((sg) => sg.guests.length > 0)
-      return { category: cat, subGroups }
+      ].filter((sg) => sg.guests.length > 0);
+      return { category: cat, subGroups };
     })
-    .filter((g) => g.subGroups.some((sg) => sg.guests.length > 0))
+    .filter((g) => g.subGroups.some((sg) => sg.guests.length > 0));
 
   // 選中桌的詳情
 
@@ -450,10 +409,10 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
               {unassignedGuests.length > 0 && (
                 <button
                   onClick={async () => {
-                    setShowModeModal(true)
-                    setEstimatedTime(null)
-                    const t = await estimateAutoAssignTimeInWorker(guests, tables, avoidPairs)
-                    setEstimatedTime(t)
+                    setShowModeModal(true);
+                    setEstimatedTime(null);
+                    const t = await estimateAutoAssignTimeInWorker(guests, tables, avoidPairs);
+                    setEstimatedTime(t);
                   }}
                   disabled={assigning}
                   className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-[var(--radius-sm)] cursor-pointer disabled:opacity-50 hover:brightness-90 bg-[var(--accent)] text-white font-[family-name:var(--font-display)]"
@@ -475,8 +434,8 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full text-base px-2.5 py-2 rounded-md bg-[var(--bg-surface)] border border-[var(--border)] text-[var(--text-primary)] outline-none font-[inherit]"
-            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)' }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
           />
         </div>
 
@@ -500,10 +459,10 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
             <div className="space-y-4">
               {(() => {
                 // 計算全域動畫索引
-                let globalIdx = 0
+                let globalIdx = 0;
                 return grouped.map(({ category, subGroups }) => {
-                const catColor = getCategoryColor(category, categoryColors)
-                const totalCount = subGroups.reduce((s, sg) => s + sg.guests.length, 0)
+                const catColor = getCategoryColor(category, categoryColors);
+                const totalCount = subGroups.reduce((s, sg) => s + sg.guests.length, 0);
                 return (
                   <div key={category}>
                     {/* 分類標頭 */}
@@ -538,8 +497,8 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
                       ))}
                     </div>
                   </div>
-                )
-              })
+                );
+              });
               })()}
             </div>
           )}
@@ -607,20 +566,20 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
       {showAvoidModal && <AvoidPairModal onClose={() => setShowAvoidModal(false)} />}
 
       {showRestoreConfirm && snapshots.length > 0 && (() => {
-        const snap = snapshots[0]
-        const snapStats = computeSnapshotStats(snap.data, snap.averageSatisfaction)
-        const currStats = computeCurrentStats(guests, tables)
+        const snap = snapshots[0];
+        const snapStats = computeSnapshotStats(snap.data, snap.averageSatisfaction);
+        const currStats = computeCurrentStats(guests, tables);
         const satItems = [
           { key: 'green' as const, color: '#16A34A', label: '滿意' },
           { key: 'yellow' as const, color: '#CA8A04', label: '尚可' },
           { key: 'orange' as const, color: '#EA580C', label: '不滿' },
           { key: 'red' as const, color: '#DC2626', label: '糟糕' },
-        ]
+        ];
         const StatColumn = ({ label, stats }: { label: string; stats: typeof snapStats }) => {
-          const seatedTotal = stats.green + stats.yellow + stats.orange + stats.red
-          const assignPct = stats.total > 0 ? Math.round((stats.assigned / stats.total) * 100) : 0
-          const assignBarColor = getSatisfactionColor(assignPct)
-          const segments = satItems.filter(({ key }) => stats[key] > 0)
+          const seatedTotal = stats.green + stats.yellow + stats.orange + stats.red;
+          const assignPct = stats.total > 0 ? Math.round((stats.assigned / stats.total) * 100) : 0;
+          const assignBarColor = getSatisfactionColor(assignPct);
+          const segments = satItems.filter(({ key }) => stats[key] > 0);
           return (
             <div className="flex-1 min-w-0">
               <div className="mb-3 text-xs font-semibold text-[var(--text-muted)] tracking-wide font-[family-name:var(--font-display)]">{label}</div>
@@ -646,8 +605,8 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
                 {stats.overflowCount > 0 && <span className="text-[var(--warning)]">溢出 {stats.overflowCount}人</span>}
               </div>
             </div>
-          )
-        }
+          );
+        };
         return createPortal(
           <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowRestoreConfirm(false)}>
             <div role="dialog" aria-modal="true" className="bg-white w-full max-w-md p-6 mx-4 rounded-[var(--radius-lg)] shadow-[var(--shadow-md)]" onClick={(e) => e.stopPropagation()}>
@@ -668,12 +627,12 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
               <p className="text-sm mb-4 text-[var(--warning)]">目前的排位將被覆蓋，還原記錄會清空。</p>
               <div className="flex gap-3">
                 <button onClick={() => setShowRestoreConfirm(false)} className="flex-1 py-2 text-sm font-medium rounded-[var(--radius-sm)] border border-[var(--border-strong)] cursor-pointer hover:bg-[var(--bg-primary)] text-[var(--text-secondary)]">取消</button>
-                <button onClick={() => { restoreSnapshot(snap.id); setShowRestoreConfirm(false) }} className="flex-1 py-2 text-sm font-semibold text-white rounded-[var(--radius-sm)] cursor-pointer hover:brightness-90 bg-[var(--accent)] font-[family-name:var(--font-display)]">還原</button>
+                <button onClick={() => { restoreSnapshot(snap.id); setShowRestoreConfirm(false); }} className="flex-1 py-2 text-sm font-semibold text-white rounded-[var(--radius-sm)] cursor-pointer hover:brightness-90 bg-[var(--accent)] font-[family-name:var(--font-display)]">還原</button>
               </div>
             </div>
           </div>,
           document.body
-        )
+        );
       })()}
 
       {showModeModal && createPortal(
@@ -694,7 +653,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
             <div className="flex flex-col gap-3">
               {/* 均衡模式 */}
               <button
-                onClick={() => { setShowModeModal(false); animateAutoAssign('balanced') }}
+                onClick={() => { setShowModeModal(false); animateAutoAssign('balanced'); }}
                 className="flex items-start gap-3.5 p-4 rounded-[10px] border border-[var(--border)] bg-[var(--bg-primary)] text-left cursor-pointer hover:brightness-95"
               >
                 <div className="relative flex items-end gap-0.5 h-[72px] shrink-0 mt-0.5">
@@ -723,7 +682,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
               </button>
               {/* 極致模式 */}
               <button
-                onClick={() => { setShowModeModal(false); animateAutoAssign('maximize-happy') }}
+                onClick={() => { setShowModeModal(false); animateAutoAssign('maximize-happy'); }}
                 className="flex items-start gap-3.5 p-4 rounded-[10px] border border-[var(--border)] bg-[var(--bg-primary)] text-left cursor-pointer hover:brightness-95"
               >
                 <div className="relative flex items-end gap-0.5 h-[72px] shrink-0 mt-0.5">
@@ -764,5 +723,5 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
         document.body
       )}
     </div>
-  )
+  );
 }

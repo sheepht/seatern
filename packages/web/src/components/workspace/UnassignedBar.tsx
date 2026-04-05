@@ -1,17 +1,17 @@
-import { useDroppable } from '@dnd-kit/core'
-import { useSeatingStore } from '@/stores/seating'
-import { GuestChip } from './GuestChip'
+import { useDroppable } from '@dnd-kit/core';
+import { useSeatingStore } from '@/stores/seating';
+import { GuestChip } from './GuestChip';
 
 export function UnassignedBar() {
-  const getUnassignedGuests = useSeatingStore((s) => s.getUnassignedGuests)
-  const unassigned = getUnassignedGuests()
+  const getUnassignedGuests = useSeatingStore((s) => s.getUnassignedGuests);
+  const unassigned = getUnassignedGuests();
 
   const { isOver, setNodeRef } = useDroppable({
     id: 'unassigned',
     data: { type: 'unassigned' },
-  })
+  });
 
-  const totalSeats = unassigned.reduce((s, g) => s + g.seatCount, 0)
+  const totalSeats = unassigned.reduce((s, g) => s + g.seatCount, 0);
 
   return (
     <div
@@ -36,5 +36,5 @@ export function UnassignedBar() {
         )}
       </div>
     </div>
-  )
+  );
 }

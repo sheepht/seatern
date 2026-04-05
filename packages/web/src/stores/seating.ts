@@ -1,15 +1,15 @@
-import { create } from 'zustand'
-import { authFetch } from '@/lib/api'
-import { recalculateAll } from '@/lib/satisfaction'
-import { type AutoAssignMode, type AutoAssignProgress } from '@/lib/auto-assign'
-import { runAutoAssignInWorker } from '@/lib/auto-assign-client'
-import { findFreePosition } from '@/lib/viewport'
-import { buildSlotArray, placeGuest, extractSeatIndices, type Slot } from '@/lib/seat-shift'
+import { create } from 'zustand';
+import { authFetch } from '@/lib/api';
+import { recalculateAll } from '@/lib/satisfaction';
+import { type AutoAssignMode, type AutoAssignProgress } from '@/lib/auto-assign';
+import { runAutoAssignInWorker } from '@/lib/auto-assign-client';
+import { findFreePosition } from '@/lib/viewport';
+import { buildSlotArray, placeGuest, extractSeatIndices, type Slot } from '@/lib/seat-shift';
 
 // ─── Types ──────────────────────────────────────────
 
-export type { Guest, Table, AvoidPair } from '@/lib/types'
-import type { Guest, Table, AvoidPair } from '@/lib/types'
+export type { Guest, Table, AvoidPair } from '@/lib/types';
+import type { Guest, Table, AvoidPair } from '@/lib/types';
 
 export interface SeatingSnapshot {
   id: string
@@ -203,30 +203,30 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   autoAssignProgress: null,
   autoAssignAbort: null,
   cancelAutoAssign: () => {
-    const ctrl = get().autoAssignAbort
-    if (ctrl) ctrl.abort()
+    const ctrl = get().autoAssignAbort;
+    if (ctrl) ctrl.abort();
   },
 
   loadEvent: async () => {
-    set({ loading: true })
+    set({ loading: true });
     try {
-      let res = await authFetch('/api/events/mine')
+      let res = await authFetch('/api/events/mine');
       if (res.status === 404) {
         // 沒有活動，自動建立一個
         const createRes = await authFetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: '我的婚禮', type: 'wedding' }),
-        })
+        });
         if (!createRes.ok) {
-          set({ loading: false })
-          window.location.href = '/'
-          return
+          set({ loading: false });
+          window.location.href = '/';
+          return;
         }
-        res = await authFetch('/api/events/mine')
+        res = await authFetch('/api/events/mine');
       }
-      if (!res.ok) throw new Error('Failed to load event')
-      const data = await res.json()
+      if (!res.ok) throw new Error('Failed to load event');
+      const data = await res.json();
 
       const guests = data.guests.map((g: any) => ({
         id: g.id,
@@ -245,49 +245,49 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         isIsolated: g.isIsolated,
         seatPreferences: g.seatPreferences || [],
         subcategory: g.subcategory || null,
-      }))
-      const tables = data.tables as Table[]
-      const subcategories = (data.subcategories || []) as Array<{ id: string; name: string; category: string }>
+      }));
+      const tables = data.tables as Table[];
+      const subcategories = (data.subcategories || []) as Array<{ id: string; name: string; category: string }>;
 
       // 初始滿意度計算
-      const result = recalculateAll(guests, tables, data.avoidPairs || [])
+      const result = recalculateAll(guests, tables, data.avoidPairs || []);
       for (const gs of result.guests) {
-        const g = guests.find((gg: Guest) => gg.id === gs.id)
-        if (g) g.satisfactionScore = gs.satisfactionScore
+        const g = guests.find((gg: Guest) => gg.id === gs.id);
+        if (g) g.satisfactionScore = gs.satisfactionScore;
       }
       for (const ts of result.tables) {
-        const t = tables.find((tt: Table) => tt.id === ts.id)
-        if (t) t.averageSatisfaction = ts.averageSatisfaction
+        const t = tables.find((tt: Table) => tt.id === ts.id);
+        if (t) t.averageSatisfaction = ts.averageSatisfaction;
       }
 
       // 為沒有 seatIndex 的賓客自動分配座位索引
       for (const t of tables) {
         const tableGuests = guests.filter(
           (g: Guest) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed',
-        )
-        const needsIndex = tableGuests.filter((g: Guest) => g.seatIndex === null)
+        );
+        const needsIndex = tableGuests.filter((g: Guest) => g.seatIndex === null);
         if (needsIndex.length > 0) {
           // 找出已使用的座位索引
           const usedIndices = new Set(
             tableGuests.filter((g: Guest) => g.seatIndex !== null).map((g: Guest) => g.seatIndex!),
-          )
+          );
           // 也要考慮眷屬佔的位子
           for (const g of tableGuests) {
             if (g.seatIndex !== null) {
               for (let c = 1; c < g.seatCount; c++) {
-                usedIndices.add((g.seatIndex + c) % t.capacity)
+                usedIndices.add((g.seatIndex + c) % t.capacity);
               }
             }
           }
-          let nextFree = 0
+          let nextFree = 0;
           for (const g of needsIndex) {
-            while (usedIndices.has(nextFree)) nextFree++
-            g.seatIndex = nextFree
-            usedIndices.add(nextFree)
+            while (usedIndices.has(nextFree)) nextFree++;
+            g.seatIndex = nextFree;
+            usedIndices.add(nextFree);
             for (let c = 1; c < g.seatCount; c++) {
-              usedIndices.add(nextFree + c)
+              usedIndices.add(nextFree + c);
             }
-            nextFree++
+            nextFree++;
           }
         }
       }
@@ -305,10 +305,10 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         selectedTableId: null,
         dragPreview: null,
         undoStack: [],
-      })
+      });
     } catch (err) {
-      console.error('Failed to load event:', err)
-      set({ loading: false })
+      console.error('Failed to load event:', err);
+      set({ loading: false });
     }
   },
 
@@ -324,115 +324,115 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   }),
 
   moveGuest: (guestId, toTableId) => {
-    const { guests, tables, undoStack, avoidPairs } = get()
-    const guest = guests.find((g) => g.id === guestId)
-    if (!guest) return
+    const { guests, tables, undoStack, avoidPairs } = get();
+    const guest = guests.find((g) => g.id === guestId);
+    if (!guest) return;
 
-    const fromTableId = guest.assignedTableId
+    const fromTableId = guest.assignedTableId;
 
     // 記錄原始 seatIndex（用於 undo）
-    const prevSeatIndices = new Map<string, number | null>()
-    prevSeatIndices.set(guestId, guest.seatIndex)
+    const prevSeatIndices = new Map<string, number | null>();
+    prevSeatIndices.set(guestId, guest.seatIndex);
 
     // 更新賓客位置（移除桌時清 seatIndex）
     const updatedGuests = guests.map((g) =>
       g.id === guestId ? { ...g, assignedTableId: toTableId, seatIndex: toTableId === null ? null : g.seatIndex } : g,
-    )
+    );
 
     // 全量重算滿意度
-    const result = recalculateAll(updatedGuests, tables, avoidPairs)
+    const result = recalculateAll(updatedGuests, tables, avoidPairs);
     const finalGuests = updatedGuests.map((g) => {
-      const score = result.guests.find((gs) => gs.id === g.id)
-      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
-    })
+      const score = result.guests.find((gs) => gs.id === g.id);
+      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g;
+    });
     const finalTables = tables.map((t) => {
-      const score = result.tables.find((ts) => ts.id === t.id)
-      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
-    })
+      const score = result.tables.find((ts) => ts.id === t.id);
+      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t;
+    });
 
     set({
       guests: finalGuests,
       tables: finalTables,
       dragPreview: null,
       undoStack: [...undoStack, { guestId, fromTableId, toTableId, prevSeatIndices }],
-    })
+    });
 
     // 非同步存到後端（不 block UI）
-    const { eventId } = get()
+    const { eventId } = get();
     if (eventId) {
       fetch(`/api/events/${eventId}/guests/${guestId}/table`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ tableId: toTableId, seatIndex: toTableId === null ? null : guest.seatIndex }),
-      }).catch(console.error)
+      }).catch(console.error);
     }
   },
 
   moveGuestToSeat: (guestId, tableId, seatIndex, cursorBias) => {
-    const { guests, tables, undoStack, avoidPairs } = get()
-    const guest = guests.find((g) => g.id === guestId)
-    if (!guest) return
+    const { guests, tables, undoStack, avoidPairs } = get();
+    const guest = guests.find((g) => g.id === guestId);
+    if (!guest) return;
 
-    const fromTableId = guest.assignedTableId
-    const table = tables.find((t) => t.id === tableId)
-    if (!table) return
+    const fromTableId = guest.assignedTableId;
+    const table = tables.find((t) => t.id === tableId);
+    if (!table) return;
 
     // 記錄所有可能受影響的 seatIndex（用於 undo）
-    const prevSeatIndices = new Map<string, number | null>()
-    prevSeatIndices.set(guestId, guest.seatIndex)
+    const prevSeatIndices = new Map<string, number | null>();
+    prevSeatIndices.set(guestId, guest.seatIndex);
 
     // 建立目標桌的 slot 陣列（排除正在拖的賓客）
     const tableGuests = guests.filter(
       (g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed' && g.id !== guestId,
-    )
+    );
     for (const g of tableGuests) {
-      prevSeatIndices.set(g.id, g.seatIndex)
+      prevSeatIndices.set(g.id, g.seatIndex);
     }
 
     const seatGuests = tableGuests
       .filter((g) => g.seatIndex !== null)
-      .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, seatCount: g.seatCount }))
+      .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, seatCount: g.seatCount }));
 
-    const slots = buildSlotArray(seatGuests, table.capacity)
-    const newSlots = placeGuest(slots, seatIndex, guestId, guest.seatCount, cursorBias)
+    const slots = buildSlotArray(seatGuests, table.capacity);
+    const newSlots = placeGuest(slots, seatIndex, guestId, guest.seatCount, cursorBias);
 
-    if (!newSlots) return // 無法放置
+    if (!newSlots) return; // 無法放置
 
     // 提取新的 seatIndex mapping
-    const newIndices = extractSeatIndices(newSlots)
+    const newIndices = extractSeatIndices(newSlots);
 
     // 更新所有賓客
     const updatedGuests = guests.map((g) => {
       if (g.id === guestId) {
-        return { ...g, assignedTableId: tableId, seatIndex: newIndices.get(guestId) ?? seatIndex }
+        return { ...g, assignedTableId: tableId, seatIndex: newIndices.get(guestId) ?? seatIndex };
       }
       if (newIndices.has(g.id)) {
-        return { ...g, seatIndex: newIndices.get(g.id)! }
+        return { ...g, seatIndex: newIndices.get(g.id)! };
       }
-      return g
-    })
+      return g;
+    });
 
     // 全量重算滿意度
-    const result = recalculateAll(updatedGuests, tables, avoidPairs)
+    const result = recalculateAll(updatedGuests, tables, avoidPairs);
     const finalGuests = updatedGuests.map((g) => {
-      const score = result.guests.find((gs) => gs.id === g.id)
-      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
-    })
+      const score = result.guests.find((gs) => gs.id === g.id);
+      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g;
+    });
     const finalTables = tables.map((t) => {
-      const score = result.tables.find((ts) => ts.id === t.id)
-      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
-    })
+      const score = result.tables.find((ts) => ts.id === t.id);
+      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t;
+    });
 
     set({
       guests: finalGuests,
       tables: finalTables,
       dragPreview: null,
       undoStack: [...undoStack, { guestId, fromTableId, toTableId: tableId, prevSeatIndices }],
-    })
+    });
 
     // 非同步存到後端 — 所有受影響的賓客
-    const { eventId } = get()
+    const { eventId } = get();
     if (eventId) {
       // 被拖的賓客
       fetch(`/api/events/${eventId}/guests/${guestId}/table`, {
@@ -440,19 +440,19 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ tableId, seatIndex: newIndices.get(guestId) ?? seatIndex }),
-      }).catch(console.error)
+      }).catch(console.error);
 
       // 被位移的同桌賓客
       for (const [id, newIdx] of newIndices) {
         if (id !== guestId) {
-          const prev = prevSeatIndices.get(id)
+          const prev = prevSeatIndices.get(id);
           if (prev !== newIdx) {
             fetch(`/api/events/${eventId}/guests/${id}/table`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
               body: JSON.stringify({ tableId, seatIndex: newIdx }),
-            }).catch(console.error)
+            }).catch(console.error);
           }
         }
       }
@@ -461,59 +461,59 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
   setDragPreview: (tableId, seatIndex, draggedGuestId, cursorBias) => {
     if (!tableId || seatIndex === undefined || !draggedGuestId) {
-      set({ dragPreview: null, dragRejectTableId: null })
-      return
+      set({ dragPreview: null, dragRejectTableId: null });
+      return;
     }
 
-    const { guests, tables, avoidPairs } = get()
-    const table = tables.find((t) => t.id === tableId)
-    const draggedGuest = guests.find((g) => g.id === draggedGuestId)
+    const { guests, tables, avoidPairs } = get();
+    const table = tables.find((t) => t.id === tableId);
+    const draggedGuest = guests.find((g) => g.id === draggedGuestId);
     if (!table || !draggedGuest) {
-      set({ dragPreview: null, dragRejectTableId: null })
-      return
+      set({ dragPreview: null, dragRejectTableId: null });
+      return;
     }
 
     // 建立 slot 陣列（排除被拖的賓客）
     const tableGuests = guests.filter(
       (g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed' && g.id !== draggedGuestId,
-    )
+    );
     const seatGuests = tableGuests
       .filter((g) => g.seatIndex !== null)
-      .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, seatCount: g.seatCount }))
+      .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, seatCount: g.seatCount }));
 
-    const slots = buildSlotArray(seatGuests, table.capacity)
-    const newSlots = placeGuest(slots, seatIndex, draggedGuestId, draggedGuest.seatCount, cursorBias)
+    const slots = buildSlotArray(seatGuests, table.capacity);
+    const newSlots = placeGuest(slots, seatIndex, draggedGuestId, draggedGuest.seatCount, cursorBias);
 
     if (!newSlots) {
       // 無法放置 — 區分原因：真的滿桌 vs 不可移動的位子
-      const emptySlots = slots.filter((s) => s === null).length
-      const isTrulyFull = emptySlots < draggedGuest.seatCount
-      set({ dragPreview: null, dragRejectTableId: isTrulyFull ? tableId : null })
-      return
+      const emptySlots = slots.filter((s) => s === null).length;
+      const isTrulyFull = emptySlots < draggedGuest.seatCount;
+      set({ dragPreview: null, dragRejectTableId: isTrulyFull ? tableId : null });
+      return;
     }
 
     // 計算預覽滿意度：模擬被拖賓客放到目標位後的分數
-    const newIndices = extractSeatIndices(newSlots)
+    const newIndices = extractSeatIndices(newSlots);
     const previewGuests = guests.map((g) => {
       if (g.id === draggedGuestId) {
-        return { ...g, assignedTableId: tableId, seatIndex: newIndices.get(g.id) ?? seatIndex }
+        return { ...g, assignedTableId: tableId, seatIndex: newIndices.get(g.id) ?? seatIndex };
       }
       if (newIndices.has(g.id)) {
-        return { ...g, seatIndex: newIndices.get(g.id)! }
+        return { ...g, seatIndex: newIndices.get(g.id)! };
       }
-      return g
-    })
-    const previewResult = recalculateAll(previewGuests, tables, avoidPairs)
+      return g;
+    });
+    const previewResult = recalculateAll(previewGuests, tables, avoidPairs);
 
-    const previewScores = new Map<string, number>()
-    for (const gs of previewResult.guests) previewScores.set(gs.id, gs.satisfactionScore)
-    const previewTableScores = new Map<string, number>()
-    for (const ts of previewResult.tables) previewTableScores.set(ts.id, ts.averageSatisfaction)
+    const previewScores = new Map<string, number>();
+    for (const gs of previewResult.guests) previewScores.set(gs.id, gs.satisfactionScore);
+    const previewTableScores = new Map<string, number>();
+    for (const ts of previewResult.tables) previewTableScores.set(ts.id, ts.averageSatisfaction);
 
     // 目標位留空 — 被拖的賓客跟著游標（DragOverlay），不顯示在桌上
     for (let i = 0; i < newSlots.length; i++) {
       if (newSlots[i]?.guestId === draggedGuestId) {
-        newSlots[i] = null
+        newSlots[i] = null;
       }
     }
 
@@ -526,28 +526,28 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         previewTableScores,
       },
       dragRejectTableId: null,
-    })
+    });
   },
 
   undo: () => {
-    const { undoStack, guests, tables, eventId, avoidPairs } = get()
-    if (undoStack.length === 0) return
+    const { undoStack, guests, tables, eventId, avoidPairs } = get();
+    if (undoStack.length === 0) return;
 
-    const last = undoStack[undoStack.length - 1]
+    const last = undoStack[undoStack.length - 1];
 
     // ─── 還原「新增桌」：刪掉該桌 ───
     if (last.type === 'add-table') {
-      const tableId = last.tableId
-      const tableGuests = guests.filter((g) => g.assignedTableId === tableId)
+      const tableId = last.tableId;
+      const tableGuests = guests.filter((g) => g.assignedTableId === tableId);
       const updatedGuests = guests.map((g) =>
         g.assignedTableId === tableId ? { ...g, assignedTableId: null as string | null, seatIndex: null } : g,
-      )
+      );
       set({
         tables: tables.filter((t) => t.id !== tableId),
         guests: updatedGuests,
         undoStack: undoStack.slice(0, -1),
         selectedTableId: get().selectedTableId === tableId ? null : get().selectedTableId,
-      })
+      });
       if (eventId) {
         if (tableGuests.length > 0) {
           fetch(`/api/events/${eventId}/guests/assign-batch`, {
@@ -557,59 +557,59 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
             body: JSON.stringify({
               assignments: tableGuests.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
             }),
-          }).catch(console.error)
+          }).catch(console.error);
         }
         fetch(`/api/events/${eventId}/tables/${tableId}`, {
           method: 'DELETE',
           credentials: 'include',
-        }).catch(console.error)
+        }).catch(console.error);
       }
-      return
+      return;
     }
 
     // ─── 還原「移動桌子」：回到原始位置 ───
     if (last.type === 'move-table') {
-      const { tableId, fromX, fromY } = last
+      const { tableId, fromX, fromY } = last;
       set({
         tables: tables.map((t) => t.id === tableId ? { ...t, positionX: fromX, positionY: fromY } : t),
         undoStack: undoStack.slice(0, -1),
-      })
+      });
       if (eventId) {
         fetch(`/api/events/${eventId}/tables/${tableId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ positionX: fromX, positionY: fromY }),
-        }).catch(console.error)
+        }).catch(console.error);
       }
-      return
+      return;
     }
 
     // ─── 還原「改桌名」 ───
     if (last.type === 'rename-table') {
-      const { tableId, oldName } = last
+      const { tableId, oldName } = last;
       set({
         tables: tables.map((t) => t.id === tableId ? { ...t, name: oldName } : t),
         undoStack: undoStack.slice(0, -1),
-      })
+      });
       if (eventId) {
         fetch(`/api/events/${eventId}/tables/${tableId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ name: oldName }),
-        }).catch(console.error)
+        }).catch(console.error);
       }
-      return
+      return;
     }
 
     // ─── 還原「自動排列」：所有桌子回到原始位置 ───
     if (last.type === 'auto-arrange') {
       const updatedTables = tables.map((t) => {
-        const prev = last.positions.get(t.id)
-        return prev ? { ...t, positionX: prev.fromX, positionY: prev.fromY } : t
-      })
-      set({ tables: updatedTables, undoStack: undoStack.slice(0, -1) })
+        const prev = last.positions.get(t.id);
+        return prev ? { ...t, positionX: prev.fromX, positionY: prev.fromY } : t;
+      });
+      set({ tables: updatedTables, undoStack: undoStack.slice(0, -1) });
       if (eventId) {
         for (const [tableId, { fromX, fromY }] of last.positions) {
           fetch(`/api/events/${eventId}/tables/${tableId}`, {
@@ -617,31 +617,31 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ positionX: fromX, positionY: fromY }),
-          }).catch(console.error)
+          }).catch(console.error);
         }
       }
-      return
+      return;
     }
 
     // ─── 還原「自動分配」：賓客回到原始桌次 + 刪除自動新增的桌子 ───
     if (last.type === 'auto-assign') {
       // 還原賓客分配（含 seatIndex）
       const updatedGuests = guests.map((g) => {
-        const orig = last.assignments.find((a) => a.guestId === g.id)
-        return orig ? { ...g, assignedTableId: orig.fromTableId, seatIndex: orig.fromSeatIndex ?? null } : g
-      })
+        const orig = last.assignments.find((a) => a.guestId === g.id);
+        return orig ? { ...g, assignedTableId: orig.fromTableId, seatIndex: orig.fromSeatIndex ?? null } : g;
+      });
       // 刪除自動新增的桌子
-      const remainingTables = tables.filter((t) => !last.createdTableIds.includes(t.id))
-      const result = recalculateAll(updatedGuests, remainingTables, avoidPairs)
+      const remainingTables = tables.filter((t) => !last.createdTableIds.includes(t.id));
+      const result = recalculateAll(updatedGuests, remainingTables, avoidPairs);
       const finalGuests = updatedGuests.map((g) => {
-        const score = result.guests.find((gs) => gs.id === g.id)
-        return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
-      })
+        const score = result.guests.find((gs) => gs.id === g.id);
+        return score ? { ...g, satisfactionScore: score.satisfactionScore } : g;
+      });
       const finalTables = remainingTables.map((t) => {
-        const score = result.tables.find((ts) => ts.id === t.id)
-        return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
-      })
-      set({ guests: finalGuests, tables: finalTables, undoStack: undoStack.slice(0, -1) })
+        const score = result.tables.find((ts) => ts.id === t.id);
+        return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t;
+      });
+      set({ guests: finalGuests, tables: finalTables, undoStack: undoStack.slice(0, -1) });
       if (eventId) {
         fetch(`/api/events/${eventId}/guests/assign-batch`, {
           method: 'PATCH',
@@ -652,78 +652,78 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
               guestId: a.guestId, tableId: a.fromTableId, seatIndex: a.fromSeatIndex ?? null,
             })),
           }),
-        }).catch(console.error)
+        }).catch(console.error);
         // 刪除自動新增的桌子
         for (const tableId of last.createdTableIds) {
           fetch(`/api/events/${eventId}/tables/${tableId}`, {
             method: 'DELETE',
             credentials: 'include',
-          }).catch(console.error)
+          }).catch(console.error);
         }
       }
-      return
+      return;
     }
 
     // ─── 還原「移動賓客」 ───
     // 批次還原：如果最後一筆有 batchId，找出所有同 batch 的 entry 一起還原
+    type MoveGuestEntry = Extract<typeof undoStack[number], { guestId: string }>;
+    const isMoveGuest = (e: typeof undoStack[number]): e is MoveGuestEntry => !e.type || e.type === 'move-guest';
     const entriesToUndo = last.batchId
-      ? undoStack.filter((e) => e.type !== 'add-table' && e.batchId === last.batchId)
-      : [last]
+      ? undoStack.filter((e): e is MoveGuestEntry => isMoveGuest(e) && e.batchId === last.batchId)
+      : [last];
     const remainingStack = last.batchId
-      ? undoStack.filter((e) => e.type === 'add-table' || e.batchId !== last.batchId)
-      : undoStack.slice(0, -1)
+      ? undoStack.filter((e) => !isMoveGuest(e) || e.batchId !== last.batchId)
+      : undoStack.slice(0, -1);
 
     // 還原所有受影響賓客的 seatIndex + tableId
-    let updatedGuests = [...guests]
+    let updatedGuests = [...guests];
     for (const entry of entriesToUndo) {
-      if (entry.type === 'add-table') continue
       updatedGuests = updatedGuests.map((g) => {
         if (g.id === entry.guestId) {
-          const prevIdx = entry.prevSeatIndices.get(g.id) ?? null
-          return { ...g, assignedTableId: entry.fromTableId, seatIndex: prevIdx }
+          const prevIdx = entry.prevSeatIndices.get(g.id) ?? null;
+          return { ...g, assignedTableId: entry.fromTableId, seatIndex: prevIdx };
         }
         if (entry.prevSeatIndices.has(g.id)) {
-          return { ...g, seatIndex: entry.prevSeatIndices.get(g.id) ?? null }
+          return { ...g, seatIndex: entry.prevSeatIndices.get(g.id) ?? null };
         }
-        return g
-      })
+        return g;
+      });
     }
 
     // 全量重算
-    const result = recalculateAll(updatedGuests, tables, avoidPairs)
+    const result = recalculateAll(updatedGuests, tables, avoidPairs);
     const finalGuests = updatedGuests.map((g) => {
-      const score = result.guests.find((gs) => gs.id === g.id)
-      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
-    })
+      const score = result.guests.find((gs) => gs.id === g.id);
+      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g;
+    });
     const finalTables = tables.map((t) => {
-      const score = result.tables.find((ts) => ts.id === t.id)
-      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
-    })
+      const score = result.tables.find((ts) => ts.id === t.id);
+      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t;
+    });
 
     set({
       guests: finalGuests,
       tables: finalTables,
       undoStack: remainingStack,
-    })
+    });
 
     // 後端同步：批次還原所有受影響的賓客
     if (eventId) {
-      const synced = new Set<string>()
-      const batchAssignments: Array<{ guestId: string; tableId: string | null; seatIndex: number | null }> = []
+      const synced = new Set<string>();
+      const batchAssignments: Array<{ guestId: string; tableId: string | null; seatIndex: number | null }> = [];
       for (const entry of entriesToUndo) {
-        if (entry.type === 'add-table' || !('guestId' in entry)) continue
         // 被拖的賓客
         if (!synced.has(entry.guestId)) {
-          synced.add(entry.guestId)
-          batchAssignments.push({ guestId: entry.guestId, tableId: entry.fromTableId, seatIndex: entry.prevSeatIndices.get(entry.guestId) ?? null })
+          synced.add(entry.guestId);
+          batchAssignments.push({ guestId: entry.guestId, tableId: entry.fromTableId, seatIndex: entry.prevSeatIndices.get(entry.guestId) ?? null });
         }
         // 其他被位移的賓客
         for (const [id, idx] of entry.prevSeatIndices) {
           if (id !== entry.guestId && !synced.has(id)) {
-            synced.add(id)
-            const currentGuest = guests.find((g) => g.id === id)
+            synced.add(id);
+            const currentGuest = guests.find((g) => g.id === id);
             if (currentGuest && currentGuest.seatIndex !== idx) {
-              batchAssignments.push({ guestId: id, tableId: currentGuest.assignedTableId ?? null, seatIndex: idx })
+              batchAssignments.push({ guestId: id, tableId: currentGuest.assignedTableId ?? null, seatIndex: idx });
             }
           }
         }
@@ -734,26 +734,26 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ assignments: batchAssignments }),
-        }).catch(console.error)
+        }).catch(console.error);
       }
     }
   },
 
   removeTable: async (tableId) => {
-    const { eventId, tables, guests, selectedTableId } = get()
-    if (!eventId) return
+    const { eventId, tables, guests, selectedTableId } = get();
+    if (!eventId) return;
 
     // 先把所有桌上的賓客移回未安排
-    const tableGuests = guests.filter((g) => g.assignedTableId === tableId)
+    const tableGuests = guests.filter((g) => g.assignedTableId === tableId);
     const updatedGuests = guests.map((g) =>
       g.assignedTableId === tableId ? { ...g, assignedTableId: null } : g,
-    )
+    );
 
     set({
       tables: tables.filter((t) => t.id !== tableId),
       guests: updatedGuests,
       selectedTableId: selectedTableId === tableId ? null : selectedTableId,
-    })
+    });
 
     // 回寫 API：移除桌上賓客
     await Promise.all(
@@ -763,66 +763,66 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
           credentials: 'include',
         }).catch(console.error),
       ),
-    )
+    );
 
     await authFetch(`/api/events/${eventId}/tables/${tableId}`, {
       method: 'DELETE',
       credentials: 'include',
-    }).catch(console.error)
+    }).catch(console.error);
   },
 
   addTable: async (name, positionX, positionY) => {
-    const { eventId, tables } = get()
-    if (!eventId) return
+    const { eventId, tables } = get();
+    if (!eventId) return;
 
     const res = await authFetch(`/api/events/${eventId}/tables`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ name, positionX, positionY }),
-    })
+    });
 
     if (res.status === 403) {
-      const data = await res.json()
+      const data = await res.json();
       if (data.code === 'TABLE_LIMIT_REACHED') {
-        set({ tableLimitReached: true })
-        return
+        set({ tableLimitReached: true });
+        return;
       }
     }
-    if (!res.ok) return
+    if (!res.ok) return;
 
-    const table = await res.json()
-    set({ tables: [...tables, table], undoStack: [...get().undoStack, { type: 'add-table' as const, tableId: table.id }] })
+    const table = await res.json();
+    set({ tables: [...tables, table], undoStack: [...get().undoStack, { type: 'add-table' as const, tableId: table.id }] });
   },
 
   clearTable: (tableId) => {
-    const { guests, tables, avoidPairs, eventId, undoStack } = get()
-    const tableGuests = guests.filter((g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed')
-    if (tableGuests.length === 0) return
+    const { guests, tables, avoidPairs, eventId, undoStack } = get();
+    const tableGuests = guests.filter((g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed');
+    if (tableGuests.length === 0) return;
 
-    const batchId = `clear-${tableId}-${Date.now()}`
+    const batchId = `clear-${tableId}-${Date.now()}`;
     const undoEntries = tableGuests.map((g) => ({
       guestId: g.id,
       fromTableId: g.assignedTableId ?? null,
       toTableId: null as string | null,
       prevSeatIndices: new Map<string, number | null>([[g.id, g.seatIndex ?? null]]),
       batchId,
-    }))
+    }));
 
     const updatedGuests = guests.map((g) =>
       g.assignedTableId === tableId ? { ...g, assignedTableId: null as string | null, seatIndex: null, satisfactionScore: g.rsvpStatus === 'confirmed' ? 55 : 0 } : g,
-    )
-    const result = recalculateAll(updatedGuests, tables, avoidPairs)
+    );
+    const result = recalculateAll(updatedGuests, tables, avoidPairs);
     const finalGuests = updatedGuests.map((g) => {
-      const score = result.guests.find((gs) => gs.id === g.id)
-      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
-    })
+      const score = result.guests.find((gs) => gs.id === g.id);
+      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g;
+    });
     const finalTables = tables.map((t) => {
-      const score = result.tables.find((ts) => ts.id === t.id)
-      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
-    })
+      const score = result.tables.find((ts) => ts.id === t.id);
+      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t;
+    });
 
-    set({ guests: finalGuests, tables: finalTables, undoStack: [...undoStack, ...undoEntries] })
+    set({ guests: finalGuests, tables: finalTables, undoStack: [...undoStack, ...undoEntries] });
 
     if (eventId && tableGuests.length > 0) {
       fetch(`/api/events/${eventId}/guests/assign-batch`, {
@@ -832,34 +832,34 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         body: JSON.stringify({
           assignments: tableGuests.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
         }),
-      }).catch(console.error)
+      }).catch(console.error);
     }
   },
 
   resetAllSeats: () => {
-    const { guests, tables, avoidPairs, eventId, undoStack } = get()
-    const assigned = guests.filter((g) => g.assignedTableId)
-    if (assigned.length === 0) return
+    const { guests, tables, eventId, undoStack } = get();
+    const assigned = guests.filter((g) => g.assignedTableId);
+    if (assigned.length === 0) return;
 
     // 把每位已安排賓客的狀態推入 undoStack，共享 batchId 讓「還原」一次全部回來
-    const batchId = `reset-${Date.now()}`
+    const batchId = `reset-${Date.now()}`;
     const undoEntries = assigned.map((g) => ({
       guestId: g.id,
       fromTableId: g.assignedTableId ?? null,
       toTableId: null as string | null,
       prevSeatIndices: new Map<string, number | null>([[g.id, g.seatIndex ?? null]]),
       batchId,
-    }))
+    }));
 
     const updatedGuests = guests.map((g) => ({
       ...g,
       assignedTableId: null as string | null,
       seatIndex: null,
       satisfactionScore: g.rsvpStatus === 'confirmed' ? 55 : 0,
-    }))
-    const updatedTables = tables.map((t) => ({ ...t, averageSatisfaction: 0 }))
+    }));
+    const updatedTables = tables.map((t) => ({ ...t, averageSatisfaction: 0 }));
 
-    set({ guests: updatedGuests, tables: updatedTables, selectedTableId: null, undoStack: [...undoStack, ...undoEntries], lastResetAt: Date.now(), isResetting: false })
+    set({ guests: updatedGuests, tables: updatedTables, selectedTableId: null, undoStack: [...undoStack, ...undoEntries], lastResetAt: Date.now(), isResetting: false });
 
     // 批次清除後端座位分配（一次寫入）
     if (eventId) {
@@ -870,131 +870,131 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         body: JSON.stringify({
           assignments: assigned.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
         }),
-      }).catch(console.error)
+      }).catch(console.error);
     }
   },
 
   updateEventName: (name) => {
-    const { eventId } = get()
-    set({ eventName: name })
-    if (!eventId) return
+    const { eventId } = get();
+    set({ eventName: name });
+    if (!eventId) return;
     fetch(`/api/events/${eventId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ name }),
-    }).catch(console.error)
+    }).catch(console.error);
   },
 
   updateTableName: (tableId, name) => {
-    const { eventId, tables, undoStack } = get()
-    const oldName = tables.find((t) => t.id === tableId)?.name
+    const { eventId, tables, undoStack } = get();
+    const oldName = tables.find((t) => t.id === tableId)?.name;
     set({
       tables: tables.map((t) => t.id === tableId ? { ...t, name } : t),
       undoStack: oldName !== undefined && oldName !== name
         ? [...undoStack, { type: 'rename-table' as const, tableId, oldName, newName: name }]
         : undoStack,
-    })
-    if (!eventId) return
+    });
+    if (!eventId) return;
     fetch(`/api/events/${eventId}/tables/${tableId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ name }),
-    }).catch(console.error)
+    }).catch(console.error);
   },
 
   updateTableCapacity: (tableId, capacity) => {
-    const { eventId, tables, guests, avoidPairs } = get()
-    const updatedTables = tables.map((t) => t.id === tableId ? { ...t, capacity } : t)
-    const result = recalculateAll(guests, updatedTables, avoidPairs)
+    const { eventId, tables, guests, avoidPairs } = get();
+    const updatedTables = tables.map((t) => t.id === tableId ? { ...t, capacity } : t);
+    const result = recalculateAll(guests, updatedTables, avoidPairs);
     set({
       tables: updatedTables.map((t) => {
-        const s = result.tables.find((ts) => ts.id === t.id)
-        return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t
+        const s = result.tables.find((ts) => ts.id === t.id);
+        return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t;
       }),
       guests: guests.map((g) => {
-        const s = result.guests.find((gs) => gs.id === g.id)
-        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
+        const s = result.guests.find((gs) => gs.id === g.id);
+        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g;
       }),
-    })
-    if (!eventId) return
+    });
+    if (!eventId) return;
     fetch(`/api/events/${eventId}/tables/${tableId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ capacity }),
-    }).catch(console.error)
+    }).catch(console.error);
   },
 
   updateTablePosition: (tableId, x, y) => {
-    const { guests, tables, avoidPairs } = get()
+    const { guests, tables, avoidPairs } = get();
     // 更新位置（拖曳中頻繁呼叫，不打 API）
     const updatedTables = tables.map((t) =>
       t.id === tableId ? { ...t, positionX: x, positionY: y } : t,
-    )
+    );
     // 即時重算滿意度（鄰桌關係隨位置改變）
-    const result = recalculateAll(guests, updatedTables, avoidPairs)
+    const result = recalculateAll(guests, updatedTables, avoidPairs);
     set({
       tables: updatedTables.map((t) => {
-        const s = result.tables.find((ts) => ts.id === t.id)
-        return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t
+        const s = result.tables.find((ts) => ts.id === t.id);
+        return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t;
       }),
       guests: guests.map((g) => {
-        const s = result.guests.find((gs) => gs.id === g.id)
-        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
+        const s = result.guests.find((gs) => gs.id === g.id);
+        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g;
       }),
-    })
+    });
   },
 
   saveTablePosition: (tableId, fromX?, fromY?) => {
-    const { tables, eventId, undoStack } = get()
-    if (!eventId) return
-    const table = tables.find((t) => t.id === tableId)
-    if (!table) return
+    const { tables, eventId, undoStack } = get();
+    if (!eventId) return;
+    const table = tables.find((t) => t.id === tableId);
+    if (!table) return;
 
     // 推入 undo（有提供原始位置且確實移動過時）
     if (fromX !== undefined && fromY !== undefined && (fromX !== table.positionX || fromY !== table.positionY)) {
-      set({ undoStack: [...undoStack, { type: 'move-table' as const, tableId, fromX, fromY, toX: table.positionX, toY: table.positionY }] })
+      set({ undoStack: [...undoStack, { type: 'move-table' as const, tableId, fromX, fromY, toX: table.positionX, toY: table.positionY }] });
     }
 
     // 鄰桌關係可能改變，重算滿意度
-    const { guests, avoidPairs } = get()
-    const result = recalculateAll(guests, tables, avoidPairs)
+    const { guests, avoidPairs } = get();
+    const result = recalculateAll(guests, tables, avoidPairs);
     set({
       guests: guests.map((g) => {
-        const s = result.guests.find((gs) => gs.id === g.id)
-        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
+        const s = result.guests.find((gs) => gs.id === g.id);
+        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g;
       }),
       tables: tables.map((t) => {
-        const s = result.tables.find((ts) => ts.id === t.id)
-        return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t
+        const s = result.tables.find((ts) => ts.id === t.id);
+        return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t;
       }),
-    })
+    });
 
     fetch(`/api/events/${eventId}/tables/${tableId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ positionX: table.positionX, positionY: table.positionY }),
-    }).catch(console.error)
+    }).catch(console.error);
   },
 
   autoArrangeTables: async (positions) => {
-    const { tables, eventId, undoStack } = get()
+    const { tables, eventId, undoStack } = get();
     // 記錄原始位置（undo 用）
-    const prevPositions = new Map<string, { fromX: number; fromY: number }>()
-    for (const t of tables) prevPositions.set(t.id, { fromX: t.positionX, fromY: t.positionY })
+    const prevPositions = new Map<string, { fromX: number; fromY: number }>();
+    for (const t of tables) prevPositions.set(t.id, { fromX: t.positionX, fromY: t.positionY });
 
     // 更新 store
     const updatedTables = tables.map((t) => {
-      const pos = positions.find((p) => p.tableId === t.id)
-      return pos ? { ...t, positionX: pos.x, positionY: pos.y } : t
-    })
+      const pos = positions.find((p) => p.tableId === t.id);
+      return pos ? { ...t, positionX: pos.x, positionY: pos.y } : t;
+    });
     set({
       tables: updatedTables,
       undoStack: [...undoStack, { type: 'auto-arrange' as const, positions: prevPositions }],
-    })
+    });
 
     // 批次存 DB
     if (eventId) {
@@ -1006,139 +1006,138 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
               body: JSON.stringify({ positionX: p.x, positionY: p.y }),
-            }).then((res) => { if (!res.ok) throw new Error(`Save failed: ${p.tableId}`) }),
+            }).then((res) => { if (!res.ok) throw new Error(`Save failed: ${p.tableId}`); }),
           ),
-        )
+        );
       } catch {
         // 失敗 → 自動 revert
         const reverted = get().tables.map((t) => {
-          const prev = prevPositions.get(t.id)
-          return prev ? { ...t, positionX: prev.fromX, positionY: prev.fromY } : t
-        })
-        set({ tables: reverted, undoStack: get().undoStack.slice(0, -1) })
-        throw new Error('保存失敗，已恢復原排列')
+          const prev = prevPositions.get(t.id);
+          return prev ? { ...t, positionX: prev.fromX, positionY: prev.fromY } : t;
+        });
+        set({ tables: reverted, undoStack: get().undoStack.slice(0, -1) });
+        throw new Error('保存失敗，已恢復原排列');
       }
     }
   },
 
   autoAssignGuests: async (mode: AutoAssignMode = 'balanced') => {
-    const { guests, tables, avoidPairs, undoStack, eventId } = get()
-    const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
-    const unassigned = confirmed.filter((g) => !g.assignedTableId)
-    if (unassigned.length === 0) return
+    const { guests, tables, avoidPairs, eventId } = get();
+    const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed');
+    const unassigned = confirmed.filter((g) => !g.assignedTableId);
+    if (unassigned.length === 0) return;
 
     // 檢查容量是否足夠，不夠就自動新增桌子
-    const totalSeatsNeeded = unassigned.reduce((s, g) => s + g.seatCount, 0)
+    const totalSeatsNeeded = unassigned.reduce((s, g) => s + g.seatCount, 0);
     const totalRemaining = tables.reduce((s, t) => {
-      const seated = confirmed.filter((g) => g.assignedTableId === t.id)
-      const used = seated.reduce((ss, g) => ss + g.seatCount, 0)
-      return s + Math.max(0, t.capacity - used)
-    }, 0)
+      const seated = confirmed.filter((g) => g.assignedTableId === t.id);
+      const used = seated.reduce((ss, g) => ss + g.seatCount, 0);
+      return s + Math.max(0, t.capacity - used);
+    }, 0);
 
-    let currentTables = tables
-    const newTableIds: string[] = []
+    let currentTables = tables;
+    const newTableIds: string[] = [];
     if (totalSeatsNeeded > totalRemaining) {
-      const deficit = totalSeatsNeeded - totalRemaining
-      const defaultCapacity = 10
-      const tablesToAdd = Math.ceil(deficit / defaultCapacity)
-      const existingCount = tables.length
+      const deficit = totalSeatsNeeded - totalRemaining;
+      const defaultCapacity = 10;
+      const tablesToAdd = Math.ceil(deficit / defaultCapacity);
 
       for (let i = 0; i < tablesToAdd; i++) {
-        const currentTbls = get().tables
-        const num = currentTbls.length + 1
-        const pos = findFreePosition(currentTbls)
-        const name = `第${num}桌`
+        const currentTbls = get().tables;
+        const num = currentTbls.length + 1;
+        const pos = findFreePosition(currentTbls);
+        const name = `第${num}桌`;
 
-        await get().addTable(name, pos.x, pos.y)
-        const latestTables = get().tables
-        const newTable = latestTables.find((t) => t.name === name)
-        if (newTable) newTableIds.push(newTable.id)
+        await get().addTable(name, pos.x, pos.y);
+        const latestTables = get().tables;
+        const newTable = latestTables.find((t) => t.name === name);
+        if (newTable) newTableIds.push(newTable.id);
       }
       // 重新讀取最新的 tables
-      currentTables = get().tables
+      currentTables = get().tables;
     }
 
-    const latestGuests = get().guests
-    const abortController = new AbortController()
+    const latestGuests = get().guests;
+    const abortController = new AbortController();
     set({
       autoAssignProgress: { label: '正在分組...', detail: '', progress: 0, currentAvg: 0, remainingSeconds: null },
       autoAssignAbort: abortController,
-    })
-    let assignments: Array<{ guestId: string; tableId: string }>
+    });
+    let assignments: Array<{ guestId: string; tableId: string }>;
     try {
       assignments = await runAutoAssignInWorker(latestGuests, currentTables, avoidPairs, mode, (progress) => {
-        set({ autoAssignProgress: progress })
-      }, abortController.signal)
+        set({ autoAssignProgress: progress });
+      }, abortController.signal);
     } catch (e: any) {
-      set({ autoAssignProgress: null, autoAssignAbort: null })
-      if (e?.name === 'AbortError') return // 使用者取消
-      throw e
+      set({ autoAssignProgress: null, autoAssignAbort: null });
+      if (e?.name === 'AbortError') return; // 使用者取消
+      throw e;
     }
-    set({ autoAssignProgress: null, autoAssignAbort: null })
-    if (assignments.length === 0) return
+    set({ autoAssignProgress: null, autoAssignAbort: null });
+    if (assignments.length === 0) return;
 
     // 記錄原始分配（undo 用）
     const undoData = assignments.map((a) => {
-      const g = latestGuests.find((g) => g.id === a.guestId)
-      return { guestId: a.guestId, fromTableId: g?.assignedTableId || null, fromSeatIndex: g?.seatIndex ?? null }
-    })
+      const g = latestGuests.find((g) => g.id === a.guestId);
+      return { guestId: a.guestId, fromTableId: g?.assignedTableId || null, fromSeatIndex: g?.seatIndex ?? null };
+    });
 
     // 更新 store：設定 assignedTableId + 自動分配 seatIndex
     const updatedGuests = latestGuests.map((g) => {
-      const assignment = assignments.find((a) => a.guestId === g.id)
-      return assignment ? { ...g, assignedTableId: assignment.tableId } : g
-    })
+      const assignment = assignments.find((a) => a.guestId === g.id);
+      return assignment ? { ...g, assignedTableId: assignment.tableId } : g;
+    });
 
     // 為新分配的賓客自動分配 seatIndex
     for (const t of currentTables) {
       const tableGuests = updatedGuests.filter(
         (g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed',
-      )
-      const needsIndex = tableGuests.filter((g) => g.seatIndex === null)
-      if (needsIndex.length === 0) continue
+      );
+      const needsIndex = tableGuests.filter((g) => g.seatIndex === null);
+      if (needsIndex.length === 0) continue;
 
-      const usedIndices = new Set<number>()
+      const usedIndices = new Set<number>();
       for (const g of tableGuests) {
         if (g.seatIndex !== null) {
-          usedIndices.add(g.seatIndex)
+          usedIndices.add(g.seatIndex);
           for (let c = 1; c < g.seatCount; c++) {
-            usedIndices.add((g.seatIndex + c) % t.capacity)
+            usedIndices.add((g.seatIndex + c) % t.capacity);
           }
         }
       }
-      let nextFree = 0
+      let nextFree = 0;
       for (const g of needsIndex) {
-        while (usedIndices.has(nextFree)) nextFree++
-        g.seatIndex = nextFree
-        usedIndices.add(nextFree)
+        while (usedIndices.has(nextFree)) nextFree++;
+        g.seatIndex = nextFree;
+        usedIndices.add(nextFree);
         for (let c = 1; c < g.seatCount; c++) {
-          usedIndices.add(nextFree + c)
+          usedIndices.add(nextFree + c);
         }
-        nextFree++
+        nextFree++;
       }
     }
 
     // 重算滿意度
-    const result = recalculateAll(updatedGuests, currentTables, avoidPairs)
+    const result = recalculateAll(updatedGuests, currentTables, avoidPairs);
     const finalGuests = updatedGuests.map((g) => {
-      const score = result.guests.find((gs) => gs.id === g.id)
-      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
-    })
+      const score = result.guests.find((gs) => gs.id === g.id);
+      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g;
+    });
     const finalTables = currentTables.map((t) => {
-      const score = result.tables.find((ts) => ts.id === t.id)
-      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
-    })
+      const score = result.tables.find((ts) => ts.id === t.id);
+      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t;
+    });
 
     // 移除 addTable 推入的個別 undo entries（合併到 auto-assign 的 compound undo）
     const currentStack = get().undoStack.filter(
       (entry) => !(entry.type === 'add-table' && newTableIds.includes(entry.tableId))
-    )
+    );
 
     set({
       guests: finalGuests,
       tables: finalTables,
       undoStack: [...currentStack, { type: 'auto-assign' as const, assignments: undoData, createdTableIds: newTableIds }],
-    })
+    });
 
     // 存 DB（批次一次寫入）
     if (eventId) {
@@ -1149,38 +1148,38 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
           credentials: 'include',
           body: JSON.stringify({
             assignments: assignments.map((a) => {
-              const guest = finalGuests.find((g) => g.id === a.guestId)
-              return { guestId: a.guestId, tableId: a.tableId, seatIndex: guest?.seatIndex ?? null }
+              const guest = finalGuests.find((g) => g.id === a.guestId);
+              return { guestId: a.guestId, tableId: a.tableId, seatIndex: guest?.seatIndex ?? null };
             }),
           }),
-        })
-        if (!res.ok) throw new Error('Save failed')
+        });
+        if (!res.ok) throw new Error('Save failed');
       } catch {
         // 失敗 → 自動 revert
         const reverted = get().guests.map((g) => {
-          const orig = undoData.find((u) => u.guestId === g.id)
-          return orig ? { ...g, assignedTableId: orig.fromTableId } : g
-        })
-        const revertResult = recalculateAll(reverted, tables, avoidPairs)
+          const orig = undoData.find((u) => u.guestId === g.id);
+          return orig ? { ...g, assignedTableId: orig.fromTableId } : g;
+        });
+        const revertResult = recalculateAll(reverted, tables, avoidPairs);
         const revertedGuests = reverted.map((g) => {
-          const score = revertResult.guests.find((gs) => gs.id === g.id)
-          return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
-        })
-        set({ guests: revertedGuests, undoStack: get().undoStack.slice(0, -1) })
-        throw new Error('保存失敗，已恢復原排列')
+          const score = revertResult.guests.find((gs) => gs.id === g.id);
+          return score ? { ...g, satisfactionScore: score.satisfactionScore } : g;
+        });
+        set({ guests: revertedGuests, undoStack: get().undoStack.slice(0, -1) });
+        throw new Error('保存失敗，已恢復原排列');
       }
     }
   },
 
   saveSnapshot: async (name) => {
-    const { eventId, guests, tables, snapshots } = get()
-    if (!eventId) return
+    const { eventId, guests, tables, snapshots } = get();
+    if (!eventId) return;
 
-    const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed')
-    const assignedScores = confirmed.filter((g) => g.assignedTableId)
+    const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed');
+    const assignedScores = confirmed.filter((g) => g.assignedTableId);
     const avg = assignedScores.length > 0
       ? Math.round((assignedScores.reduce((s, g) => s + g.satisfactionScore, 0) / assignedScores.length) * 10) / 10
-      : 0
+      : 0;
 
     const data = {
       guests: confirmed.map((g) => ({
@@ -1196,55 +1195,55 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         positionX: t.positionX,
         positionY: t.positionY,
       })),
-    }
+    };
 
     const res = await authFetch(`/api/events/${eventId}/snapshots`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ name, data, averageSatisfaction: avg }),
-    })
-    if (!res.ok) return
-    const snapshot = await res.json()
-    set({ snapshots: [snapshot, ...snapshots] })
+    });
+    if (!res.ok) return;
+    const snapshot = await res.json();
+    set({ snapshots: [snapshot, ...snapshots] });
   },
 
   restoreSnapshot: async (snapshotId) => {
-    const { snapshots, guests, tables, avoidPairs } = get()
-    const snapshot = snapshots.find((s) => s.id === snapshotId)
-    if (!snapshot) return
+    const { snapshots, guests, tables, avoidPairs } = get();
+    const snapshot = snapshots.find((s) => s.id === snapshotId);
+    if (!snapshot) return;
 
     const snapData = snapshot.data as {
       guests: Array<{ guestId: string; tableId: string | null; seatIndex?: number | null; satisfactionScore: number }>
       tables: Array<{ tableId: string; name?: string; positionX: number; positionY: number }>
-    }
+    };
 
     // 還原賓客分配
     const restoredGuests = guests.map((g) => {
-      const sg = snapData.guests.find((sg) => sg.guestId === g.id)
+      const sg = snapData.guests.find((sg) => sg.guestId === g.id);
       if (sg) {
-        return { ...g, assignedTableId: sg.tableId, seatIndex: sg.seatIndex ?? null, satisfactionScore: sg.satisfactionScore }
+        return { ...g, assignedTableId: sg.tableId, seatIndex: sg.seatIndex ?? null, satisfactionScore: sg.satisfactionScore };
       }
-      return g
-    })
+      return g;
+    });
 
     // 還原桌次：保留快照裡有的桌、重建被刪除的桌、刪除快照後新增的桌
-    const snapshotTableIds = new Set(snapData.tables.map((st) => st.tableId))
-    const currentTableIds = new Set(tables.map((t) => t.id))
+    const snapshotTableIds = new Set(snapData.tables.map((st) => st.tableId));
+    const currentTableIds = new Set(tables.map((t) => t.id));
 
     // 目前存在且快照裡也有 → 還原位置和名稱
     const keptTables = tables
       .filter((t) => snapshotTableIds.has(t.id))
       .map((t) => {
-        const st = snapData.tables.find((st) => st.tableId === t.id)!
-        return { ...t, positionX: st.positionX, positionY: st.positionY, ...(st.name ? { name: st.name } : {}) }
-      })
+        const st = snapData.tables.find((st) => st.tableId === t.id)!;
+        return { ...t, positionX: st.positionX, positionY: st.positionY, ...(st.name ? { name: st.name } : {}) };
+      });
 
     // 快照裡有但目前不存在 → 需要重建
-    const missingSnapTables = snapData.tables.filter((st) => !currentTableIds.has(st.tableId))
+    const missingSnapTables = snapData.tables.filter((st) => !currentTableIds.has(st.tableId));
 
     // 快照後新增、需要刪除的桌
-    const extraTableIds = tables.filter((t) => !snapshotTableIds.has(t.id)).map((t) => t.id)
+    const extraTableIds = tables.filter((t) => !snapshotTableIds.has(t.id)).map((t) => t.id);
 
     // 先用快照資料建立 placeholder（後端會重建真正的桌）
     const placeholderTables: typeof tables = missingSnapTables.map((st) => ({
@@ -1256,25 +1255,25 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       averageSatisfaction: 0,
       color: null,
       note: null,
-    }))
+    }));
 
-    const restoredTables = [...keptTables, ...placeholderTables]
+    const restoredTables = [...keptTables, ...placeholderTables];
 
     // 重算滿意度（確保一致）
-    const result = recalculateAll(restoredGuests, restoredTables, avoidPairs)
+    const result = recalculateAll(restoredGuests, restoredTables, avoidPairs);
     const finalGuests = restoredGuests.map((g) => {
-      const score = result.guests.find((gs) => gs.id === g.id)
-      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g
-    })
+      const score = result.guests.find((gs) => gs.id === g.id);
+      return score ? { ...g, satisfactionScore: score.satisfactionScore } : g;
+    });
     const finalTables = restoredTables.map((t) => {
-      const score = result.tables.find((ts) => ts.id === t.id)
-      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t
-    })
+      const score = result.tables.find((ts) => ts.id === t.id);
+      return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t;
+    });
 
-    set({ guests: finalGuests, tables: finalTables, undoStack: [] })
+    set({ guests: finalGuests, tables: finalTables, undoStack: [] });
 
     // 後端同步
-    const { eventId } = get()
+    const { eventId } = get();
     if (eventId) {
       // 重建被刪除的桌（必須先完成，再還原賓客座位）
       if (missingSnapTables.length > 0) {
@@ -1287,7 +1286,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
               body: JSON.stringify({ id: st.tableId, name: st.name || '桌', positionX: st.positionX, positionY: st.positionY }),
             }).catch(console.error)
           )
-        )
+        );
       }
       // 還原賓客座位（批次一次寫入，桌子已確保存在）
       if (snapData.guests.length > 0) {
@@ -1298,74 +1297,73 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
           body: JSON.stringify({
             assignments: snapData.guests.map((sg) => ({ guestId: sg.guestId, tableId: sg.tableId, seatIndex: sg.seatIndex ?? null })),
           }),
-        }).catch(console.error)
+        }).catch(console.error);
       }
       // 刪除快照後新增的桌
       for (const tableId of extraTableIds) {
         fetch(`/api/events/${eventId}/tables/${tableId}`, {
           method: 'DELETE',
           credentials: 'include',
-        }).catch(console.error)
+        }).catch(console.error);
       }
     }
   },
 
   addAvoidPair: async (guestAId, guestBId, reason) => {
-    const { eventId, avoidPairs } = get()
-    if (!eventId) return
+    const { eventId, avoidPairs } = get();
+    if (!eventId) return;
 
     const res = await authFetch(`/api/events/${eventId}/avoid-pairs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ guestAId, guestBId, reason }),
-    })
-    if (!res.ok) return
-    const pair = await res.json()
-    set({ avoidPairs: [...avoidPairs, pair] })
+    });
+    if (!res.ok) return;
+    const pair = await res.json();
+    set({ avoidPairs: [...avoidPairs, pair] });
   },
 
   removeAvoidPair: async (pairId) => {
-    const { eventId, avoidPairs } = get()
-    if (!eventId) return
+    const { eventId, avoidPairs } = get();
+    if (!eventId) return;
 
     await authFetch(`/api/events/${eventId}/avoid-pairs/${pairId}`, {
       method: 'DELETE',
       credentials: 'include',
-    })
-    set({ avoidPairs: avoidPairs.filter((ap) => ap.id !== pairId) })
+    });
+    set({ avoidPairs: avoidPairs.filter((ap) => ap.id !== pairId) });
   },
 
   checkAvoidViolation: (guestId, tableId) => {
-    const { guests, avoidPairs } = get()
+    const { guests, avoidPairs } = get();
     const tableGuestIds = guests
       .filter((g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed')
-      .map((g) => g.id)
+      .map((g) => g.id);
 
     return avoidPairs.find((ap) =>
       (ap.guestAId === guestId && tableGuestIds.includes(ap.guestBId)) ||
       (ap.guestBId === guestId && tableGuestIds.includes(ap.guestAId))
-    ) || null
+    ) || null;
   },
 
   // ─── Guest CRUD（管理頁面用）─────────────────────────
 
   updateGuest: async (guestId, patch) => {
-    const { eventId, guests, tables, avoidPairs } = get()
-    if (!eventId) return false
+    const { eventId, guests, tables, avoidPairs } = get();
+    if (!eventId) return false;
 
     // Optimistic update
-    const prevGuests = guests
-    const idx = guests.findIndex((g) => g.id === guestId)
-    if (idx < 0) return false
-    const merged = { ...guests[idx], ...patch }
-    if ('companionCount' in patch) merged.seatCount = (merged.companionCount ?? 0) + 1
+    const prevGuests = guests;
+    const idx = guests.findIndex((g) => g.id === guestId);
+    if (idx < 0) return false;
+    const merged = { ...guests[idx], ...patch };
+    if ('companionCount' in patch) merged.seatCount = (merged.companionCount ?? 0) + 1;
 
     // When declining, unassign from table
     if (patch.rsvpStatus === 'declined' && merged.assignedTableId) {
-      const prevTableId = merged.assignedTableId
-      merged.assignedTableId = null
-      merged.seatIndex = null
+      merged.assignedTableId = null;
+      merged.seatIndex = null;
       // Also persist the table removal to backend
       if (eventId) {
         fetch(`/api/events/${eventId}/guests/${guestId}/table`, {
@@ -1373,55 +1371,55 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ tableId: null, seatIndex: null }),
-        }).catch(console.error)
+        }).catch(console.error);
       }
     }
 
-    const updated = merged
-    let nextGuests = [...guests]
-    nextGuests[idx] = updated
-    set({ guests: nextGuests })
+    const updated = merged;
+    let nextGuests = [...guests];
+    nextGuests[idx] = updated;
+    set({ guests: nextGuests });
 
     // When companionCount changes and guest is seated, re-layout seats to avoid overlap
     if ('companionCount' in patch && updated.assignedTableId && updated.seatIndex !== null) {
-      const table = tables.find((t) => t.id === updated.assignedTableId)
+      const table = tables.find((t) => t.id === updated.assignedTableId);
       if (table) {
         // Build slot array excluding the updated guest
         const tableGuests = nextGuests.filter(
           (g) => g.assignedTableId === table.id && g.rsvpStatus === 'confirmed' && g.id !== guestId,
-        )
+        );
         const seatGuests = tableGuests
           .filter((g) => g.seatIndex !== null)
-          .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, seatCount: g.seatCount }))
+          .map((g) => ({ id: g.id, seatIndex: g.seatIndex!, seatCount: g.seatCount }));
 
-        const slots = buildSlotArray(seatGuests, table.capacity)
-        const newSlots = placeGuest(slots, updated.seatIndex, guestId, updated.seatCount)
+        const slots = buildSlotArray(seatGuests, table.capacity);
+        const newSlots = placeGuest(slots, updated.seatIndex, guestId, updated.seatCount);
 
         if (newSlots) {
-          const newIndices = extractSeatIndices(newSlots)
+          const newIndices = extractSeatIndices(newSlots);
           nextGuests = nextGuests.map((g) => {
             if (g.id === guestId) {
-              return { ...g, seatIndex: newIndices.get(guestId) ?? updated.seatIndex }
+              return { ...g, seatIndex: newIndices.get(guestId) ?? updated.seatIndex };
             }
             if (newIndices.has(g.id)) {
-              return { ...g, seatIndex: newIndices.get(g.id)! }
+              return { ...g, seatIndex: newIndices.get(g.id)! };
             }
-            return g
-          })
-          set({ guests: nextGuests })
+            return g;
+          });
+          set({ guests: nextGuests });
 
           // Persist shifted seat indices to backend
           if (eventId) {
             for (const [id, newIdx] of newIndices) {
               if (id !== guestId) {
-                const prev = tableGuests.find((g) => g.id === id)
+                const prev = tableGuests.find((g) => g.id === id);
                 if (prev && prev.seatIndex !== newIdx) {
                   fetch(`/api/events/${eventId}/guests/${id}/table`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({ tableId: table.id, seatIndex: newIdx }),
-                  }).catch(console.error)
+                  }).catch(console.error);
                 }
               }
             }
@@ -1431,19 +1429,19 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     }
 
     // Recalculate if score-affecting fields changed
-    const scoreFields = ['companionCount', 'rsvpStatus'] as const
-    const needsRecalc = scoreFields.some((f) => f in patch)
+    const scoreFields = ['companionCount', 'rsvpStatus'] as const;
+    const needsRecalc = scoreFields.some((f) => f in patch);
     if (needsRecalc) {
-      const result = recalculateAll(nextGuests, tables, avoidPairs)
+      const result = recalculateAll(nextGuests, tables, avoidPairs);
       const recalcedGuests = nextGuests.map((g) => {
-        const s = result.guests.find((gs) => gs.id === g.id)
-        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
-      })
+        const s = result.guests.find((gs) => gs.id === g.id);
+        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g;
+      });
       const recalcedTables = tables.map((t) => {
-        const ts = result.tables.find((ts) => ts.id === t.id)
-        return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t
-      })
-      set({ guests: recalcedGuests, tables: recalcedTables })
+        const ts = result.tables.find((ts) => ts.id === t.id);
+        return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t;
+      });
+      set({ guests: recalcedGuests, tables: recalcedTables });
     }
 
     try {
@@ -1452,59 +1450,59 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(patch),
-      })
+      });
       if (!res.ok) {
         // Rollback
-        set({ guests: prevGuests })
-        return false
+        set({ guests: prevGuests });
+        return false;
       }
-      return true
+      return true;
     } catch {
-      set({ guests: prevGuests })
-      return false
+      set({ guests: prevGuests });
+      return false;
     }
   },
 
   deleteGuest: async (guestId) => {
-    const { eventId, guests, tables, avoidPairs } = get()
-    if (!eventId) return false
+    const { eventId, guests, tables, avoidPairs } = get();
+    if (!eventId) return false;
 
-    const guest = guests.find((g) => g.id === guestId)
-    if (!guest) return false
+    const guest = guests.find((g) => g.id === guestId);
+    if (!guest) return false;
 
     // Remove from local state
-    const nextGuests = guests.filter((g) => g.id !== guestId)
+    const nextGuests = guests.filter((g) => g.id !== guestId);
     const nextAvoidPairs = avoidPairs.filter(
       (ap) => ap.guestAId !== guestId && ap.guestBId !== guestId,
-    )
-    set({ guests: nextGuests, avoidPairs: nextAvoidPairs })
+    );
+    set({ guests: nextGuests, avoidPairs: nextAvoidPairs });
 
     // Recalculate satisfaction
-    const result = recalculateAll(nextGuests, tables, nextAvoidPairs)
+    const result = recalculateAll(nextGuests, tables, nextAvoidPairs);
     const recalcedGuests = nextGuests.map((g) => {
-      const s = result.guests.find((gs) => gs.id === g.id)
-      return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
-    })
+      const s = result.guests.find((gs) => gs.id === g.id);
+      return s ? { ...g, satisfactionScore: s.satisfactionScore } : g;
+    });
     const recalcedTables = tables.map((t) => {
-      const ts = result.tables.find((ts) => ts.id === t.id)
-      return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t
-    })
-    set({ guests: recalcedGuests, tables: recalcedTables })
+      const ts = result.tables.find((ts) => ts.id === t.id);
+      return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t;
+    });
+    set({ guests: recalcedGuests, tables: recalcedTables });
 
     try {
       const res = await authFetch(`/api/events/${eventId}/guests/${guestId}`, {
         method: 'DELETE',
         credentials: 'include',
-      })
-      return res.ok
+      });
+      return res.ok;
     } catch {
-      return false
+      return false;
     }
   },
 
   addGuest: async (data) => {
-    const { eventId, guests, tables, avoidPairs } = get()
-    if (!eventId) return null
+    const { eventId, guests, tables, avoidPairs } = get();
+    if (!eventId) return null;
 
     try {
       const res = await authFetch(`/api/events/${eventId}/guests`, {
@@ -1512,49 +1510,49 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(data),
-      })
-      if (!res.ok) return null
-      const raw = await res.json()
-      const guest: Guest = { ...raw, seatCount: (raw.companionCount ?? 0) + 1 }
-      const nextGuests = [...guests, guest]
-      set({ guests: nextGuests })
+      });
+      if (!res.ok) return null;
+      const raw = await res.json();
+      const guest: Guest = { ...raw, seatCount: (raw.companionCount ?? 0) + 1 };
+      const nextGuests = [...guests, guest];
+      set({ guests: nextGuests });
 
       // Recalculate if confirmed
       if (guest.rsvpStatus === 'confirmed') {
-        const result = recalculateAll(nextGuests, tables, avoidPairs)
+        const result = recalculateAll(nextGuests, tables, avoidPairs);
         const recalcedGuests = nextGuests.map((g) => {
-          const s = result.guests.find((gs) => gs.id === g.id)
-          return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
-        })
+          const s = result.guests.find((gs) => gs.id === g.id);
+          return s ? { ...g, satisfactionScore: s.satisfactionScore } : g;
+        });
         const recalcedTables = tables.map((t) => {
-          const ts = result.tables.find((ts) => ts.id === t.id)
-          return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t
-        })
-        set({ guests: recalcedGuests, tables: recalcedTables })
+          const ts = result.tables.find((ts) => ts.id === t.id);
+          return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t;
+        });
+        set({ guests: recalcedGuests, tables: recalcedTables });
       }
 
-      return guest
+      return guest;
     } catch {
-      return null
+      return null;
     }
   },
 
   // ─── Per-guest preference & tag management ─────────
 
   updateGuestPreferences: async (guestId, preferences) => {
-    const { eventId, guests, tables, avoidPairs } = get()
-    if (!eventId) return false
+    const { eventId, guests } = get();
+    if (!eventId) return false;
 
     // Enforce max 3 preferences
-    const clamped = preferences.slice(0, 3)
+    const clamped = preferences.slice(0, 3);
 
     // Optimistic update
-    const prevGuests = guests
-    const idx = guests.findIndex((g) => g.id === guestId)
-    if (idx < 0) return false
-    const nextGuests = [...guests]
-    nextGuests[idx] = { ...nextGuests[idx], seatPreferences: clamped }
-    set({ guests: nextGuests })
+    const prevGuests = guests;
+    const idx = guests.findIndex((g) => g.id === guestId);
+    if (idx < 0) return false;
+    const nextGuests = [...guests];
+    nextGuests[idx] = { ...nextGuests[idx], seatPreferences: clamped };
+    set({ guests: nextGuests });
 
     try {
       const res = await authFetch(`/api/events/${eventId}/guests/${guestId}/preferences`, {
@@ -1562,37 +1560,36 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ preferences: clamped }),
-      })
+      });
       if (!res.ok) {
-        set({ guests: prevGuests })
-        return false
+        set({ guests: prevGuests });
+        return false;
       }
       // Recalculate since preferences affect satisfaction scores
-      const latest = get()
-      const result = recalculateAll(latest.guests, latest.tables, latest.avoidPairs)
+      const latest = get();
+      const result = recalculateAll(latest.guests, latest.tables, latest.avoidPairs);
       const recalcedGuests = latest.guests.map((g) => {
-        const s = result.guests.find((gs) => gs.id === g.id)
-        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
-      })
+        const s = result.guests.find((gs) => gs.id === g.id);
+        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g;
+      });
       const recalcedTables = latest.tables.map((t) => {
-        const ts = result.tables.find((ts) => ts.id === t.id)
-        return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t
-      })
-      set({ guests: recalcedGuests, tables: recalcedTables })
-      return true
+        const ts = result.tables.find((ts) => ts.id === t.id);
+        return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t;
+      });
+      set({ guests: recalcedGuests, tables: recalcedTables });
+      return true;
     } catch {
-      set({ guests: prevGuests })
-      return false
+      set({ guests: prevGuests });
+      return false;
     }
   },
 
   setGuestSubcategory: async (guestId, subcategoryId) => {
-    const { eventId, guests } = get()
-    if (!eventId) return false
+    const { eventId, guests } = get();
+    if (!eventId) return false;
 
-    const prevGuests = guests
-    const idx = guests.findIndex((g) => g.id === guestId)
-    if (idx < 0) return false
+    const idx = guests.findIndex((g) => g.id === guestId);
+    if (idx < 0) return false;
 
     try {
       const res = await authFetch(`/api/events/${eventId}/guests/${guestId}`, {
@@ -1600,19 +1597,19 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ subcategoryId }),
-      })
-      if (!res.ok) return false
-      const updated = await res.json()
+      });
+      if (!res.ok) return false;
+      const updated = await res.json();
 
-      const nextGuests = [...guests]
+      const nextGuests = [...guests];
       nextGuests[idx] = {
         ...nextGuests[idx],
         subcategory: updated.subcategory || null,
-      }
-      set({ guests: nextGuests })
-      return true
+      };
+      set({ guests: nextGuests });
+      return true;
     } catch {
-      return false
+      return false;
     }
   },
 
@@ -1620,30 +1617,30 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   getTableGuests: (tableId) => {
     return get().guests.filter(
       (g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed',
-    )
+    );
   },
 
   getUnassignedGuests: () => {
     return get().guests.filter(
       (g) => g.assignedTableId === null && g.rsvpStatus === 'confirmed',
-    )
+    );
   },
 
   getTableSeatCount: (tableId) => {
     return get()
       .guests.filter((g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed')
-      .reduce((sum, g) => sum + g.seatCount, 0)
+      .reduce((sum, g) => sum + g.seatCount, 0);
   },
 
   getTotalAssignedSeats: () => {
     return get()
       .guests.filter((g) => g.assignedTableId !== null && g.rsvpStatus === 'confirmed')
-      .reduce((sum, g) => sum + g.seatCount, 0)
+      .reduce((sum, g) => sum + g.seatCount, 0);
   },
 
   getTotalConfirmedSeats: () => {
     return get()
       .guests.filter((g) => g.rsvpStatus === 'confirmed')
-      .reduce((sum, g) => sum + g.seatCount, 0)
+      .reduce((sum, g) => sum + g.seatCount, 0);
   },
-}))
+}));

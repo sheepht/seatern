@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
-import type { PreferenceMatch as PrefMatch } from '@/lib/preference-matcher'
-import { summarizeMatches } from '@/lib/preference-matcher'
+import { useState, useMemo } from 'react';
+import type { PreferenceMatch as PrefMatch } from '@/lib/preference-matcher';
+import { summarizeMatches } from '@/lib/preference-matcher';
 
 interface Props {
   matches: PrefMatch[]
@@ -10,29 +10,29 @@ interface Props {
 }
 
 export function PreferenceMatch({ matches, onConfirm, onSkipAll, onBack }: Props) {
-  const [resolved, setResolved] = useState<PrefMatch[]>(matches)
+  const [resolved, setResolved] = useState<PrefMatch[]>(matches);
 
-  const summary = useMemo(() => summarizeMatches(resolved), [resolved])
+  const summary = useMemo(() => summarizeMatches(resolved), [resolved]);
 
   // 需要手動處理的（fuzzy + unmatched）
-  const needsAction = resolved.filter((m) => m.status !== 'exact' && m.selectedIndex === null)
-  const allResolved = needsAction.length === 0
+  const needsAction = resolved.filter((m) => m.status !== 'exact' && m.selectedIndex === null);
+  const allResolved = needsAction.length === 0;
 
   const handleSelect = (matchIndex: number, candidateGuestIndex: number) => {
     setResolved((prev) =>
       prev.map((m, i) =>
         i === matchIndex ? { ...m, selectedIndex: candidateGuestIndex } : m,
       ),
-    )
-  }
+    );
+  };
 
   const handleDismiss = (matchIndex: number) => {
     setResolved((prev) =>
       prev.map((m, i) =>
         i === matchIndex ? { ...m, selectedIndex: -1 } : m, // -1 = 明確跳過
       ),
-    )
-  }
+    );
+  };
 
   // 只顯示 exact 全部配對成功的情況
   if (summary.fuzzy === 0 && summary.unmatched === 0) {
@@ -54,7 +54,7 @@ export function PreferenceMatch({ matches, onConfirm, onSkipAll, onBack }: Props
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -82,9 +82,9 @@ export function PreferenceMatch({ matches, onConfirm, onSkipAll, onBack }: Props
       <div className="space-y-3">
         {resolved.map((match, idx) => {
           // 跳過已自動配對和已明確跳過的
-          if (match.status === 'exact') return null
-          if (match.selectedIndex !== null && match.selectedIndex !== -1) return null
-          if (match.selectedIndex === -1) return null
+          if (match.status === 'exact') return null;
+          if (match.selectedIndex !== null && match.selectedIndex !== -1) return null;
+          if (match.selectedIndex === -1) return null;
 
           return (
             <div key={idx} className="p-3 border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)]">
@@ -110,8 +110,8 @@ export function PreferenceMatch({ matches, onConfirm, onSkipAll, onBack }: Props
                       key={c.guestIndex}
                       onClick={() => handleSelect(idx, c.guestIndex)}
                       className="px-3 py-1 text-sm hover:opacity-90 border border-[var(--border)] rounded-[var(--radius-sm)]"
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-light)'; e.currentTarget.style.borderColor = 'var(--accent)' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = ''; e.currentTarget.style.borderColor = 'var(--border)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-light)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = ''; e.currentTarget.style.borderColor = 'var(--border)'; }}
                     >
                       {c.name}
                       <span className="ml-1 text-xs font-data text-[var(--text-muted)]">
@@ -124,7 +124,7 @@ export function PreferenceMatch({ matches, onConfirm, onSkipAll, onBack }: Props
                 <p className="text-sm text-[var(--text-muted)]">找不到匹配的賓客</p>
               )}
             </div>
-          )
+          );
         })}
 
         {/* 已處理的摘要 */}
@@ -163,5 +163,5 @@ export function PreferenceMatch({ matches, onConfirm, onSkipAll, onBack }: Props
         </div>
       </div>
     </div>
-  )
+  );
 }

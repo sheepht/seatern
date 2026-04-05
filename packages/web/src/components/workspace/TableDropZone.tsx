@@ -1,4 +1,4 @@
-import { useDroppable } from '@dnd-kit/core'
+import { useDroppable } from '@dnd-kit/core';
 
 interface Props {
   tableId: string
@@ -15,9 +15,9 @@ export function TableDropZone({ tableId, x, y, radius }: Props) {
   const { isOver, setNodeRef } = useDroppable({
     id: `table-${tableId}`,
     data: { type: 'table', tableId },
-  })
+  });
 
-  const size = radius * 2
+  const size = radius * 2;
   return (
     <div
       ref={setNodeRef}
@@ -31,5 +31,5 @@ export function TableDropZone({ tableId, x, y, radius }: Props) {
         height: size,
       }}
     />
-  )
+  );
 }

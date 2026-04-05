@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { Minus, Plus, Maximize2, HelpCircle } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react';
+import { Minus, Plus, Maximize2, HelpCircle } from 'lucide-react';
 
 interface Props {
   zoom: number
@@ -9,41 +9,41 @@ interface Props {
   onSetZoom: (zoom: number) => void
 }
 
-const PRESETS = [0.25, 0.5, 0.75, 1]
+const PRESETS = [0.25, 0.5, 0.75, 1];
 
 export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }: Props) {
-  const [showPresets, setShowPresets] = useState(false)
-  const [showHelp, setShowHelp] = useState(false)
-  const presetsRef = useRef<HTMLDivElement>(null)
-  const helpRef = useRef<HTMLDivElement>(null)
+  const [showPresets, setShowPresets] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const presetsRef = useRef<HTMLDivElement>(null);
+  const helpRef = useRef<HTMLDivElement>(null);
 
   // 點擊外部關閉 dropdown
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (presetsRef.current && !presetsRef.current.contains(e.target as Node)) setShowPresets(false)
-      if (helpRef.current && !helpRef.current.contains(e.target as Node)) setShowHelp(false)
-    }
-    if (showPresets || showHelp) document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [showPresets, showHelp])
+      if (presetsRef.current && !presetsRef.current.contains(e.target as Node)) setShowPresets(false);
+      if (helpRef.current && !helpRef.current.contains(e.target as Node)) setShowHelp(false);
+    };
+    if (showPresets || showHelp) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showPresets, showHelp]);
 
   // ? 鍵 toggle 快捷鍵提示
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const tag = (document.activeElement?.tagName || '').toLowerCase()
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       if (e.key === '?') {
-        e.preventDefault()
-        setShowHelp((prev) => !prev)
-        setShowPresets(false)
+        e.preventDefault();
+        setShowHelp((prev) => !prev);
+        setShowPresets(false);
       }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
-  const atMin = zoom <= 0.25
-  const atMax = zoom >= 1
+  const atMin = zoom <= 0.25;
+  const atMax = zoom >= 1;
 
   return (
     <div
@@ -62,7 +62,7 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }:
       {/* Zoom Level */}
       <div className="relative" ref={presetsRef}>
         <button
-          onClick={() => { setShowPresets(!showPresets); setShowHelp(false) }}
+          onClick={() => { setShowPresets(!showPresets); setShowHelp(false); }}
           className="flex items-center justify-center px-1.5 h-full transition-colors hover:bg-black/5 text-[var(--text-secondary,#78716C)] min-w-[42px] cursor-pointer"
         >
           {Math.round(zoom * 100)}%
@@ -74,7 +74,7 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }:
             {PRESETS.map((p) => (
               <button
                 key={p}
-                onClick={() => { onSetZoom(p); setShowPresets(false) }}
+                onClick={() => { onSetZoom(p); setShowPresets(false); }}
                 className={`block w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-black/5 ${
                   Math.abs(zoom - p) < 0.01 ? 'text-[var(--accent,#B08D57)] font-semibold' : 'text-[var(--text-secondary,#78716C)] font-normal'
                 }`}
@@ -114,7 +114,7 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }:
       {/* Help */}
       <div className="relative" ref={helpRef}>
         <button
-          onClick={() => { setShowHelp(!showHelp); setShowPresets(false) }}
+          onClick={() => { setShowHelp(!showHelp); setShowPresets(false); }}
           className="flex items-center justify-center w-8 h-full rounded-r-lg transition-colors text-[var(--text-muted,#A8A29E)] cursor-pointer"
           title="快捷鍵"
         >
@@ -149,5 +149,5 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }:
         )}
       </div>
     </div>
-  )
+  );
 }

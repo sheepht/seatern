@@ -1,36 +1,36 @@
-import { useRef, useLayoutEffect, useState, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
-import { useSeatingStore, type Table, type Guest } from '@/stores/seating'
-import { getSatisfactionColor, formatScoreDelta } from '@/lib/satisfaction'
-import { dampedCounterScale, labelOpacity, satisfactionBlend, blendColors } from '@/lib/viewport'
-import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors'
-import type { Slot } from '@/lib/seat-shift'
+import { useRef, useLayoutEffect, useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { useSeatingStore, type Table, type Guest } from '@/stores/seating';
+import { getSatisfactionColor, formatScoreDelta } from '@/lib/satisfaction';
+import { dampedCounterScale, labelOpacity, satisfactionBlend, blendColors } from '@/lib/viewport';
+import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors';
+import type { Slot } from '@/lib/seat-shift';
 
 /**
  * 數字漸變動畫 hook — 值改變時平滑過渡
  */
 function useAnimatedNumber(target: number, duration = 400): number {
-  const [current, setCurrent] = useState(target)
-  const prevRef = useRef(target)
-  const rafRef = useRef<number | null>(null)
+  const [current, setCurrent] = useState(target);
+  const prevRef = useRef(target);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const from = prevRef.current
-    if (from === target) return
-    prevRef.current = target
+    const from = prevRef.current;
+    if (from === target) return;
+    prevRef.current = target;
 
-    const start = performance.now()
+    const start = performance.now();
     const animate = (now: number) => {
-      const t = Math.min((now - start) / duration, 1)
-      const eased = 1 - Math.pow(1 - t, 3) // ease-out cubic
-      setCurrent(Math.round(from + (target - from) * eased))
-      if (t < 1) rafRef.current = requestAnimationFrame(animate)
-    }
-    rafRef.current = requestAnimationFrame(animate)
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, [target, duration])
+      const t = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      setCurrent(Math.round(from + (target - from) * eased));
+      if (t < 1) rafRef.current = requestAnimationFrame(animate);
+    };
+    rafRef.current = requestAnimationFrame(animate);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [target, duration]);
 
-  return current
+  return current;
 }
 
 
@@ -53,28 +53,28 @@ interface Props {
 function getDisplayName(name: string, aliases?: string[]): string {
   // 優先用暱稱（第一個），沒有再用名字後兩字
   if (aliases && aliases.length > 0) {
-    const nick = aliases[0]
-    if (nick.length <= 3) return nick
-    return nick.slice(0, 3)
+    const nick = aliases[0];
+    if (nick.length <= 3) return nick;
+    return nick.slice(0, 3);
   }
-  if (name.length <= 2) return name
-  return name.slice(-2)
+  if (name.length <= 2) return name;
+  return name.slice(-2);
 }
 
 /** 桌次中央滿意度圓環（數字 + 進度弧線帶動畫） */
 function TableScoreRing({ score, originalScore, hasGuests, hideDelta }: { score: number; originalScore: number; hasGuests: boolean; hideDelta?: boolean }) {
-  const ringRadius = 28
-  const strokeW = 5
-  const circumference = 2 * Math.PI * ringRadius
+  const ringRadius = 28;
+  const strokeW = 5;
+  const circumference = 2 * Math.PI * ringRadius;
 
-  const roundedScore = Math.round(score)
-  const animatedScore = useAnimatedNumber(roundedScore)
-  const progress = Math.min(animatedScore / 100, 1)
-  const color = getSatisfactionColor(animatedScore)
+  const roundedScore = Math.round(score);
+  const animatedScore = useAnimatedNumber(roundedScore);
+  const progress = Math.min(animatedScore / 100, 1);
+  const color = getSatisfactionColor(animatedScore);
 
-  const rawDelta = score - originalScore
-  const delta = formatScoreDelta(rawDelta)
-  const scale = rawDelta > 0.1 ? 1.25 : rawDelta < -0.1 ? 0.8 : 1
+  const rawDelta = score - originalScore;
+  const delta = formatScoreDelta(rawDelta);
+  const scale = rawDelta > 0.1 ? 1.25 : rawDelta < -0.1 ? 0.8 : 1;
 
   return (
     <g>
@@ -131,141 +131,140 @@ function TableScoreRing({ score, originalScore, hasGuests, hideDelta }: { score:
         </g>
       )}
     </g>
-  )
+  );
 }
 
 export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimmed, zoom, onMouseDown, onEmptySeatClick }: Props) {
-  const counterScale = 1 / zoom // 桌名等維持固定螢幕大小
-  const rawGuestScale = dampedCounterScale(zoom) // 賓客元素：阻尼縮小
-  const nameAlpha = labelOpacity(zoom)         // 名字漸進淡出
-  const satBlend = satisfactionBlend(zoom)     // 填色從分類色→滿意度色
-  const eventId = useSeatingStore((s) => s.eventId)
-  const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId])
-  const getTableGuests = useSeatingStore((s) => s.getTableGuests)
-  const getTableSeatCount = useSeatingStore((s) => s.getTableSeatCount)
-  const avoidPairs = useSeatingStore((s) => s.avoidPairs)
-  const dragPreview = useSeatingStore((s) => s.dragPreview)
-  const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
-  const dragRejectTableId = useSeatingStore((s) => s.dragRejectTableId)
-  const recommendationTableScores = useSeatingStore((s) => s.recommendationTableScores)
-  const hoveredGuestId = useSeatingStore((s) => s.hoveredGuestId)
-  const recommendationGuestScore = useSeatingStore((s) => s.recommendationGuestScore)
-  const guestsWithRecommendations = useSeatingStore((s) => s.guestsWithRecommendations)
-  const seatPreviewGuest = useSeatingStore((s) => s.seatPreviewGuest)
-  const allGuests = useSeatingStore((s) => s.guests)
-  const isResetting = useSeatingStore((s) => s.isResetting)
-  const flyingGuestIds = useSeatingStore((s) => s.flyingGuestIds)
-  const moveGuest = useSeatingStore((s) => s.moveGuest)
-  const clearTable = useSeatingStore((s) => s.clearTable)
-  const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
-  const removeTable = useSeatingStore((s) => s.removeTable)
-  const updateTableName = useSeatingStore((s) => s.updateTableName)
-  const updateTableCapacity = useSeatingStore((s) => s.updateTableCapacity)
+  const counterScale = 1 / zoom; // 桌名等維持固定螢幕大小
+  const rawGuestScale = dampedCounterScale(zoom); // 賓客元素：阻尼縮小
+  const nameAlpha = labelOpacity(zoom);         // 名字漸進淡出
+  const satBlend = satisfactionBlend(zoom);     // 填色從分類色→滿意度色
+  const eventId = useSeatingStore((s) => s.eventId);
+  const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId]);
+  const getTableGuests = useSeatingStore((s) => s.getTableGuests);
+  const getTableSeatCount = useSeatingStore((s) => s.getTableSeatCount);
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs);
+  const dragPreview = useSeatingStore((s) => s.dragPreview);
+  const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId);
+  const dragRejectTableId = useSeatingStore((s) => s.dragRejectTableId);
+  const recommendationTableScores = useSeatingStore((s) => s.recommendationTableScores);
+  const hoveredGuestId = useSeatingStore((s) => s.hoveredGuestId);
+  const recommendationGuestScore = useSeatingStore((s) => s.recommendationGuestScore);
+  const guestsWithRecommendations = useSeatingStore((s) => s.guestsWithRecommendations);
+  const seatPreviewGuest = useSeatingStore((s) => s.seatPreviewGuest);
+  const allGuests = useSeatingStore((s) => s.guests);
+  const isResetting = useSeatingStore((s) => s.isResetting);
+  const flyingGuestIds = useSeatingStore((s) => s.flyingGuestIds);
+  const clearTable = useSeatingStore((s) => s.clearTable);
+  const setSelectedTable = useSeatingStore((s) => s.setSelectedTable);
+  const removeTable = useSeatingStore((s) => s.removeTable);
+  const updateTableName = useSeatingStore((s) => s.updateTableName);
+  const updateTableCapacity = useSeatingStore((s) => s.updateTableCapacity);
 
-  const [isHovered, setIsHovered] = useState(false)
-  const [showRenameModal, setShowRenameModal] = useState(false)
-  const [showActionConfirm, setShowActionConfirm] = useState(false)
-  const [renameValue, setRenameValue] = useState(table.name)
-  const [capacityValue, setCapacityValue] = useState(table.capacity)
+  const [_isHovered, setIsHovered] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showActionConfirm, setShowActionConfirm] = useState(false);
+  const [renameValue, setRenameValue] = useState(table.name);
+  const [capacityValue, setCapacityValue] = useState(table.capacity);
   // 量測桌名文字長度，用來精確定位圖示
-  const namePathRef = useRef<SVGTextPathElement>(null)
-  const [nameTextLength, setNameTextLength] = useState(table.name.length * 20)
+  const namePathRef = useRef<SVGTextPathElement>(null);
+  const [nameTextLength, setNameTextLength] = useState(table.name.length * 20);
 
-  const guests = getTableGuests(table.id)
-  const seatCount = getTableSeatCount(table.id)
-  const isOverCapacity = seatCount > table.capacity
+  const guests = getTableGuests(table.id);
+  const seatCount = getTableSeatCount(table.id);
+  const isOverCapacity = seatCount > table.capacity;
 
   // 檢查此桌是否有避免同桌違規，並記錄哪些賓客涉及
-  const guestIds = guests.map((g) => g.id)
-  const violatingGuestIds = new Set<string>()
+  const guestIds = guests.map((g) => g.id);
+  const violatingGuestIds = new Set<string>();
   for (const ap of avoidPairs) {
     if (guestIds.includes(ap.guestAId) && guestIds.includes(ap.guestBId)) {
-      violatingGuestIds.add(ap.guestAId)
-      violatingGuestIds.add(ap.guestBId)
+      violatingGuestIds.add(ap.guestAId);
+      violatingGuestIds.add(ap.guestBId);
     }
   }
   // 拖曳預覽時：檢查被拖的賓客是否跟此桌的人有衝突
-  const previewDragId = dragPreview?.tableId === table.id ? dragPreview.draggedGuestId : null
+  const previewDragId = dragPreview?.tableId === table.id ? dragPreview.draggedGuestId : null;
   if (previewDragId) {
     for (const ap of avoidPairs) {
       const isConflict =
         (ap.guestAId === previewDragId && guestIds.includes(ap.guestBId)) ||
-        (ap.guestBId === previewDragId && guestIds.includes(ap.guestAId))
+        (ap.guestBId === previewDragId && guestIds.includes(ap.guestAId));
       if (isConflict) {
-        violatingGuestIds.add(ap.guestAId)
-        violatingGuestIds.add(ap.guestBId)
+        violatingGuestIds.add(ap.guestAId);
+        violatingGuestIds.add(ap.guestBId);
       }
     }
   }
 
   // 桌次大小依容量固定（要放得下所有座位圈圈）
-  const baseRadius = 58 + Math.min(table.capacity, 12) * 7
-  const radius = Math.max(baseRadius, 88)
+  const baseRadius = 58 + Math.min(table.capacity, 12) * 7;
+  const radius = Math.max(baseRadius, 88);
 
   // 賓客圈圈大小上限：不超出桌子、不互相擠壓
-  const seatRadius = radius - 34
-  const maxByTable = 34 - 2 // 不超出桌緣（34 = radius - seatRadius，留 2px padding）
-  const maxBySeat = seatRadius * Math.sin(Math.PI / table.capacity) - 2 // 相鄰不重疊
-  const maxGuestR = Math.min(maxByTable, maxBySeat)
-  const guestScale = Math.min(rawGuestScale, maxGuestR / 20) // cap: 20 * guestScale <= maxGuestR
+  const seatRadius = radius - 34;
+  const maxByTable = 34 - 2; // 不超出桌緣（34 = radius - seatRadius，留 2px padding）
+  const maxBySeat = seatRadius * Math.sin(Math.PI / table.capacity) - 2; // 相鄰不重疊
+  const maxGuestR = Math.min(maxByTable, maxBySeat);
+  const guestScale = Math.min(rawGuestScale, maxGuestR / 20); // cap: 20 * guestScale <= maxGuestR
 
   // 拖曳 hover 但無法放置（滿桌）
-  const isRejectTable = dragRejectTableId === table.id
+  const isRejectTable = dragRejectTableId === table.id;
 
   // 是否有此桌的拖曳預覽
-  const isPreviewTable = dragPreview?.tableId === table.id
-  const previewSlots = isPreviewTable ? dragPreview.previewSlots : null
+  const isPreviewTable = dragPreview?.tableId === table.id;
+  const previewSlots = isPreviewTable ? dragPreview.previewSlots : null;
   // 預覽滿意度分數（拖曳中即時計算 — 適用於所有桌，不只目標桌）
-  const previewScores = dragPreview ? dragPreview.previewScores : null
-  const previewTableScore = dragPreview?.previewTableScores?.get(table.id)
+  const previewScores = dragPreview ? dragPreview.previewScores : null;
+  const previewTableScore = dragPreview?.previewTableScores?.get(table.id);
 
   // 拖曳中的賓客一律不顯示在任何桌上（他跟著游標走）
   const filteredGuests = activeDragGuestId
     ? guests.filter((g) => g.id !== activeDragGuestId)
-    : guests
+    : guests;
 
   // 預覽時需要所有賓客資料（被位移的人可能需要查找）
-  const guestPool = isPreviewTable ? allGuests.filter((g) => g.rsvpStatus === 'confirmed') : filteredGuests
+  const guestPool = isPreviewTable ? allGuests.filter((g) => g.rsvpStatus === 'confirmed') : filteredGuests;
 
   // 飛行動畫中的賓客視為尚未入座（空位+弧線不提前更新）
   const layoutGuests = flyingGuestIds.size > 0
     ? guestPool.filter((g) => !flyingGuestIds.has(g.id))
-    : guestPool
+    : guestPool;
 
   // 所有座位（含空位），依 capacity 固定數量
-  const allSeats = buildSeatLayout(layoutGuests, table.capacity, radius, previewSlots)
+  const allSeats = buildSeatLayout(layoutGuests, table.capacity, radius, previewSlots);
 
   // FLIP 動畫：追蹤座位元素的前一次位置
-  const seatRefsMap = useRef<Map<string, SVGGElement>>(new Map())
-  const prevPositions = useRef<Map<string, { x: number; y: number }>>(new Map())
+  const seatRefsMap = useRef<Map<string, SVGGElement>>(new Map());
+  const prevPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
 
   // 在 DOM 更新前捕捉當前位置（FLIP: First）
   // 因為 React 在 render 後才更新 DOM，我們在這裡先記錄 "即將被替換" 的位置
-  const currentPositions = new Map<string, { x: number; y: number }>()
+  const currentPositions = new Map<string, { x: number; y: number }>();
   for (const seat of allSeats) {
     if (seat.guest) {
-      const key = seat.type === 'companion' ? `guest-${seat.guest.id}-c${seat.companionIndex}` : `guest-${seat.guest.id}-main`
-      currentPositions.set(key, { x: seat.x, y: seat.y })
+      const key = seat.type === 'companion' ? `guest-${seat.guest.id}-c${seat.companionIndex}` : `guest-${seat.guest.id}-main`;
+      currentPositions.set(key, { x: seat.x, y: seat.y });
     }
   }
 
   useLayoutEffect(() => {
     // FLIP: Last → Invert → Play
-    const prev = prevPositions.current
+    const prev = prevPositions.current;
     for (const [key, newPos] of currentPositions) {
-      const oldPos = prev.get(key)
-      if (!oldPos) continue
+      const oldPos = prev.get(key);
+      if (!oldPos) continue;
 
-      const dx = oldPos.x - newPos.x
-      const dy = oldPos.y - newPos.y
-      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue
+      const dx = oldPos.x - newPos.x;
+      const dy = oldPos.y - newPos.y;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
 
       // 跳過正在飛行動畫中的賓客（undo 動畫已處理過渡）
-      const guestId = key.replace(/^guest-/, '').replace(/-(main|c\d+)$/, '')
-      if (flyingGuestIds.has(guestId) || isResetting) continue
+      const guestId = key.replace(/^guest-/, '').replace(/-(main|c\d+)$/, '');
+      if (flyingGuestIds.has(guestId) || isResetting) continue;
 
-      const el = seatRefsMap.current.get(key)
-      if (!el) continue
+      const el = seatRefsMap.current.get(key);
+      if (!el) continue;
 
       // Invert + Play：從舊位置動畫到新位置
       el.animate(
@@ -274,63 +273,63 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
           { transform: `translate(${newPos.x}px, ${newPos.y}px)` },
         ],
         { duration: 200, easing: 'ease-out' },
-      )
+      );
     }
 
     // 更新記錄
-    prevPositions.current = currentPositions
-  })
+    prevPositions.current = currentPositions;
+  });
 
   // 量測桌名文字長度（用於圖示定位）
   useLayoutEffect(() => {
     if (namePathRef.current) {
-      const len = namePathRef.current.getComputedTextLength()
-      if (len > 0) setNameTextLength(len)
+      const len = namePathRef.current.getComputedTextLength();
+      if (len > 0) setNameTextLength(len);
     }
-  }, [table.name, radius])
+  }, [table.name, radius]);
 
   // 眷屬群組弧線
-  const groupArcs = buildGroupArcsFromSeats(allSeats, table.capacity, radius)
+  const groupArcs = buildGroupArcsFromSeats(allSeats, table.capacity, radius);
 
   const handleRename = () => {
-    const trimmed = renameValue.trim()
-    if (trimmed && trimmed !== table.name) updateTableName(table.id, trimmed)
-    if (capacityValue !== table.capacity) updateTableCapacity(table.id, capacityValue)
-    setShowRenameModal(false)
-  }
+    const trimmed = renameValue.trim();
+    if (trimmed && trimmed !== table.name) updateTableName(table.id, trimmed);
+    if (capacityValue !== table.capacity) updateTableCapacity(table.id, capacityValue);
+    setShowRenameModal(false);
+  };
 
   const handleActionConfirm = () => {
     if (guests.length > 0) {
-      clearTable(table.id)
-      setSelectedTable(null)
+      clearTable(table.id);
+      setSelectedTable(null);
     } else {
-      removeTable(table.id)
+      removeTable(table.id);
     }
-    setShowActionConfirm(false)
-  }
+    setShowActionConfirm(false);
+  };
 
-  const showIcons = isSelected && !isDragging
-  const iconR = 14
+  const showIcons = isSelected && !isDragging;
+  const iconR = 14;
   // 弧線參數化：t ∈ [0,1]，x(t) = -R·cos(t·π)，y(t) = -R·sin(t·π)
   // textArcR = 文字 baseline 所在弧線（與 textPath 一致）
   // iconArcR = 圖示中心所在弧線，需往外偏移約半個字高，使圖示視覺中心對齊文字中心
-  const textArcR = radius + 12
-  const fontSize = 20
-  const iconArcR = textArcR + fontSize * 0.55  // baseline → 文字視覺中心
-  const arcLength = Math.PI * textArcR
-  const iconPad = 20 * counterScale  // 文字邊緣到圖示中心的間距（螢幕 px），隨 zoom 反向縮放
-  const tEdit = Math.max(0.04, 0.5 - (nameTextLength / 2 + iconPad) / arcLength)
-  const tDelete = Math.min(0.96, 0.5 + (nameTextLength / 2 + iconPad) / arcLength)
-  const editX = -iconArcR * Math.cos(tEdit * Math.PI)
-  const editY = -iconArcR * Math.sin(tEdit * Math.PI)
-  const deleteX = -iconArcR * Math.cos(tDelete * Math.PI)
-  const deleteY = -iconArcR * Math.sin(tDelete * Math.PI)
+  const textArcR = radius + 12;
+  const fontSize = 20;
+  const iconArcR = textArcR + fontSize * 0.55;  // baseline → 文字視覺中心
+  const arcLength = Math.PI * textArcR;
+  const iconPad = 20 * counterScale;  // 文字邊緣到圖示中心的間距（螢幕 px），隨 zoom 反向縮放
+  const tEdit = Math.max(0.04, 0.5 - (nameTextLength / 2 + iconPad) / arcLength);
+  const tDelete = Math.min(0.96, 0.5 + (nameTextLength / 2 + iconPad) / arcLength);
+  const editX = -iconArcR * Math.cos(tEdit * Math.PI);
+  const editY = -iconArcR * Math.sin(tEdit * Math.PI);
+  const deleteX = -iconArcR * Math.cos(tDelete * Math.PI);
+  const deleteY = -iconArcR * Math.sin(tDelete * Math.PI);
   // 動畫起點：桌子中心（從外層 <g> 反推 = 負的終點座標）
   // 圖示畫在桌子圓形之前，所以在桌面內的路程被桌子蓋住，穿越邊緣後彈出
-  const editFromX = -editX
-  const editFromY = -editY
-  const deleteFromX = -deleteX
-  const deleteFromY = -deleteY
+  const editFromX = -editX;
+  const editFromY = -editY;
+  const deleteFromX = -deleteX;
+  const deleteFromY = -deleteY;
 
   return (
     <>
@@ -350,7 +349,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
             className="table-btn-edit cursor-pointer"
             transform={`translate(${editX}, ${editY}) scale(${counterScale})`}
             onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => { e.stopPropagation(); setRenameValue(table.name); setCapacityValue(table.capacity); setShowRenameModal(true) }}
+            onClick={(e) => { e.stopPropagation(); setRenameValue(table.name); setCapacityValue(table.capacity); setShowRenameModal(true); }}
           >
             <g className="table-icon-pop" style={{ '--icon-from-x': `${editFromX * zoom}px`, '--icon-from-y': `${editFromY * zoom}px` } as React.CSSProperties}>
               <circle r={iconR} fill="white" stroke="#D6D3D1" strokeWidth="1.5" />
@@ -365,7 +364,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
             className="table-btn-delete cursor-pointer"
             transform={`translate(${deleteX}, ${deleteY}) scale(${counterScale})`}
             onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => { e.stopPropagation(); setShowActionConfirm(true) }}
+            onClick={(e) => { e.stopPropagation(); setShowActionConfirm(true); }}
           >
             <g className="table-icon-pop" style={{ '--icon-from-x': `${deleteFromX * zoom}px`, '--icon-from-y': `${deleteFromY * zoom}px` } as React.CSSProperties}>
               <circle r={iconR} fill="white" stroke="#FECACA" strokeWidth="1.5" />
@@ -447,21 +446,21 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
         <TableScoreRing
           hideDelta
           score={(() => {
-            if (previewTableScore != null) return previewTableScore
-            const recScore = recommendationTableScores.get(table.id)
+            if (previewTableScore != null) return previewTableScore;
+            const recScore = recommendationTableScores.get(table.id);
             if (recScore != null) {
               // 已入座賓客的推薦受 zoom 限制，待排賓客的推薦不受限
-              const hoveredGuest = hoveredGuestId ? allGuests.find((g) => g.id === hoveredGuestId) : null
-              if (zoom >= 0.7 || (hoveredGuest && !hoveredGuest.assignedTableId)) return recScore
+              const hoveredGuest = hoveredGuestId ? allGuests.find((g) => g.id === hoveredGuestId) : null;
+              if (zoom >= 0.7 || (hoveredGuest && !hoveredGuest.assignedTableId)) return recScore;
             }
-            return guests.length > 0 ? table.averageSatisfaction : 0
+            return guests.length > 0 ? table.averageSatisfaction : 0;
           })()}
           originalScore={guests.length > 0 ? table.averageSatisfaction : 0}
           hasGuests={(() => {
-            if (guests.length > 0) return true
-            if (!recommendationTableScores.has(table.id)) return false
-            const hoveredGuest = hoveredGuestId ? allGuests.find((g) => g.id === hoveredGuestId) : null
-            return zoom >= 0.7 || (hoveredGuest != null && !hoveredGuest.assignedTableId)
+            if (guests.length > 0) return true;
+            if (!recommendationTableScores.has(table.id)) return false;
+            const hoveredGuest = hoveredGuestId ? allGuests.find((g) => g.id === hoveredGuestId) : null;
+            return zoom >= 0.7 || (hoveredGuest != null && !hoveredGuest.assignedTableId);
           })()}
         />
       </g>
@@ -481,24 +480,24 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
 
       {/* 空位（靜態）— isResetting 時隱藏，含 "+" 可點擊 */}
       {!isResetting && allSeats.filter((s) => s.type === 'empty').map((seat) => {
-        const isPreview = seatPreviewGuest?.tableId === table.id && seatPreviewGuest?.seatIndex === seat.seatIndex
-        const previewScore = isPreview ? seatPreviewGuest.predictedScore : 0
-        const previewCategory = isPreview ? seatPreviewGuest.category : undefined
-        const previewBgColor = isPreview ? getCategoryColor(previewCategory, categoryColors).background : undefined
-        const previewSatColor = isPreview ? getSatisfactionColor(previewScore) : undefined
-        const guestR = 20 * guestScale
-        const guestRingR = guestR + 3 * guestScale
-        const guestCircum = 2 * Math.PI * guestRingR
-        const guestProgress = previewScore / 100
+        const isPreview = seatPreviewGuest?.tableId === table.id && seatPreviewGuest?.seatIndex === seat.seatIndex;
+        const previewScore = isPreview ? seatPreviewGuest.predictedScore : 0;
+        const previewCategory = isPreview ? seatPreviewGuest.category : undefined;
+        const previewBgColor = isPreview ? getCategoryColor(previewCategory, categoryColors).background : undefined;
+        const previewSatColor = isPreview ? getSatisfactionColor(previewScore) : undefined;
+        const guestR = 20 * guestScale;
+        const guestRingR = guestR + 3 * guestScale;
+        const guestCircum = 2 * Math.PI * guestRingR;
+        const guestProgress = previewScore / 100;
 
         return (
           <g
             key={`empty-${seat.seatIndex}`}
             style={{ cursor: nameAlpha > 0 ? 'pointer' : 'default' }}
             onClick={(e) => {
-              if (nameAlpha <= 0) return
-              e.stopPropagation()
-              onEmptySeatClick?.(table.id, seat.seatIndex, e)
+              if (nameAlpha <= 0) return;
+              e.stopPropagation();
+              onEmptySeatClick?.(table.id, seat.seatIndex, e);
             }}
           >
             {isPreview ? (
@@ -567,7 +566,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
               </>
             )}
           </g>
-        )
+        );
       })}
 
       {/* 賓客圖層 — 重排時立刻隱藏（浮動圓圈取代） */}
@@ -577,20 +576,20 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
 
       {/* 有人的座位（賓客 + 眷屬），用 guest ID 作為穩定 key + FLIP 動畫 */}
       {allSeats.filter((s) => s.type !== 'empty').map((seat) => {
-        const key = `guest-${seat.guest!.id}-${seat.type === 'companion' ? `c${seat.companionIndex}` : 'main'}`
+        const key = `guest-${seat.guest!.id}-${seat.type === 'companion' ? `c${seat.companionIndex}` : 'main'}`;
         const setRef = (el: SVGGElement | null) => {
-          if (el) seatRefsMap.current.set(key, el)
-          else seatRefsMap.current.delete(key)
-        }
+          if (el) seatRefsMap.current.set(key, el);
+          else seatRefsMap.current.delete(key);
+        };
 
-        const isFlying = flyingGuestIds.has(seat.guest!.id)
+        const isFlying = flyingGuestIds.has(seat.guest!.id);
 
         if (seat.type === 'companion' || seat.type === 'overflow-companion') {
-          const companionCatColor = getCategoryColor(seat.guest!.category, categoryColors)
-          const bgColor = companionCatColor.background
-          const textColor = companionCatColor.color
-          const totalCompanions = seat.guest!.companionCount
-          const isLast = seat.companionIndex === totalCompanions
+          const companionCatColor = getCategoryColor(seat.guest!.category, categoryColors);
+          const bgColor = companionCatColor.background;
+          const textColor = companionCatColor.color;
+          const totalCompanions = seat.guest!.companionCount;
+          const isLast = seat.companionIndex === totalCompanions;
           return (
             <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)`, opacity: isFlying ? 0 : undefined }}>
               <circle
@@ -614,23 +613,23 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
                 </text>
               )}
             </g>
-          )
+          );
         }
 
         // 賓客本人
-        const guestCatColor = getCategoryColor(seat.guest!.category, categoryColors)
-        const bgColor = guestCatColor.background
-        const textColor = guestCatColor.color
-        const displayName = getDisplayName(seat.guest!.name, seat.guest!.aliases)
-        const recGuestScore = recommendationGuestScore?.guestId === seat.guest!.id ? recommendationGuestScore.score : undefined
-        const guestScore = previewScores?.get(seat.guest!.id) ?? recGuestScore ?? seat.guest!.satisfactionScore
-        const guestSatColor = getSatisfactionColor(guestScore)
-        const guestR = 20 * guestScale
-        const guestRingR = guestR + 3 * guestScale
-        const guestCircum = 2 * Math.PI * guestRingR
-        const guestProgress = Math.min(guestScore / 100, 1)
+        const guestCatColor = getCategoryColor(seat.guest!.category, categoryColors);
+        const bgColor = guestCatColor.background;
+        const textColor = guestCatColor.color;
+        const displayName = getDisplayName(seat.guest!.name, seat.guest!.aliases);
+        const recGuestScore = recommendationGuestScore?.guestId === seat.guest!.id ? recommendationGuestScore.score : undefined;
+        const guestScore = previewScores?.get(seat.guest!.id) ?? recGuestScore ?? seat.guest!.satisfactionScore;
+        const guestSatColor = getSatisfactionColor(guestScore);
+        const guestR = 20 * guestScale;
+        const guestRingR = guestR + 3 * guestScale;
+        const guestCircum = 2 * Math.PI * guestRingR;
+        const guestProgress = Math.min(guestScore / 100, 1);
         // 縮小時填色從分類色漸變到滿意度色
-        const fillColor = blendColors(bgColor, guestSatColor, satBlend)
+        const fillColor = blendColors(bgColor, guestSatColor, satBlend);
 
         return (
           <g key={key} ref={setRef} style={{ transform: `translate(${seat.x}px, ${seat.y}px)`, opacity: isFlying ? 0 : undefined }}>
@@ -683,16 +682,16 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
               </text>
             )}
           </g>
-        )
+        );
       })}
 
       {/* 圖示層：怒氣 + 推薦（在所有賓客之上）— 縮小時跟名字一起淡出 */}
       {nameAlpha > 0 && allSeats.filter((s) => s.type === 'guest' && s.guest).map((seat) => {
-        const guestR = 20 * guestScale
-        const hasViolation = violatingGuestIds.has(seat.guest!.id)
-        const hasRecommendation = zoom >= 0.7 && guestsWithRecommendations.has(seat.guest!.id)
+        const guestR = 20 * guestScale;
+        const hasViolation = violatingGuestIds.has(seat.guest!.id);
+        const hasRecommendation = zoom >= 0.7 && guestsWithRecommendations.has(seat.guest!.id);
 
-        if (!hasViolation && !hasRecommendation) return null
+        if (!hasViolation && !hasRecommendation) return null;
 
         return (
           <g key={`icon-${seat.guest!.id}`} style={{ transform: `translate(${seat.x}px, ${seat.y}px)` }}>
@@ -735,7 +734,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
               </g>
             )}
           </g>
-        )
+        );
       })}
 
       </g>{/* 結束賓客圖層 */}
@@ -743,21 +742,21 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
       {/* ±N badge — 渲染在所有賓客之上 */}
       {(() => {
         const ringScore = (() => {
-          if (previewTableScore != null) return previewTableScore
-          const recScore = recommendationTableScores.get(table.id)
+          if (previewTableScore != null) return previewTableScore;
+          const recScore = recommendationTableScores.get(table.id);
           if (recScore != null) {
-            const hg = hoveredGuestId ? allGuests.find((g) => g.id === hoveredGuestId) : null
-            if (zoom >= 0.7 || (hg && !hg.assignedTableId)) return recScore
+            const hg = hoveredGuestId ? allGuests.find((g) => g.id === hoveredGuestId) : null;
+            if (zoom >= 0.7 || (hg && !hg.assignedTableId)) return recScore;
           }
-          return guests.length > 0 ? table.averageSatisfaction : 0
-        })()
-        const origScore = guests.length > 0 ? table.averageSatisfaction : 0
-        const d = formatScoreDelta(ringScore - origScore)
-        if (d === 0) return null
-        const badgeScale = 1 / zoom // badge 維持固定螢幕大小
+          return guests.length > 0 ? table.averageSatisfaction : 0;
+        })();
+        const origScore = guests.length > 0 ? table.averageSatisfaction : 0;
+        const d = formatScoreDelta(ringScore - origScore);
+        if (d === 0) return null;
+        const badgeScale = 1 / zoom; // badge 維持固定螢幕大小
         // 中央分數圈用 zoom^(-0.45) 縮放，半徑 28，換算成 badge 座標系的偏移
-        const ringScreenR = 28 * Math.pow(zoom, -0.45)
-        const offsetInBadgeSpace = ringScreenR * zoom + 16 // 轉到 badgeScale 座標系
+        const ringScreenR = 28 * Math.pow(zoom, -0.45);
+        const offsetInBadgeSpace = ringScreenR * zoom + 16; // 轉到 badgeScale 座標系
         return (
           <g transform={`scale(${badgeScale})`}>
             <g transform={`translate(0, ${offsetInBadgeSpace})`}>
@@ -767,7 +766,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
               </text>
             </g>
           </g>
-        )
+        );
       })()}
 
     </g>
@@ -783,7 +782,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
             autoFocus
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setShowRenameModal(false) }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setShowRenameModal(false); }}
             className="w-full px-2.5 py-2 border border-[var(--accent)] rounded-md text-[13px] outline-none bg-[var(--bg-surface)] text-[var(--text-primary)] box-border font-inherit"
           />
           <label className="block text-[12px] text-[var(--text-muted)] mt-3 mb-1">座位數</label>
@@ -834,7 +833,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
       document.body
     )}
     </>
-  )
+  );
 }
 
 interface Seat {
@@ -850,11 +849,11 @@ interface Seat {
  * 計算座位角度位置
  */
 function seatPosition(seatIndex: number, totalSlots: number, seatRadius: number) {
-  const angle = ((2 * Math.PI) / totalSlots) * seatIndex - Math.PI / 2
+  const angle = ((2 * Math.PI) / totalSlots) * seatIndex - Math.PI / 2;
   return {
     x: Math.cos(angle) * seatRadius,
     y: Math.sin(angle) * seatRadius,
-  }
+  };
 }
 
 /**
@@ -868,52 +867,52 @@ function buildSeatLayout(
   tableRadius: number,
   previewSlots?: Slot[] | null,
 ): Seat[] {
-  const totalSlots = capacity
-  const seatRadius = tableRadius - 34
+  const totalSlots = capacity;
+  const seatRadius = tableRadius - 34;
 
   // Step 1: 建立 Slot[] — preview 時直接用，正常時從 guests 建立
-  let slots: Slot[]
+  let slots: Slot[];
   if (previewSlots) {
-    slots = previewSlots
+    slots = previewSlots;
   } else {
-    slots = new Array(totalSlots).fill(null)
+    slots = new Array(totalSlots).fill(null);
     for (const guest of guests) {
-      const startIdx = guest.seatIndex ?? 0
-      const immovable = guest.seatCount > 1
+      const startIdx = guest.seatIndex ?? 0;
+      const immovable = guest.seatCount > 1;
       if (startIdx < totalSlots) {
-        slots[startIdx] = { guestId: guest.id, isCompanion: false, immovable }
+        slots[startIdx] = { guestId: guest.id, isCompanion: false, immovable };
       }
       for (let c = 1; c < guest.seatCount; c++) {
-        const idx = (startIdx + c) % totalSlots
-        slots[idx] = { guestId: guest.id, isCompanion: true, immovable }
+        const idx = (startIdx + c) % totalSlots;
+        slots[idx] = { guestId: guest.id, isCompanion: true, immovable };
       }
     }
   }
 
   // Step 2: 統一 code path — 從 Slot[] 轉成 Seat[]
-  const guestMap = new Map<string, Guest>()
-  for (const g of guests) guestMap.set(g.id, g)
+  const guestMap = new Map<string, Guest>();
+  for (const g of guests) guestMap.set(g.id, g);
 
-  const seats: Seat[] = []
+  const seats: Seat[] = [];
   for (let i = 0; i < totalSlots; i++) {
-    const slot = slots[i]
-    const pos = seatPosition(i, totalSlots, seatRadius)
+    const slot = slots[i];
+    const pos = seatPosition(i, totalSlots, seatRadius);
 
     if (!slot) {
-      seats.push({ type: 'empty', guest: null, seatIndex: i, ...pos })
+      seats.push({ type: 'empty', guest: null, seatIndex: i, ...pos });
     } else if (slot.isCompanion) {
-      const guest = guestMap.get(slot.guestId) || null
+      const guest = guestMap.get(slot.guestId) || null;
       // 計算 companionIndex（用 circular offset，支援 wrap-around）
-      const mainSeatIdx = guest?.seatIndex ?? 0
-      const companionIdx = (i - mainSeatIdx + totalSlots) % totalSlots
-      seats.push({ type: 'companion', guest, companionIndex: companionIdx, seatIndex: i, ...pos })
+      const mainSeatIdx = guest?.seatIndex ?? 0;
+      const companionIdx = (i - mainSeatIdx + totalSlots) % totalSlots;
+      seats.push({ type: 'companion', guest, companionIndex: companionIdx, seatIndex: i, ...pos });
     } else {
-      const guest = guestMap.get(slot.guestId) || null
-      seats.push({ type: 'guest', guest, seatIndex: i, ...pos })
+      const guest = guestMap.get(slot.guestId) || null;
+      seats.push({ type: 'guest', guest, seatIndex: i, ...pos });
     }
   }
 
-  return seats
+  return seats;
 }
 
 interface GroupArc {
@@ -929,43 +928,43 @@ function buildGroupArcsFromSeats(
   capacity: number,
   tableRadius: number,
 ): GroupArc[] {
-  const seatRadius = tableRadius - 34
-  const totalSlots = capacity
-  const arcs: GroupArc[] = []
+  const seatRadius = tableRadius - 34;
+  const totalSlots = capacity;
+  const arcs: GroupArc[] = [];
 
   // 找出帶眷屬的賓客，取得他們的起始 seatIndex 和佔位數
-  const processed = new Set<string>()
+  const processed = new Set<string>();
 
   for (const seat of allSeats) {
-    if (!seat.guest || seat.type !== 'guest') continue
-    if (processed.has(seat.guest.id)) continue
-    processed.add(seat.guest.id)
+    if (!seat.guest || seat.type !== 'guest') continue;
+    if (processed.has(seat.guest.id)) continue;
+    processed.add(seat.guest.id);
 
-    if (seat.guest.seatCount < 2) continue
+    if (seat.guest.seatCount < 2) continue;
 
-    const startIndex = seat.seatIndex
-    const seatCount = seat.guest.seatCount
+    const startIndex = seat.seatIndex;
+    const seatCount = seat.guest.seatCount;
 
-    const angleStep = (2 * Math.PI) / totalSlots
-    const startAngle = angleStep * startIndex - Math.PI / 2
-    const endAngle = angleStep * ((startIndex + seatCount - 1) % totalSlots) - Math.PI / 2
+    const angleStep = (2 * Math.PI) / totalSlots;
+    const startAngle = angleStep * startIndex - Math.PI / 2;
+    const endAngle = angleStep * ((startIndex + seatCount - 1) % totalSlots) - Math.PI / 2;
 
     // 處理環形情況
-    let sweepAngle = endAngle - startAngle
-    if (sweepAngle < 0) sweepAngle += 2 * Math.PI
-    const largeArc = sweepAngle > Math.PI ? 1 : 0
+    let sweepAngle = endAngle - startAngle;
+    if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+    const largeArc = sweepAngle > Math.PI ? 1 : 0;
 
-    const x1 = Math.cos(startAngle) * seatRadius
-    const y1 = Math.sin(startAngle) * seatRadius
-    const x2 = Math.cos(endAngle) * seatRadius
-    const y2 = Math.sin(endAngle) * seatRadius
+    const x1 = Math.cos(startAngle) * seatRadius;
+    const y1 = Math.sin(startAngle) * seatRadius;
+    const x2 = Math.cos(endAngle) * seatRadius;
+    const y2 = Math.sin(endAngle) * seatRadius;
 
     arcs.push({
       path: `M ${x1} ${y1} A ${seatRadius} ${seatRadius} 0 ${largeArc} 1 ${x2} ${y2}`,
       category: seat.guest.category,
-    })
+    });
   }
 
-  return arcs
+  return arcs;
 }
 

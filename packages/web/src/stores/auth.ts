@@ -1,7 +1,7 @@
-import { create } from 'zustand'
-import type { Session, User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
-import { api } from '@/lib/api'
+import { create } from 'zustand';
+import type { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api';
 
 interface AuthState {
   user: User | null
@@ -23,42 +23,42 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
 
   setSession: (session) => {
-    set({ session, user: session?.user ?? null, isLoading: false })
+    set({ session, user: session?.user ?? null, isLoading: false });
   },
 
   signInWithEmail: async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
   },
 
   signUpWithEmail: async (email, password) => {
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) throw error
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
   },
 
   signInWithGoogle: async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/` },
-    })
-    if (error) throw error
+    });
+    if (error) throw error;
   },
 
   signInWithLINE: async () => {
     // LINE OAuth 由後端處理（Supabase 沒有內建 LINE provider）
     // 跳轉到 API 發起 LINE OAuth 流程
-    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/line`
+    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/line`;
   },
 
   claimEvent: async () => {
     try {
-      const res = await api.post('/auth/claim-event')
+      const res = await api.post('/auth/claim-event');
       // Force seating store to reload the user's event
-      const { useSeatingStore } = await import('./seating')
-      useSeatingStore.setState({ eventId: null })
-      return res.data
+      const { useSeatingStore } = await import('./seating');
+      useSeatingStore.setState({ eventId: null });
+      return res.data;
     } catch {
-      return { migrated: false }
+      return { migrated: false };
     }
   },
 
@@ -70,7 +70,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       app_metadata: {},
       aud: 'authenticated',
       created_at: new Date().toISOString(),
-    } as unknown as User
+    } as unknown as User;
 
     const fakeSession = {
       access_token: `dev-bypass-${userId}`,
@@ -78,16 +78,16 @@ export const useAuthStore = create<AuthState>((set) => ({
       expires_in: 86400,
       refresh_token: '',
       user: fakeUser,
-    } as unknown as Session
+    } as unknown as Session;
 
-    set({ user: fakeUser, session: fakeSession, isLoading: false })
+    set({ user: fakeUser, session: fakeSession, isLoading: false });
   },
 
   signOut: async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
     // Clear seating store so stale data doesn't leak into anonymous session
-    const { useSeatingStore } = await import('./seating')
+    const { useSeatingStore } = await import('./seating');
     useSeatingStore.setState({
       eventId: null,
       eventName: '',
@@ -98,7 +98,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       snapshots: [],
       tableLimitReached: false,
       tableLimitDismissed: false,
-    })
-    set({ user: null, session: null })
+    });
+    set({ user: null, session: null });
   },
-}))
+}));

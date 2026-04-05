@@ -1,4 +1,4 @@
-import type { RawGuest } from './column-detector'
+import type { RawGuest } from './column-detector';
 
 export interface MatchCandidate {
   guestIndex: number
@@ -30,39 +30,39 @@ export interface PreferenceMatch {
  *                     未提供時預設為 guests 本身。
  */
 export function matchAllPreferences(guests: RawGuest[], searchPool?: RawGuest[]): PreferenceMatch[] {
-  const results: PreferenceMatch[] = []
-  const pool = searchPool ?? guests
+  const results: PreferenceMatch[] = [];
+  const pool = searchPool ?? guests;
 
   // 建立名字索引：name + aliases → guestIndex（從完整名單建立）
-  const nameIndex: Array<{ text: string; guestIndex: number; isAlias: boolean }> = []
+  const nameIndex: Array<{ text: string; guestIndex: number; isAlias: boolean }> = [];
   pool.forEach((g, i) => {
-    if (g.rsvpStatus === 'declined') return
-    nameIndex.push({ text: g.name, guestIndex: i, isAlias: false })
+    if (g.rsvpStatus === 'declined') return;
+    nameIndex.push({ text: g.name, guestIndex: i, isAlias: false });
     g.aliases.forEach((a) => {
-      nameIndex.push({ text: a, guestIndex: i, isAlias: true })
-    })
-  })
+      nameIndex.push({ text: a, guestIndex: i, isAlias: true });
+    });
+  });
 
   for (let fromIdx = 0; fromIdx < guests.length; fromIdx++) {
-    const guest = guests[fromIdx]
-    if (guest.rsvpStatus === 'declined') continue
+    const guest = guests[fromIdx];
+    if (guest.rsvpStatus === 'declined') continue;
 
     for (let rank = 0; rank < guest.rawPreferences.length; rank++) {
-      const rawText = guest.rawPreferences[rank]
-      if (!rawText) continue
+      const rawText = guest.rawPreferences[rank];
+      if (!rawText) continue;
 
-      const match = findMatch(rawText, guest.name, nameIndex, pool)
+      const match = findMatch(rawText, guest.name, nameIndex, pool);
       results.push({
         fromIndex: fromIdx,
         fromName: guest.name,
         rawText,
         rank: rank + 1,
         ...match,
-      })
+      });
     }
   }
 
-  return results
+  return results;
 }
 
 function findMatch(
@@ -71,46 +71,46 @@ function findMatch(
   nameIndex: Array<{ text: string; guestIndex: number; isAlias: boolean }>,
   pool: RawGuest[],
 ): { status: 'exact' | 'fuzzy' | 'unmatched'; candidates: MatchCandidate[]; selectedIndex: number | null } {
-  const query = rawText.trim().toLowerCase()
-  const fromNameLower = fromName.trim().toLowerCase()
+  const query = rawText.trim().toLowerCase();
+  const fromNameLower = fromName.trim().toLowerCase();
 
   // 1. 完全匹配（排除自己：用名字比對）
   const exactMatches = nameIndex.filter(
     (n) => n.text.toLowerCase() === query && pool[n.guestIndex].name.toLowerCase() !== fromNameLower,
-  )
+  );
   if (exactMatches.length === 1) {
     return {
       status: 'exact',
       candidates: [{ guestIndex: exactMatches[0].guestIndex, name: pool[exactMatches[0].guestIndex].name, score: 1 }],
       selectedIndex: exactMatches[0].guestIndex,
-    }
+    };
   }
 
   // 2. 模糊匹配：子字串包含
-  const fuzzyMatches: MatchCandidate[] = []
-  const seen = new Set<number>()
+  const fuzzyMatches: MatchCandidate[] = [];
+  const seen = new Set<number>();
 
   for (const entry of nameIndex) {
-    if (pool[entry.guestIndex].name.toLowerCase() === fromNameLower) continue
-    if (seen.has(entry.guestIndex)) continue
+    if (pool[entry.guestIndex].name.toLowerCase() === fromNameLower) continue;
+    if (seen.has(entry.guestIndex)) continue;
 
-    const entryLower = entry.text.toLowerCase()
-    let score = 0
+    const entryLower = entry.text.toLowerCase();
+    let score = 0;
 
     if (entryLower.includes(query) || query.includes(entryLower)) {
       // 子字串匹配
-      const longer = Math.max(entryLower.length, query.length)
-      const shorter = Math.min(entryLower.length, query.length)
-      score = shorter / longer // 越接近完全匹配，分數越高
+      const longer = Math.max(entryLower.length, query.length);
+      const shorter = Math.min(entryLower.length, query.length);
+      score = shorter / longer; // 越接近完全匹配，分數越高
     }
 
     if (score > 0) {
-      seen.add(entry.guestIndex)
+      seen.add(entry.guestIndex);
       fuzzyMatches.push({
         guestIndex: entry.guestIndex,
         name: pool[entry.guestIndex].name,
         score,
-      })
+      });
     }
   }
 
@@ -120,29 +120,29 @@ function findMatch(
       guestIndex: m.guestIndex,
       name: pool[m.guestIndex].name,
       score: 1,
-    }))
-    return { status: 'fuzzy', candidates: candidates.slice(0, 5), selectedIndex: null }
+    }));
+    return { status: 'fuzzy', candidates: candidates.slice(0, 5), selectedIndex: null };
   }
 
   if (fuzzyMatches.length > 0) {
-    fuzzyMatches.sort((a, b) => b.score - a.score)
+    fuzzyMatches.sort((a, b) => b.score - a.score);
     return {
       status: 'fuzzy',
       candidates: fuzzyMatches.slice(0, 5),
       selectedIndex: null,
-    }
+    };
   }
 
   // 3. 無匹配
-  return { status: 'unmatched', candidates: [], selectedIndex: null }
+  return { status: 'unmatched', candidates: [], selectedIndex: null };
 }
 
 /**
  * 統計配對結果
  */
 export function summarizeMatches(matches: PreferenceMatch[]) {
-  const exact = matches.filter((m) => m.status === 'exact').length
-  const fuzzy = matches.filter((m) => m.status === 'fuzzy').length
-  const unmatched = matches.filter((m) => m.status === 'unmatched').length
-  return { exact, fuzzy, unmatched, total: matches.length }
+  const exact = matches.filter((m) => m.status === 'exact').length;
+  const fuzzy = matches.filter((m) => m.status === 'fuzzy').length;
+  const unmatched = matches.filter((m) => m.status === 'unmatched').length;
+  return { exact, fuzzy, unmatched, total: matches.length };
 }

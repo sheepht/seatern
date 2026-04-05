@@ -1,16 +1,16 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useSeatingStore } from '@/stores/seating'
-import { useAuthStore } from '@/stores/auth'
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useSeatingStore } from '@/stores/seating';
+import { useAuthStore } from '@/stores/auth';
 
 export default function TableLimitBanner() {
-  const tables = useSeatingStore((s) => s.tables)
-  const user = useAuthStore((s) => s.user)
-  const [dismissed, setDismissed] = useState(false)
-  const navigate = useNavigate()
+  const tables = useSeatingStore((s) => s.tables);
+  const user = useAuthStore((s) => s.user);
+  const [dismissed, setDismissed] = useState(false);
+  const navigate = useNavigate();
 
   // Only show for anonymous users with 8+ tables
-  if (user || dismissed || tables.length < 8) return null
+  if (user || dismissed || tables.length < 8) return null;
 
   return (
     <div className="flex items-center gap-2 px-4 py-2 mx-2 mb-2 rounded-lg text-xs bg-[#F5F0E6] text-[#8C6D3F]">
@@ -31,5 +31,5 @@ export default function TableLimitBanner() {
         </svg>
       </button>
     </div>
-  )
+  );
 }

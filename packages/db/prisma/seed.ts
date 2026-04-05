@@ -1,22 +1,22 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 開始種子資料...\n')
+  console.log('🌱 開始種子資料...\n');
 
   // 清除所有資料（依賴順序）
-  console.log('清除舊資料...')
-  await prisma.seatingSnapshot.deleteMany()
-  await prisma.avoidPair.deleteMany()
-  await prisma.seatPreference.deleteMany()
-  await prisma.edge.deleteMany()
-  await prisma.guest.deleteMany()
-  await prisma.table.deleteMany()
-  await prisma.subcategory.deleteMany()
-  await prisma.event.deleteMany()
-  await prisma.user.deleteMany()
-  console.log('舊資料已清除\n')
+  console.log('清除舊資料...');
+  await prisma.seatingSnapshot.deleteMany();
+  await prisma.avoidPair.deleteMany();
+  await prisma.seatPreference.deleteMany();
+  await prisma.edge.deleteMany();
+  await prisma.guest.deleteMany();
+  await prisma.table.deleteMany();
+  await prisma.subcategory.deleteMany();
+  await prisma.event.deleteMany();
+  await prisma.user.deleteMany();
+  console.log('舊資料已清除\n');
 
   // ─── 建立測試用戶 ──────────────────────────
   const testUser = await prisma.user.create({
@@ -25,8 +25,8 @@ async function main() {
       email: 'test@example.com',
       name: '測試用戶',
     },
-  })
-  console.log(`✅ 建立用戶: ${testUser.name}`)
+  });
+  console.log(`✅ 建立用戶: ${testUser.name}`);
 
   // ─── 建立小型婚禮活動（50人 5桌）──────────
   const event = await prisma.event.create({
@@ -38,8 +38,8 @@ async function main() {
       ownerType: 'user',
       ownerId: testUser.id,
     },
-  })
-  console.log(`✅ 建立活動: ${event.name}`)
+  });
+  console.log(`✅ 建立活動: ${event.name}`);
 
   // ─── 建立子分類 ─────────────────────────────
   const subcatData = [
@@ -49,15 +49,15 @@ async function main() {
     { name: '男方家人', category: '男方' },
     { name: '女方家人', category: '女方' },
     { name: '鄰居', category: '女方' },
-  ]
-  const subcats: Record<string, string> = {}
+  ];
+  const subcats: Record<string, string> = {};
   for (const s of subcatData) {
     const subcat = await prisma.subcategory.create({
       data: { eventId: event.id, name: s.name, category: s.category },
-    })
-    subcats[s.name] = subcat.id
+    });
+    subcats[s.name] = subcat.id;
   }
-  console.log(`✅ 建立 ${subcatData.length} 個子分類`)
+  console.log(`✅ 建立 ${subcatData.length} 個子分類`);
 
   // ─── 建立賓客 ─────────────────────────────
   interface GuestInput {
@@ -123,9 +123,9 @@ async function main() {
     { name: '不來先生', aliases: [], category: '男方', rsvpStatus: 'declined', companionCount: 0, subcategory: '高中同學' },
     { name: '沒空小姐', aliases: ['小空'], category: '女方', rsvpStatus: 'declined', companionCount: 0, subcategory: '公司同事' },
     { name: '出國先生', aliases: [], category: '男方', rsvpStatus: 'declined', companionCount: 0, subcategory: '大學同學' },
-  ]
+  ];
 
-  const guestMap: Record<string, string> = {} // name → id
+  const guestMap: Record<string, string> = {}; // name → id
 
   for (const g of guestInputs) {
     const guest = await prisma.guest.create({
@@ -140,13 +140,13 @@ async function main() {
         specialNote: g.specialNote,
         subcategoryId: g.subcategory ? subcats[g.subcategory] || null : null,
       },
-    })
-    guestMap[g.name] = guest.id
+    });
+    guestMap[g.name] = guest.id;
   }
 
-  const confirmed = guestInputs.filter((g) => g.rsvpStatus === 'confirmed')
-  const totalSeats = confirmed.reduce((sum, g) => sum + g.companionCount + 1, 0)
-  console.log(`✅ 建立 ${guestInputs.length} 位賓客（${confirmed.length} 確認, ${guestInputs.length - confirmed.length} 婉拒, 共 ${totalSeats} 席）`)
+  const confirmed = guestInputs.filter((g) => g.rsvpStatus === 'confirmed');
+  const totalSeats = confirmed.reduce((sum, g) => sum + g.companionCount + 1, 0);
+  console.log(`✅ 建立 ${guestInputs.length} 位賓客（${confirmed.length} 確認, ${guestInputs.length - confirmed.length} 婉拒, 共 ${totalSeats} 席）`);
 
   // ─── 建立桌次（5桌）───────────────────────
   const tableData = [
@@ -155,16 +155,16 @@ async function main() {
     { name: '公司同事桌', capacity: 10, positionX: 600, positionY: 350 },
     { name: '高中同學桌', capacity: 10, positionX: 200, positionY: 550 },
     { name: '混合桌', capacity: 10, positionX: 600, positionY: 550 },
-  ]
+  ];
 
-  const tableMap: Record<string, string> = {}
+  const tableMap: Record<string, string> = {};
   for (const t of tableData) {
     const table = await prisma.table.create({
       data: { eventId: event.id, ...t },
-    })
-    tableMap[t.name] = table.id
+    });
+    tableMap[t.name] = table.id;
   }
-  console.log(`✅ 建立 ${tableData.length} 桌`)
+  console.log(`✅ 建立 ${tableData.length} 桌`);
 
   // ─── 建立「想同桌」偏好 ────────────────────
   const preferences = [
@@ -183,7 +183,7 @@ async function main() {
     { from: '何小敏', to: '蘇小安', rank: 1 },
     { from: '蘇小安', to: '何小敏', rank: 1 },
     { from: '馬小雲', to: '郭台明', rank: 1 },
-  ]
+  ];
 
   for (const p of preferences) {
     if (guestMap[p.from] && guestMap[p.to]) {
@@ -193,16 +193,16 @@ async function main() {
           preferredGuestId: guestMap[p.to],
           rank: p.rank,
         },
-      })
+      });
     }
   }
-  console.log(`✅ 建立 ${preferences.length} 個座位偏好`)
+  console.log(`✅ 建立 ${preferences.length} 個座位偏好`);
 
   // ─── 建立避免同桌 ─────────────────────────
   const avoidPairs = [
     { a: '許志安', b: '鄭秀文', reason: '前任關係' },
     { a: '陳叔叔', b: '林志偉', reason: '家庭糾紛' },
-  ]
+  ];
 
   for (const ap of avoidPairs) {
     if (guestMap[ap.a] && guestMap[ap.b]) {
@@ -213,10 +213,10 @@ async function main() {
           guestBId: guestMap[ap.b],
           reason: ap.reason,
         },
-      })
+      });
     }
   }
-  console.log(`✅ 建立 ${avoidPairs.length} 對避免同桌`)
+  console.log(`✅ 建立 ${avoidPairs.length} 對避免同桌`);
 
   // ─── 分配賓客到桌次 ───────────────────────
   // 模擬新人已排好的座位（有好有壞的安排，用來驗證滿意度計算）
@@ -251,42 +251,42 @@ async function main() {
       '張三', '王大嬸', '陌生人阿強',  // 3 位孤立賓客都在這 → 滿意度低
       '謝霆鋒',
     ],
-  }
+  };
 
   // 修正：避免同桌的人不要排一起（除了故意的測試）
   // 把許志安留在混合桌，鄭秀文移到大學同學桌（她也是大學同學）
   // 已經在上面調整了
 
-  let assignedCount = 0
+  let assignedCount = 0;
   for (const [tableName, guestNames] of Object.entries(assignments)) {
-    const tableId = tableMap[tableName]
-    if (!tableId) continue
+    const tableId = tableMap[tableName];
+    if (!tableId) continue;
 
     for (const name of guestNames) {
-      const guestId = guestMap[name]
+      const guestId = guestMap[name];
       if (!guestId) {
-        console.warn(`  ⚠️ 找不到賓客: ${name}`)
-        continue
+        console.warn(`  ⚠️ 找不到賓客: ${name}`);
+        continue;
       }
       await prisma.guest.update({
         where: { id: guestId },
         data: { assignedTableId: tableId },
-      })
-      assignedCount++
+      });
+      assignedCount++;
     }
   }
-  console.log(`✅ 分配 ${assignedCount} 位賓客到桌次`)
+  console.log(`✅ 分配 ${assignedCount} 位賓客到桌次`);
 
   // ─── 建立同群組 Edge ──────────────────────
   // 同子分類的人自動建立 same_group edge
-  const confirmedGuests = guestInputs.filter((g) => g.rsvpStatus === 'confirmed')
-  let edgeCount = 0
+  const confirmedGuests = guestInputs.filter((g) => g.rsvpStatus === 'confirmed');
+  let edgeCount = 0;
   for (const subcat of subcatData) {
-    const membersOfSubcat = confirmedGuests.filter((g) => g.subcategory === subcat.name)
+    const membersOfSubcat = confirmedGuests.filter((g) => g.subcategory === subcat.name);
     for (let i = 0; i < membersOfSubcat.length; i++) {
       for (let j = i + 1; j < membersOfSubcat.length; j++) {
-        const fromId = guestMap[membersOfSubcat[i].name]
-        const toId = guestMap[membersOfSubcat[j].name]
+        const fromId = guestMap[membersOfSubcat[i].name];
+        const toId = guestMap[membersOfSubcat[j].name];
         if (fromId && toId) {
           await prisma.edge.create({
             data: {
@@ -296,8 +296,8 @@ async function main() {
               weight: 1,
               type: 'same_group',
             },
-          }).catch(() => {}) // 忽略重複
-          edgeCount++
+          }).catch(() => {}); // 忽略重複
+          edgeCount++;
         }
       }
     }
@@ -305,14 +305,14 @@ async function main() {
 
   // 偏好 edge（mutual / one_way）
   for (const p of preferences) {
-    const fromId = guestMap[p.from]
-    const toId = guestMap[p.to]
-    if (!fromId || !toId) continue
+    const fromId = guestMap[p.from];
+    const toId = guestMap[p.to];
+    if (!fromId || !toId) continue;
 
     // 檢查是否雙向
-    const reverse = preferences.find((r) => r.from === p.to && r.to === p.from)
-    const edgeType = reverse ? 'mutual' : 'one_way'
-    const weight = reverse ? 2 : 1
+    const reverse = preferences.find((r) => r.from === p.to && r.to === p.from);
+    const edgeType = reverse ? 'mutual' : 'one_way';
+    const weight = reverse ? 2 : 1;
 
     await prisma.edge.upsert({
       where: { fromGuestId_toGuestId: { fromGuestId: fromId, toGuestId: toId } },
@@ -324,28 +324,28 @@ async function main() {
         weight,
         type: edgeType,
       },
-    })
-    edgeCount++
+    });
+    edgeCount++;
   }
-  console.log(`✅ 建立 ${edgeCount} 條關係邊`)
+  console.log(`✅ 建立 ${edgeCount} 條關係邊`);
 
   // ─── 統計 ─────────────────────────────────
-  console.log('\n📊 Seed 統計：')
-  console.log(`   賓客：${guestInputs.length} 人（確認 ${confirmed.length}、婉拒 ${guestInputs.length - confirmed.length}）`)
-  console.log(`   總席位需求：${totalSeats} 席`)
-  console.log(`   桌次：${tableData.length} 桌（總容量 ${tableData.reduce((s, t) => s + t.capacity, 0)} 席）`)
-  console.log(`   子分類：${subcatData.length} 個`)
-  console.log(`   座位偏好：${preferences.length} 個（含雙向 + 單向）`)
-  console.log(`   避免同桌：${avoidPairs.length} 對`)
-  console.log(`   孤立賓客：3 位（張三、王大嬸、陌生人阿強）`)
-  console.log(`   帶眷屬：5 位（companionCount>=1）`)
-  console.log(`   嬰兒椅需求：2 位`)
-  console.log('\n✅ 種子資料完成！')
+  console.log('\n📊 Seed 統計：');
+  console.log(`   賓客：${guestInputs.length} 人（確認 ${confirmed.length}、婉拒 ${guestInputs.length - confirmed.length}）`);
+  console.log(`   總席位需求：${totalSeats} 席`);
+  console.log(`   桌次：${tableData.length} 桌（總容量 ${tableData.reduce((s, t) => s + t.capacity, 0)} 席）`);
+  console.log(`   子分類：${subcatData.length} 個`);
+  console.log(`   座位偏好：${preferences.length} 個（含雙向 + 單向）`);
+  console.log(`   避免同桌：${avoidPairs.length} 對`);
+  console.log(`   孤立賓客：3 位（張三、王大嬸、陌生人阿強）`);
+  console.log(`   帶眷屬：5 位（companionCount>=1）`);
+  console.log(`   嬰兒椅需求：2 位`);
+  console.log('\n✅ 種子資料完成！');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ 種子資料失敗：', e)
-    process.exit(1)
+    console.error('❌ 種子資料失敗：', e);
+    process.exit(1);
   })
-  .finally(() => prisma.$disconnect())
+  .finally(() => prisma.$disconnect());

@@ -28,19 +28,19 @@ export function buildSlotArray(
   guests: Array<{ id: string; seatIndex: number; seatCount: number }>,
   capacity: number,
 ): Slot[] {
-  const slots: Slot[] = new Array(capacity).fill(null)
+  const slots: Slot[] = new Array(capacity).fill(null);
 
   for (const g of guests) {
-    const immovable = g.seatCount > 1
+    const immovable = g.seatCount > 1;
     for (let i = 0; i < g.seatCount; i++) {
-      const idx = (g.seatIndex + i) % capacity
+      const idx = (g.seatIndex + i) % capacity;
       if (idx < capacity) {
-        slots[idx] = { guestId: g.id, isCompanion: i > 0, immovable }
+        slots[idx] = { guestId: g.id, isCompanion: i > 0, immovable };
       }
     }
   }
 
-  return slots
+  return slots;
 }
 
 /**
@@ -49,19 +49,19 @@ export function buildSlotArray(
  * 遇到不可移動的牆壁 → 回傳 -1（此方向不通）
  */
 function countShiftable(slots: Slot[], targetIndex: number, direction: 1 | -1): number {
-  const len = slots.length
-  let count = 0
-  let idx = (targetIndex + direction + len) % len
+  const len = slots.length;
+  let count = 0;
+  let idx = (targetIndex + direction + len) % len;
 
   while (idx !== targetIndex) {
-    const slot = slots[idx]
-    if (slot === null) return count // 找到空位，可達
-    if (slot.immovable) return -1 // 被牆壁擋住，不通
-    count++
-    idx = (idx + direction + len) % len
+    const slot = slots[idx];
+    if (slot === null) return count; // 找到空位，可達
+    if (slot.immovable) return -1; // 被牆壁擋住，不通
+    count++;
+    idx = (idx + direction + len) % len;
   }
 
-  return -1 // 繞了一圈，無路可走
+  return -1; // 繞了一圈，無路可走
 }
 
 /**
@@ -72,22 +72,22 @@ function computeDirection(
   targetIndex: number,
   cursorBias?: 'left' | 'right',
 ): 'left' | 'right' | null {
-  const slot = slots[targetIndex]
-  if (slot === null) return null // 空位不需位移
-  if (slot.immovable) return null // 不可移動
+  const slot = slots[targetIndex];
+  if (slot === null) return null; // 空位不需位移
+  if (slot.immovable) return null; // 不可移動
 
-  const rightCount = countShiftable(slots, targetIndex, 1)
-  const leftCount = countShiftable(slots, targetIndex, -1)
+  const rightCount = countShiftable(slots, targetIndex, 1);
+  const leftCount = countShiftable(slots, targetIndex, -1);
 
   // 兩邊都不通
-  if (rightCount === -1 && leftCount === -1) return null
+  if (rightCount === -1 && leftCount === -1) return null;
   // 只有一邊通
-  if (rightCount === -1) return 'left'
-  if (leftCount === -1) return 'right'
+  if (rightCount === -1) return 'left';
+  if (leftCount === -1) return 'right';
   // 兩邊都通，選較少的
-  if (rightCount < leftCount) return 'right'
-  if (leftCount < rightCount) return 'left'
-  return cursorBias || 'right'
+  if (rightCount < leftCount) return 'right';
+  if (leftCount < rightCount) return 'left';
+  return cursorBias || 'right';
 }
 
 /**
@@ -98,42 +98,42 @@ function shiftSlot(
   targetIndex: number,
   direction: 'left' | 'right',
 ): Slot[] {
-  const len = slots.length
-  const result = [...slots]
-  const step = direction === 'right' ? 1 : -1
+  const len = slots.length;
+  const result = [...slots];
+  const step = direction === 'right' ? 1 : -1;
 
   // 找到可達的空位（保證路上只有單人賓客）
-  let emptyIdx = (targetIndex + step + len) % len
+  let emptyIdx = (targetIndex + step + len) % len;
   while (result[emptyIdx] !== null) {
-    emptyIdx = (emptyIdx + step + len) % len
+    emptyIdx = (emptyIdx + step + len) % len;
   }
 
   // 從空位往回搬
-  let current = emptyIdx
-  const reverseStep = -step
-  let next = (current + reverseStep + len) % len
+  let current = emptyIdx;
+  const reverseStep = -step;
+  let next = (current + reverseStep + len) % len;
   while (current !== targetIndex) {
-    result[current] = result[next]
-    current = next
-    next = (current + reverseStep + len) % len
+    result[current] = result[next];
+    current = next;
+    next = (current + reverseStep + len) % len;
   }
-  result[targetIndex] = null
+  result[targetIndex] = null;
 
-  return result
+  return result;
 }
 
 /**
  * 從位移後的 slot 陣列，提取每位賓客的新 seatIndex
  */
 export function extractSeatIndices(slots: Slot[]): Map<string, number> {
-  const result = new Map<string, number>()
+  const result = new Map<string, number>();
   for (let i = 0; i < slots.length; i++) {
-    const slot = slots[i]
+    const slot = slots[i];
     if (slot && !slot.isCompanion) {
-      result.set(slot.guestId, i)
+      result.set(slot.guestId, i);
     }
   }
-  return result
+  return result;
 }
 
 /**
@@ -152,28 +152,28 @@ export function placeGuest(
   seatCount: number,
   cursorBias?: 'left' | 'right',
 ): Slot[] | null {
-  const len = slots.length
+  const len = slots.length;
 
   // 檢查空位總數
-  const emptyCount = slots.filter((s) => s === null).length
-  if (emptyCount < seatCount) return null
+  const emptyCount = slots.filter((s) => s === null).length;
+  if (emptyCount < seatCount) return null;
 
   // 檢查目標區域：不可包含不可移動的牆壁
   for (let i = 0; i < seatCount; i++) {
-    const idx = (targetIndex + i) % len
-    const slot = slots[idx]
-    if (slot !== null && slot.immovable) return null
+    const idx = (targetIndex + i) % len;
+    const slot = slots[idx];
+    if (slot !== null && slot.immovable) return null;
   }
 
-  let workingSlots = [...slots]
+  let workingSlots = [...slots];
 
   // 統一決定方向（以第一個需要位移的格子為準）
-  let direction: 'left' | 'right' | null = null
+  let direction: 'left' | 'right' | null = null;
   for (let i = 0; i < seatCount; i++) {
-    const idx = (targetIndex + i) % len
+    const idx = (targetIndex + i) % len;
     if (workingSlots[idx] !== null) {
-      direction = computeDirection(workingSlots, idx, cursorBias)
-      break
+      direction = computeDirection(workingSlots, idx, cursorBias);
+      break;
     }
   }
 
@@ -183,16 +183,16 @@ export function placeGuest(
   if (direction !== null) {
     if (direction === 'right') {
       for (let i = 0; i < seatCount; i++) {
-        const idx = (targetIndex + i) % len
+        const idx = (targetIndex + i) % len;
         if (workingSlots[idx] !== null) {
-          workingSlots = shiftSlot(workingSlots, idx, 'right')
+          workingSlots = shiftSlot(workingSlots, idx, 'right');
         }
       }
     } else {
       for (let i = seatCount - 1; i >= 0; i--) {
-        const idx = (targetIndex + i) % len
+        const idx = (targetIndex + i) % len;
         if (workingSlots[idx] !== null) {
-          workingSlots = shiftSlot(workingSlots, idx, 'left')
+          workingSlots = shiftSlot(workingSlots, idx, 'left');
         }
       }
     }
@@ -200,18 +200,18 @@ export function placeGuest(
 
   // 驗證目標區域已全部清空
   for (let i = 0; i < seatCount; i++) {
-    const idx = (targetIndex + i) % len
-    if (workingSlots[idx] !== null) return null // 無法清空（不應發生）
+    const idx = (targetIndex + i) % len;
+    if (workingSlots[idx] !== null) return null; // 無法清空（不應發生）
   }
 
   // 放入賓客
-  const immovable = seatCount > 1
+  const immovable = seatCount > 1;
   for (let i = 0; i < seatCount; i++) {
-    const idx = (targetIndex + i) % len
-    workingSlots[idx] = { guestId, isCompanion: i > 0, immovable }
+    const idx = (targetIndex + i) % len;
+    workingSlots[idx] = { guestId, isCompanion: i > 0, immovable };
   }
 
-  return workingSlots
+  return workingSlots;
 }
 
 // ── 以下為向後相容的匯出（store 仍使用） ──
@@ -221,7 +221,7 @@ export function computeShiftDirection(
   targetIndex: number,
   cursorBias?: 'left' | 'right',
 ): 'left' | 'right' | null {
-  return computeDirection(slots, targetIndex, cursorBias)
+  return computeDirection(slots, targetIndex, cursorBias);
 }
 
 export function applyShift(
@@ -229,7 +229,7 @@ export function applyShift(
   targetIndex: number,
   direction: 'left' | 'right',
 ): Slot[] {
-  return shiftSlot(slots, targetIndex, direction)
+  return shiftSlot(slots, targetIndex, direction);
 }
 
 export interface ShiftResult {
@@ -242,8 +242,8 @@ export function computeShift(
   targetIndex: number,
   cursorBias?: 'left' | 'right',
 ): ShiftResult | null {
-  if (slots[targetIndex] === null) return null
-  const direction = computeDirection(slots, targetIndex, cursorBias)
-  if (direction === null) return null
-  return { slots: shiftSlot(slots, targetIndex, direction), direction }
+  if (slots[targetIndex] === null) return null;
+  const direction = computeDirection(slots, targetIndex, cursorBias);
+  if (direction === null) return null;
+  return { slots: shiftSlot(slots, targetIndex, direction), direction };
 }

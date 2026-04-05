@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
-import { X, ChevronDown } from 'lucide-react'
-import type { Guest, Table, AvoidPair } from '@/lib/types'
-import type { CategoryColor } from '@/lib/category-colors'
-import { getCategoryColor } from '@/lib/category-colors'
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { X, ChevronDown } from 'lucide-react';
+import type { Guest, Table, AvoidPair } from '@/lib/types';
+import type { CategoryColor } from '@/lib/category-colors';
+import { getCategoryColor } from '@/lib/category-colors';
 
 // ─── Types ────────────────────────────────────────
 
@@ -40,47 +40,47 @@ interface GuestFormModalProps {
 const labelStyle: React.CSSProperties = {
   fontFamily: 'var(--font-ui)', fontSize: 15, color: 'var(--text-secondary)',
   width: 80, flexShrink: 0, paddingTop: 6,
-}
+};
 
 const rowStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'flex-start', gap: 12, padding: '5px 0',
-}
+};
 
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 600,
   color: 'var(--text-muted)', textTransform: 'uppercase' as const,
   letterSpacing: 0.5, padding: '0 0 6px', marginBottom: 4,
   borderBottom: '1px solid var(--border)',
-}
+};
 
 const inputStyle: React.CSSProperties = {
   border: 'none', borderBottom: '1px dashed var(--border)',
   background: 'rgba(0,0,0,0.02)', fontSize: 15, fontFamily: 'var(--font-body)',
   color: 'var(--text-primary)', outline: 'none', padding: '4px 6px',
   width: '100%', borderRadius: 2,
-}
+};
 
 const inputFocusStyle: React.CSSProperties = {
   ...inputStyle,
   borderBottom: '2px solid var(--accent)',
   background: 'var(--accent-light)',
-}
+};
 
 // ─── Small Editable Input ──────────────────────────
 
 function FieldInput({ value, onChange, placeholder, maxLength = 100 }: {
   value: string; onChange: (v: string) => void; placeholder?: string; maxLength?: number
 }) {
-  const [draft, setDraft] = useState(value)
-  const [focused, setFocused] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [draft, setDraft] = useState(value);
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setDraft(value) }, [value])
+  useEffect(() => { setDraft(value); }, [value]);
 
   const commit = () => {
-    setFocused(false)
-    onChange(draft.trim())
-  }
+    setFocused(false);
+    onChange(draft.trim());
+  };
 
   return (
     <input
@@ -89,16 +89,16 @@ function FieldInput({ value, onChange, placeholder, maxLength = 100 }: {
       onChange={(e) => setDraft(e.target.value.slice(0, maxLength))}
       onFocus={() => setFocused(true)}
       onBlur={commit}
-      onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setFocused(false); inputRef.current?.blur() } }}
+      onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setFocused(false); inputRef.current?.blur(); } }}
       placeholder={placeholder}
       style={focused ? inputFocusStyle : inputStyle}
     />
-  )
+  );
 }
 
 // ─── Guest Search Dropdown ─────────────────────────
 
-export const CATEGORY_ORDER = ['男方', '女方', '共同']
+export const CATEGORY_ORDER = ['男方', '女方', '共同'];
 
 // ─── Add Picker Button (+新增 → floating chip picker) ──
 
@@ -106,50 +106,50 @@ export function AddPickerButton({ guests, excludeIds, onSelect, categoryColors, 
   guests: Guest[]; excludeIds: Set<string>; onSelect: (guestId: string) => void
   categoryColors: Record<string, CategoryColor>; placeholder?: string
 }) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
-  const [pos, setPos] = useState({ left: 0, top: 0 })
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [pos, setPos] = useState({ left: 0, top: 0 });
 
-  const confirmed = useMemo(() => guests.filter((g) => g.rsvpStatus === 'confirmed' && !excludeIds.has(g.id)), [guests, excludeIds])
+  const confirmed = useMemo(() => guests.filter((g) => g.rsvpStatus === 'confirmed' && !excludeIds.has(g.id)), [guests, excludeIds]);
 
   const grouped = useMemo(() => {
-    const allCats = Array.from(new Set(confirmed.map((g) => g.category ?? '其他')))
-    const sorted = [...CATEGORY_ORDER.filter((c) => allCats.includes(c)), ...allCats.filter((c) => !CATEGORY_ORDER.includes(c))]
-    const q = search.trim().toLowerCase()
+    const allCats = Array.from(new Set(confirmed.map((g) => g.category ?? '其他')));
+    const sorted = [...CATEGORY_ORDER.filter((c) => allCats.includes(c)), ...allCats.filter((c) => !CATEGORY_ORDER.includes(c))];
+    const q = search.trim().toLowerCase();
     return sorted.map((cat) => {
-      let catGuests = confirmed.filter((g) => (g.category ?? '其他') === cat)
-      if (q) catGuests = catGuests.filter((g) => g.name.toLowerCase().includes(q) || g.aliases.some((a) => a.toLowerCase().includes(q)))
-      const subcatNames = Array.from(new Set(catGuests.map((g) => g.subcategory?.name).filter(Boolean))) as string[]
+      let catGuests = confirmed.filter((g) => (g.category ?? '其他') === cat);
+      if (q) catGuests = catGuests.filter((g) => g.name.toLowerCase().includes(q) || g.aliases.some((a) => a.toLowerCase().includes(q)));
+      const subcatNames = Array.from(new Set(catGuests.map((g) => g.subcategory?.name).filter(Boolean))) as string[];
       const subGroups = [
         ...subcatNames.map((sn) => ({ tagName: sn, guests: catGuests.filter((g) => g.subcategory?.name === sn) })),
         { tagName: null as string | null, guests: catGuests.filter((g) => !g.subcategory) },
-      ].filter((sg) => sg.guests.length > 0)
-      return { category: cat, subGroups }
-    }).filter((g) => g.subGroups.some((sg) => sg.guests.length > 0))
-  }, [confirmed, search])
+      ].filter((sg) => sg.guests.length > 0);
+      return { category: cat, subGroups };
+    }).filter((g) => g.subGroups.some((sg) => sg.guests.length > 0));
+  }, [confirmed, search]);
 
   useEffect(() => {
     if (open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect()
-      setPos({ left: r.left, top: r.bottom + 4 })
-      setTimeout(() => searchRef.current?.focus(), 50)
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ left: r.left, top: r.bottom + 4 });
+      setTimeout(() => searchRef.current?.focus(), 50);
     }
-  }, [open])
+  }, [open]);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     const handler = (e: MouseEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node) &&
           btnRef.current && !btnRef.current.contains(e.target as Node)) {
-        setOpen(false); setSearch('')
+        setOpen(false); setSearch('');
       }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
   return (
     <>
@@ -172,8 +172,8 @@ export function AddPickerButton({ guests, excludeIds, onSelect, categoryColors, 
             onChange={(e) => setSearch(e.target.value)}
             placeholder={placeholder || '搜尋賓客...'}
             className="w-full px-2 py-1 border border-[var(--border)] rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)] outline-none bg-[var(--bg-surface)] text-[var(--text-primary)] box-border mb-1.5"
-            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)' }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
           />
           <div className="max-h-60 overflow-y-auto">
             {grouped.length === 0 ? (
@@ -182,7 +182,7 @@ export function AddPickerButton({ guests, excludeIds, onSelect, categoryColors, 
               </div>
             ) : (
               grouped.map(({ category, subGroups }) => {
-                const catColor = getCategoryColor(category, categoryColors)
+                const catColor = getCategoryColor(category, categoryColors);
                 return (
                   <div key={category} className="mb-2">
                     <div className="flex items-center gap-1 mb-1">
@@ -200,14 +200,14 @@ export function AddPickerButton({ guests, excludeIds, onSelect, categoryColors, 
                           {sgGuests.map((g) => (
                             <button
                               key={g.id}
-                              onClick={() => { onSelect(g.id) }}
+                              onClick={() => { onSelect(g.id); }}
                               className="px-2 py-0.5 text-[13px] font-[family-name:var(--font-body)] rounded-[var(--radius-sm,4px)] cursor-pointer whitespace-nowrap"
                               style={{
                                 border: `1px solid ${catColor.border}`, background: catColor.background,
                                 color: catColor.color,
                               }}
-                              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-light)'; e.currentTarget.style.borderColor = 'var(--accent)' }}
-                              onMouseLeave={(e) => { e.currentTarget.style.background = catColor.background; e.currentTarget.style.borderColor = catColor.border }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-light)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = catColor.background; e.currentTarget.style.borderColor = catColor.border; }}
                             >
                               {g.aliases.length > 0 ? g.aliases[0] : g.name}
                             </button>
@@ -216,7 +216,7 @@ export function AddPickerButton({ guests, excludeIds, onSelect, categoryColors, 
                       </div>
                     ))}
                   </div>
-                )
+                );
               })
             )}
           </div>
@@ -224,7 +224,7 @@ export function AddPickerButton({ guests, excludeIds, onSelect, categoryColors, 
         document.body,
       )}
     </>
-  )
+  );
 }
 
 // ─── Fixed Dropdown (portal) ───────────────────────
@@ -232,26 +232,26 @@ export function AddPickerButton({ guests, excludeIds, onSelect, categoryColors, 
 export function FixedDropdown({ anchorRef, children, onClose, style: extraStyle }: {
   anchorRef: React.RefObject<HTMLElement | null>; children: React.ReactNode; onClose: () => void; style?: React.CSSProperties
 }) {
-  const popRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 })
+  const popRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
 
   useEffect(() => {
     if (anchorRef.current) {
-      const r = anchorRef.current.getBoundingClientRect()
-      setPos({ left: r.left, top: r.bottom + 4 })
+      const r = anchorRef.current.getBoundingClientRect();
+      setPos({ left: r.left, top: r.bottom + 4 });
     }
-  }, [anchorRef])
+  }, [anchorRef]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (popRef.current && !popRef.current.contains(e.target as Node) &&
           anchorRef.current && !anchorRef.current.contains(e.target as Node)) {
-        onClose()
+        onClose();
       }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [onClose, anchorRef])
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose, anchorRef]);
 
   return createPortal(
     <div ref={popRef} className="fixed z-[10000] bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-md,8px)] shadow-[0_8px_24px_rgba(0,0,0,0.12)] p-1 min-w-[120px]" style={{
@@ -260,7 +260,7 @@ export function FixedDropdown({ anchorRef, children, onClose, style: extraStyle 
       {children}
     </div>,
     document.body,
-  )
+  );
 }
 
 // ─── Main Modal ────────────────────────────────────
@@ -271,81 +271,81 @@ export default function GuestFormModal({
 }: GuestFormModalProps) {
 
   // ─── Internal draft state ──────────────────────────
-  const [name, setName] = useState(mode === 'edit' && guest ? guest.name : '')
-  const [alias, setAlias] = useState(mode === 'edit' && guest ? (guest.aliases[0] || '') : '')
-  const [category, setCategory] = useState(mode === 'edit' && guest ? (guest.category || categories[0] || '男方') : (categories[0] || '男方'))
-  const [subcatName, setSubcatName] = useState(mode === 'edit' && guest ? (guest.subcategory?.name || '') : '')
-  const [newSubcat, setNewSubcat] = useState('')
-  const [rsvp, setRsvp] = useState<'confirmed' | 'declined'>(mode === 'edit' && guest ? guest.rsvpStatus : 'confirmed')
-  const [companion, setCompanion] = useState(mode === 'edit' && guest ? guest.companionCount : 0)
-  const [tableId, setTableId] = useState<string | null>(mode === 'edit' && guest ? (guest.assignedTableId || null) : null)
+  const [name, setName] = useState(mode === 'edit' && guest ? guest.name : '');
+  const [alias, setAlias] = useState(mode === 'edit' && guest ? (guest.aliases[0] || '') : '');
+  const [category, setCategory] = useState(mode === 'edit' && guest ? (guest.category || categories[0] || '男方') : (categories[0] || '男方'));
+  const [subcatName, setSubcatName] = useState(mode === 'edit' && guest ? (guest.subcategory?.name || '') : '');
+  const [newSubcat, setNewSubcat] = useState('');
+  const [rsvp, setRsvp] = useState<'confirmed' | 'declined'>(mode === 'edit' && guest ? guest.rsvpStatus : 'confirmed');
+  const [companion, setCompanion] = useState(mode === 'edit' && guest ? guest.companionCount : 0);
+  const [tableId, setTableId] = useState<string | null>(mode === 'edit' && guest ? (guest.assignedTableId || null) : null);
   const [prefIds, setPrefIds] = useState<string[]>(
     mode === 'edit' && guest
       ? guest.seatPreferences.slice().sort((a, b) => a.rank - b.rank).map((p) => p.preferredGuestId)
       : []
-  )
+  );
   const [avoidIds, setAvoidIds] = useState<string[]>(
     mode === 'edit' && guest
       ? avoidPairs
           .filter((ap) => ap.guestAId === guest.id || ap.guestBId === guest.id)
           .map((ap) => ap.guestAId === guest.id ? ap.guestBId : ap.guestAId)
       : []
-  )
-  const [dietary, setDietary] = useState(mode === 'edit' && guest ? (guest.dietaryNote || '') : '')
-  const [special, setSpecial] = useState(mode === 'edit' && guest ? (guest.specialNote || '') : '')
-  const [tableOpen, setTableOpen] = useState(false)
-  const [subcatOpen, setSubcatOpen] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  );
+  const [dietary, setDietary] = useState(mode === 'edit' && guest ? (guest.dietaryNote || '') : '');
+  const [special, setSpecial] = useState(mode === 'edit' && guest ? (guest.specialNote || '') : '');
+  const [tableOpen, setTableOpen] = useState(false);
+  const [subcatOpen, setSubcatOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const tableAnchorRef = useRef<HTMLSpanElement>(null)
-  const subcatAnchorRef = useRef<HTMLSpanElement>(null)
-  const newSubcatInputRef = useRef<HTMLInputElement>(null)
+  const tableAnchorRef = useRef<HTMLSpanElement>(null);
+  const subcatAnchorRef = useRef<HTMLSpanElement>(null);
+  const newSubcatInputRef = useRef<HTMLInputElement>(null);
 
   // Reset subcatName when category changes
-  const prevCatRef = useRef(category)
+  const prevCatRef = useRef(category);
   useEffect(() => {
     if (prevCatRef.current !== category) {
-      setSubcatName('')
-      setNewSubcat('')
-      prevCatRef.current = category
+      setSubcatName('');
+      setNewSubcat('');
+      prevCatRef.current = category;
     }
-  }, [category])
+  }, [category]);
 
   // Focus new subcat input when entering new-subcat mode
   useEffect(() => {
     if (subcatName === '__new__') {
-      setTimeout(() => newSubcatInputRef.current?.focus(), 50)
+      setTimeout(() => newSubcatInputRef.current?.focus(), 50);
     }
-  }, [subcatName])
+  }, [subcatName]);
 
   // ─── Table info ─────────────────────────────────────
-  const seatCount = companion + 1
+  const seatCount = companion + 1;
   const tableInfo = tables.map((t) => {
-    const used = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed').reduce((s, g) => s + g.seatCount, 0)
-    return { ...t, used, remaining: t.capacity - used }
-  })
-  const currentTable = tableId ? tables.find((t) => t.id === tableId) : null
+    const used = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed').reduce((s, g) => s + g.seatCount, 0);
+    return { ...t, used, remaining: t.capacity - used };
+  });
+  const currentTable = tableId ? tables.find((t) => t.id === tableId) : null;
 
   // ─── Exclude sets ───────────────────────────────────
-  const selfId = mode === 'edit' && guest ? guest.id : undefined
+  const selfId = mode === 'edit' && guest ? guest.id : undefined;
   const prefExcludeIds = useMemo(() => {
-    const ids = new Set(prefIds)
-    if (selfId) ids.add(selfId)
-    return ids
-  }, [prefIds, selfId])
+    const ids = new Set(prefIds);
+    if (selfId) ids.add(selfId);
+    return ids;
+  }, [prefIds, selfId]);
   const avoidExcludeIds = useMemo(() => {
-    const ids = new Set(avoidIds)
-    if (selfId) ids.add(selfId)
-    return ids
-  }, [avoidIds, selfId])
+    const ids = new Set(avoidIds);
+    if (selfId) ids.add(selfId);
+    return ids;
+  }, [avoidIds, selfId]);
 
   // ─── Filtered subcategories ─────────────────────────
-  const filteredSubcats = subcategories.filter((sc) => sc.category === category)
+  const filteredSubcats = subcategories.filter((sc) => sc.category === category);
 
   // ─── Submit handler ─────────────────────────────────
   const handleSubmit = async () => {
-    if (!name.trim() || submitting) return
-    setSubmitting(true)
+    if (!name.trim() || submitting) return;
+    setSubmitting(true);
     try {
       await onSubmit({
         name: name.trim(),
@@ -359,11 +359,11 @@ export default function GuestFormModal({
         specialNote: special.trim(),
         preferredGuestIds: prefIds,
         avoidGuestIds: avoidIds,
-      })
+      });
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   // ─── Render ─────────────────────────────────────────
   return createPortal(
@@ -420,8 +420,8 @@ export default function GuestFormModal({
               <span style={labelStyle}>分類</span>
               <div className="flex-1 flex gap-1.5 pt-0.5">
                 {categories.map((cat) => {
-                  const cc = getCategoryColor(cat, categoryColors)
-                  const selected = category === cat
+                  const cc = getCategoryColor(cat, categoryColors);
+                  const selected = category === cat;
                   return (
                     <button
                       key={cat}
@@ -433,7 +433,7 @@ export default function GuestFormModal({
                         color: selected ? cc.color : 'var(--text-secondary)',
                       }}
                     >{cat}</button>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -456,35 +456,35 @@ export default function GuestFormModal({
                 {subcatOpen && (
                   <FixedDropdown anchorRef={subcatAnchorRef} onClose={() => setSubcatOpen(false)} style={{ minWidth: 180, maxHeight: 240, overflow: 'auto' }}>
                     <div
-                      onClick={() => { setSubcatName(''); setNewSubcat(''); setSubcatOpen(false) }}
+                      onClick={() => { setSubcatName(''); setNewSubcat(''); setSubcatOpen(false); }}
                       className="px-2 py-1 rounded-[var(--radius-sm,4px)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--text-muted)]"
                       style={{
                         background: !subcatName ? 'var(--accent-light)' : 'transparent',
                       }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)' }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = !subcatName ? 'var(--accent-light)' : 'transparent' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = !subcatName ? 'var(--accent-light)' : 'transparent'; }}
                     >
                       （未指定）
                     </div>
                     {filteredSubcats.map((sc) => (
                       <div
                         key={sc.id}
-                        onClick={() => { setSubcatName(sc.name); setNewSubcat(''); setSubcatOpen(false) }}
+                        onClick={() => { setSubcatName(sc.name); setNewSubcat(''); setSubcatOpen(false); }}
                         className="px-2 py-1 rounded-[var(--radius-sm,4px)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--text-primary)]"
                         style={{
                           background: subcatName === sc.name ? 'var(--accent-light)' : 'transparent',
                         }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)' }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = subcatName === sc.name ? 'var(--accent-light)' : 'transparent' }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = subcatName === sc.name ? 'var(--accent-light)' : 'transparent'; }}
                       >
                         {sc.name}
                       </div>
                     ))}
                     <div
-                      onClick={() => { setSubcatName('__new__'); setSubcatOpen(false) }}
+                      onClick={() => { setSubcatName('__new__'); setSubcatOpen(false); }}
                       className="px-2 py-1 rounded-[var(--radius-sm,4px)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--accent)] border-t border-[var(--border)] mt-1 pt-1.5"
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)' }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
                     >
                       ＋ 新增子分類
                     </div>
@@ -498,19 +498,19 @@ export default function GuestFormModal({
                       onChange={(e) => setNewSubcat(e.target.value.slice(0, 50))}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && newSubcat.trim()) {
-                          setSubcatName(newSubcat.trim())
+                          setSubcatName(newSubcat.trim());
                         }
                         if (e.key === 'Escape') {
-                          setSubcatName('')
-                          setNewSubcat('')
+                          setSubcatName('');
+                          setNewSubcat('');
                         }
                       }}
                       onBlur={() => {
                         if (newSubcat.trim()) {
-                          setSubcatName(newSubcat.trim())
+                          setSubcatName(newSubcat.trim());
                         } else {
-                          setSubcatName('')
-                          setNewSubcat('')
+                          setSubcatName('');
+                          setNewSubcat('');
                         }
                       }}
                       placeholder="輸入子分類名稱..."
@@ -580,23 +580,23 @@ export default function GuestFormModal({
                 {tableOpen && (
                   <FixedDropdown anchorRef={tableAnchorRef} onClose={() => setTableOpen(false)} style={{ minWidth: 180, maxHeight: 240, overflow: 'auto' }}>
                     <div
-                      onClick={() => { setTableId(null); setTableOpen(false) }}
+                      onClick={() => { setTableId(null); setTableOpen(false); }}
                       className="px-2 py-1 rounded-[var(--radius-sm,4px)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--text-muted)]"
                       style={{
                         background: !tableId ? 'var(--accent-light)' : 'transparent',
                       }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)' }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = !tableId ? 'var(--accent-light)' : 'transparent' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = !tableId ? 'var(--accent-light)' : 'transparent'; }}
                     >
                       未排座
                     </div>
                     {tableInfo.map((t) => {
-                      const isCurrent = t.id === tableId
-                      const full = isCurrent ? false : t.remaining < seatCount
+                      const isCurrent = t.id === tableId;
+                      const full = isCurrent ? false : t.remaining < seatCount;
                       return (
                         <div
                           key={t.id}
-                          onClick={() => { if (!full || isCurrent) { setTableId(t.id); setTableOpen(false) } }}
+                          onClick={() => { if (!full || isCurrent) { setTableId(t.id); setTableOpen(false); } }}
                           className="px-2 py-1 rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)] flex justify-between gap-2"
                           style={{
                             cursor: full && !isCurrent ? 'default' : 'pointer',
@@ -604,13 +604,13 @@ export default function GuestFormModal({
                             opacity: full && !isCurrent ? 0.5 : 1,
                             background: isCurrent ? 'var(--accent-light)' : 'transparent',
                           }}
-                          onMouseEnter={(e) => { if (!full || isCurrent) (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)' }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = isCurrent ? 'var(--accent-light)' : 'transparent' }}
+                          onMouseEnter={(e) => { if (!full || isCurrent) (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = isCurrent ? 'var(--accent-light)' : 'transparent'; }}
                         >
                           <span>{t.name}</span>
                           <span className="text-[var(--text-muted)]">({t.used}/{t.capacity})</span>
                         </div>
-                      )
+                      );
                     })}
                   </FixedDropdown>
                 )}
@@ -647,9 +647,9 @@ export default function GuestFormModal({
               <div className="flex-1 pt-1">
                 <div className="flex gap-1 flex-wrap items-center">
                   {prefIds.map((pid) => {
-                    const g = guests.find((x) => x.id === pid)
-                    const display = g ? (g.aliases.length > 0 ? g.aliases[0] : g.name) : '?'
-                    const cc = g ? getCategoryColor(g.category, categoryColors) : null
+                    const g = guests.find((x) => x.id === pid);
+                    const display = g ? (g.aliases.length > 0 ? g.aliases[0] : g.name) : '?';
+                    const cc = g ? getCategoryColor(g.category, categoryColors) : null;
                     return (
                       <span key={pid} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)]" style={{
                         background: cc?.background || 'var(--accent-light)',
@@ -665,7 +665,7 @@ export default function GuestFormModal({
                           <X size={14} />
                         </button>
                       </span>
-                    )
+                    );
                   })}
                   {prefIds.length < 3 && (
                     <AddPickerButton
@@ -686,9 +686,9 @@ export default function GuestFormModal({
               <div className="flex-1 pt-1">
                 <div className="flex gap-1 flex-wrap items-center">
                   {avoidIds.map((aid) => {
-                    const g = guests.find((x) => x.id === aid)
-                    const display = g ? (g.aliases.length > 0 ? g.aliases[0] : g.name) : '?'
-                    const cc = g ? getCategoryColor(g.category, categoryColors) : null
+                    const g = guests.find((x) => x.id === aid);
+                    const display = g ? (g.aliases.length > 0 ? g.aliases[0] : g.name) : '?';
+                    const cc = g ? getCategoryColor(g.category, categoryColors) : null;
                     return (
                       <span key={aid} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)]" style={{
                         background: cc?.background || 'rgba(239,68,68,0.08)',
@@ -704,7 +704,7 @@ export default function GuestFormModal({
                           <X size={14} />
                         </button>
                       </span>
-                    )
+                    );
                   })}
                   <AddPickerButton
                     guests={guests}
@@ -774,5 +774,5 @@ export default function GuestFormModal({
       </div>
     </div>,
     document.body,
-  )
+  );
 }

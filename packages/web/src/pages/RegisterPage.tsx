@@ -1,40 +1,38 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuthStore } from '@/stores/auth'
+import { useState } from 'react';
+import { useAuthStore } from '@/stores/auth';
 
 export default function RegisterPage() {
-  const navigate = useNavigate()
-  const { signUpWithEmail } = useAuthStore()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
+  const { signUpWithEmail } = useAuthStore();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
+    e.preventDefault();
+    setError('');
 
     if (password !== confirmPassword) {
-      setError('密碼不一致')
-      return
+      setError('密碼不一致');
+      return;
     }
     if (password.length < 6) {
-      setError('密碼至少 6 個字元')
-      return
+      setError('密碼至少 6 個字元');
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
     try {
-      await signUpWithEmail(email, password)
-      setSuccess(true)
+      await signUpWithEmail(email, password);
+      setSuccess(true);
     } catch (err: any) {
-      setError(err.message || '註冊失敗')
+      setError(err.message || '註冊失敗');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   if (success) {
     return (
@@ -47,7 +45,7 @@ export default function RegisterPage() {
           </a>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -109,5 +107,5 @@ export default function RegisterPage() {
         </p>
       </div>
     </div>
-  )
+  );
 }

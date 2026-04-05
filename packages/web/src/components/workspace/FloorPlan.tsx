@@ -1,14 +1,14 @@
-import { useCallback, useState, useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from 'react'
-import { createPortal } from 'react-dom'
-import { useSeatingStore, type Guest } from '@/stores/seating'
-import { recalculateAll, getSatisfactionColor } from '@/lib/satisfaction'
-import { computeAvoidancePath, getPathEndDirection } from '@/lib/path-routing'
-import { calculateFitAll, centerOnPoint } from '@/lib/viewport'
-import { TableNode } from './TableNode'
-import { SeatPopover } from './SeatPopover'
-import { SeatDropZone } from './SeatDropZone'
-import { GuestSeatOverlay } from './GuestSeatOverlay'
-import { ZoomControls } from './ZoomControls'
+import { useCallback, useState, useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useSeatingStore, type Guest } from '@/stores/seating';
+import { recalculateAll, getSatisfactionColor } from '@/lib/satisfaction';
+import { computeAvoidancePath, getPathEndDirection } from '@/lib/path-routing';
+import { calculateFitAll, centerOnPoint } from '@/lib/viewport';
+import { TableNode } from './TableNode';
+import { SeatPopover } from './SeatPopover';
+import { SeatDropZone } from './SeatDropZone';
+import { GuestSeatOverlay } from './GuestSeatOverlay';
+import { ZoomControls } from './ZoomControls';
 
 interface Recommendation {
   tableId: string
@@ -25,8 +25,8 @@ interface Recommendation {
   newGuestScores: Map<string, number>
 }
 
-const CANVAS_WIDTH = 1200
-const CANVAS_HEIGHT = 800
+const CANVAS_WIDTH = 1200;
+const CANVAS_HEIGHT = 800;
 
 interface ScreenSeat {
   tableId: string
@@ -44,145 +44,144 @@ export interface FloorPlanHandle {
 }
 
 export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, ref) {
-  const tables = useSeatingStore((s) => s.tables)
-  const guests = useSeatingStore((s) => s.guests)
-  const avoidPairs = useSeatingStore((s) => s.avoidPairs)
-  const hoveredGuestId = useSeatingStore((s) => s.hoveredGuestId)
-  const hoveredGuestScreenY = useSeatingStore((s) => s.hoveredGuestScreenY)
-  const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId)
-  const flyingGuestIds = useSeatingStore((s) => s.flyingGuestIds)
-  const isResetting = useSeatingStore((s) => s.isResetting)
-  const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress)
-  const longPressActive = useSeatingStore((s) => s.longPressActive)
-  const bestSwapTableId = useSeatingStore((s) => s.bestSwapTableId)
-  const selectedTableId = useSeatingStore((s) => s.selectedTableId)
-  const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
-  const updateTablePosition = useSeatingStore((s) => s.updateTablePosition)
-  const saveTablePosition = useSeatingStore((s) => s.saveTablePosition)
+  const tables = useSeatingStore((s) => s.tables);
+  const guests = useSeatingStore((s) => s.guests);
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs);
+  const hoveredGuestId = useSeatingStore((s) => s.hoveredGuestId);
+  const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId);
+  const flyingGuestIds = useSeatingStore((s) => s.flyingGuestIds);
+  const isResetting = useSeatingStore((s) => s.isResetting);
+  const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress);
+  const longPressActive = useSeatingStore((s) => s.longPressActive);
+  const bestSwapTableId = useSeatingStore((s) => s.bestSwapTableId);
+  const selectedTableId = useSeatingStore((s) => s.selectedTableId);
+  const setSelectedTable = useSeatingStore((s) => s.setSelectedTable);
+  const updateTablePosition = useSeatingStore((s) => s.updateTablePosition);
+  const saveTablePosition = useSeatingStore((s) => s.saveTablePosition);
 
   // 智慧推薦虛線
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
-  const recCacheRef = useRef<Map<string, Recommendation[]>>(new Map())
-  const recCacheVersionRef = useRef(0)
-  const throttleRef = useRef(false)
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const recCacheRef = useRef<Map<string, Recommendation[]>>(new Map());
+  const recCacheVersionRef = useRef(0);
+  const throttleRef = useRef(false);
 
   // guests/tables 變動時清快取（例如移動了賓客）
-  const dataVersion = guests.length + tables.length + guests.reduce((s, g) => s + (g.assignedTableId?.length ?? 0) + g.satisfactionScore, 0)
+  const dataVersion = guests.length + tables.length + guests.reduce((s, g) => s + (g.assignedTableId?.length ?? 0) + g.satisfactionScore, 0);
   useEffect(() => {
-    recCacheRef.current.clear()
-    recCacheVersionRef.current++
-  }, [dataVersion])
+    recCacheRef.current.clear();
+    recCacheVersionRef.current++;
+  }, [dataVersion]);
 
   // 背景掃描：找出所有有更好位置的賓客（顯示💡）
-  const bgScanVersionRef = useRef(0)
+  const bgScanVersionRef = useRef(0);
   useEffect(() => {
-    const version = ++bgScanVersionRef.current
-    const seatedGuests = guests.filter((g) => g.assignedTableId && g.rsvpStatus === 'confirmed')
+    const version = ++bgScanVersionRef.current;
+    const seatedGuests = guests.filter((g) => g.assignedTableId && g.rsvpStatus === 'confirmed');
     if (seatedGuests.length === 0 || tables.length === 0) {
-      useSeatingStore.setState({ guestsWithRecommendations: new Set() })
-      return
+      useSeatingStore.setState({ guestsWithRecommendations: new Set() });
+      return;
     }
 
     // 用 setTimeout 分批計算，避免阻塞 UI
-    const result = new Set<string>()
-    let idx = 0
-    const batchSize = 3
+    const result = new Set<string>();
+    let idx = 0;
+    const batchSize = 3;
 
     const processBatch = () => {
-      if (bgScanVersionRef.current !== version) return // 資料已變，中止
-      const end = Math.min(idx + batchSize, seatedGuests.length)
+      if (bgScanVersionRef.current !== version) return; // 資料已變，中止
+      const end = Math.min(idx + batchSize, seatedGuests.length);
 
       for (; idx < end; idx++) {
-        const guest = seatedGuests[idx]
+        const guest = seatedGuests[idx];
         // 快取有結果就直接用
-        const cached = recCacheRef.current.get(guest.id)
+        const cached = recCacheRef.current.get(guest.id);
         if (cached) {
-          if (cached.length > 0) result.add(guest.id)
-          continue
+          if (cached.length > 0) result.add(guest.id);
+          continue;
         }
 
         // 簡化計算：只檢查是否存在任何雙贏桌（找到一個就停）
-        let found = false
-        const currentResult = recalculateAll(guests, tables, avoidPairs)
-        const currentOverall = currentResult.overallAverage
+        let found = false;
+        const currentResult = recalculateAll(guests, tables, avoidPairs);
+        const currentOverall = currentResult.overallAverage;
 
         for (const t of tables) {
-          if (t.id === guest.assignedTableId) continue
-          const tableGuests = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')
-          const seatCount = tableGuests.reduce((s, g) => s + g.seatCount, 0)
-          if (seatCount + guest.seatCount > t.capacity) continue
+          if (t.id === guest.assignedTableId) continue;
+          const tableGuests = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed');
+          const seatCount = tableGuests.reduce((s, g) => s + g.seatCount, 0);
+          if (seatCount + guest.seatCount > t.capacity) continue;
 
-          const simGuests = guests.map((g) => g.id === guest.id ? { ...g, assignedTableId: t.id } : g)
-          const simResult = recalculateAll(simGuests, tables, avoidPairs)
-          const newGuestScore = simResult.guests.find((g) => g.id === guest.id)?.satisfactionScore ?? 0
-          const guestDelta = newGuestScore - guest.satisfactionScore
-          const rawTableDelta = (simResult.tables.find((ts) => ts.id === t.id)?.averageSatisfaction ?? 0) - t.averageSatisfaction
-          const rawOverallDelta = simResult.overallAverage - currentOverall
+          const simGuests = guests.map((g) => g.id === guest.id ? { ...g, assignedTableId: t.id } : g);
+          const simResult = recalculateAll(simGuests, tables, avoidPairs);
+          const newGuestScore = simResult.guests.find((g) => g.id === guest.id)?.satisfactionScore ?? 0;
+          const guestDelta = newGuestScore - guest.satisfactionScore;
+          const rawTableDelta = (simResult.tables.find((ts) => ts.id === t.id)?.averageSatisfaction ?? 0) - t.averageSatisfaction;
+          const rawOverallDelta = simResult.overallAverage - currentOverall;
 
           if (guestDelta > 0.1 && (rawTableDelta > 0.1 || rawOverallDelta > 0.1)) {
-            found = true
-            break
+            found = true;
+            break;
           }
         }
-        if (found) result.add(guest.id)
+        if (found) result.add(guest.id);
       }
 
       if (idx < seatedGuests.length) {
-        setTimeout(processBatch, 0) // 下一批
+        setTimeout(processBatch, 0); // 下一批
       } else {
         if (bgScanVersionRef.current === version) {
-          useSeatingStore.setState({ guestsWithRecommendations: result })
+          useSeatingStore.setState({ guestsWithRecommendations: result });
         }
       }
-    }
+    };
 
     // 延遲 500ms 後開始背景掃描（等 UI 穩定）
-    const timer = setTimeout(processBatch, 500)
-    return () => clearTimeout(timer)
-  }, [dataVersion, guests, tables])
+    const timer = setTimeout(processBatch, 500);
+    return () => clearTimeout(timer);
+  }, [dataVersion, guests, tables]);
 
   // 桌次拖曳狀態
-  const [draggingTableId, setDraggingTableId] = useState<string | null>(null)
-  const [seatPopover, setSeatPopover] = useState<{ tableId: string; seatIndex: number; x: number; y: number; tableCenterX: number; tableCenterY: number } | null>(null)
-  const dragOffsetRef = useRef({ x: 0, y: 0 })
-  const dragStartPosRef = useRef({ x: 0, y: 0 })
-  const didDragRef = useRef(false)
-  const [dragOverlap, setDragOverlap] = useState(false)
-  const svgRef = useRef<SVGSVGElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [draggingTableId, setDraggingTableId] = useState<string | null>(null);
+  const [seatPopover, setSeatPopover] = useState<{ tableId: string; seatIndex: number; x: number; y: number; tableCenterX: number; tableCenterY: number } | null>(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const dragStartPosRef = useRef({ x: 0, y: 0 });
+  const didDragRef = useRef(false);
+  const [dragOverlap, setDragOverlap] = useState(false);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // ─── Zoom / Pan 狀態 ──────────────────────────────────
-  const [zoom, setZoom] = useState(1)
-  const [panX, setPanX] = useState(0)
-  const [panY, setPanY] = useState(0)
-  const [containerSize, setContainerSize] = useState({ w: CANVAS_WIDTH, h: CANVAS_HEIGHT })
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [containerSize, setContainerSize] = useState({ w: CANVAS_WIDTH, h: CANVAS_HEIGHT });
 
   // Ref mirrors：讓 wheel handler 能在 useCallback([]) 中讀取最新值
-  const zoomRef = useRef(zoom)
-  const panXRef = useRef(panX)
-  const panYRef = useRef(panY)
-  zoomRef.current = zoom
-  panXRef.current = panX
-  panYRef.current = panY
+  const zoomRef = useRef(zoom);
+  const panXRef = useRef(panX);
+  const panYRef = useRef(panY);
+  zoomRef.current = zoom;
+  panXRef.current = panX;
+  panYRef.current = panY;
 
   // ─── 智慧推薦計算（需要 zoom 定義後）──────────────────
   useEffect(() => {
     const syncRecToStore = (recs: Recommendation[], guestId: string) => {
-      const scores = new Map<string, number>()
-      for (const rec of recs) scores.set(rec.tableId, rec.newTableAvg)
-      const bestGuest = recs.length > 0 ? { guestId, score: recs[0].newGuestScore } : null
-      const bestOverall = recs.length > 0 ? recs[0].newOverallAvg : null
-      const bestPreviewScores = recs.length > 0 ? recs[0].newGuestScores : new Map<string, number>()
+      const scores = new Map<string, number>();
+      for (const rec of recs) scores.set(rec.tableId, rec.newTableAvg);
+      const bestGuest = recs.length > 0 ? { guestId, score: recs[0].newGuestScore } : null;
+      const bestOverall = recs.length > 0 ? recs[0].newOverallAvg : null;
+      const bestPreviewScores = recs.length > 0 ? recs[0].newGuestScores : new Map<string, number>();
 
       // 長按換位：選最佳目標桌（分數最高 → 整體提升最多 → 第一條）
-      let bestSwapTableId: string | null = null
+      let bestSwapTableId: string | null = null;
       if (recs.length > 0) {
         const sorted = [...recs].sort((a, b) => {
-          if (b.guestDelta !== a.guestDelta) return b.guestDelta - a.guestDelta
-          if (b.overallDelta !== a.overallDelta) return b.overallDelta - a.overallDelta
-          return 0
-        })
-        bestSwapTableId = sorted[0].tableId
+          if (b.guestDelta !== a.guestDelta) return b.guestDelta - a.guestDelta;
+          if (b.overallDelta !== a.overallDelta) return b.overallDelta - a.overallDelta;
+          return 0;
+        });
+        bestSwapTableId = sorted[0].tableId;
       }
 
       useSeatingStore.setState({
@@ -191,84 +190,84 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         recommendationOverallScore: bestOverall,
         recommendationPreviewScores: bestPreviewScores,
         bestSwapTableId,
-      })
-    }
+      });
+    };
 
     if (activeDragGuestId) {
-      setRecommendations([])
-      syncRecToStore([], '')
-      return
+      setRecommendations([]);
+      syncRecToStore([], '');
+      return;
     }
 
     // zoom < 0.7 時：已入座賓客的桌上 overlay 消失，清除其 hover 狀態
     // 但待排賓客的側欄 chip 不受 zoom 影響，保留推薦計算
     if (zoom < 0.7 && hoveredGuestId) {
-      const hovered = guests.find((g) => g.id === hoveredGuestId)
+      const hovered = guests.find((g) => g.id === hoveredGuestId);
       if (hovered?.assignedTableId) {
         // 已入座賓客 → 清除推薦
-        setRecommendations([])
-        syncRecToStore([], '')
-        useSeatingStore.getState().setHoveredGuest(null)
-        return
+        setRecommendations([]);
+        syncRecToStore([], '');
+        useSeatingStore.getState().setHoveredGuest(null);
+        return;
       }
       // 待排賓客 → 繼續計算推薦（不 return）
     }
 
     if (!hoveredGuestId) {
-      setRecommendations([])
-      syncRecToStore([], '')
-      throttleRef.current = false
-      return
+      setRecommendations([]);
+      syncRecToStore([], '');
+      throttleRef.current = false;
+      return;
     }
 
     // 有快取 → 直接用
-    const cached = recCacheRef.current.get(hoveredGuestId)
+    const cached = recCacheRef.current.get(hoveredGuestId);
     if (cached) {
-      setRecommendations(cached)
-      syncRecToStore(cached, hoveredGuestId)
-      return
+      setRecommendations(cached);
+      syncRecToStore(cached, hoveredGuestId);
+      return;
     }
 
     // Throttle：第一次立即執行，後續 300ms 內忽略
-    if (throttleRef.current) return
-    throttleRef.current = true
-    setTimeout(() => { throttleRef.current = false }, 300)
+    if (throttleRef.current) return;
+    throttleRef.current = true;
+    setTimeout(() => { throttleRef.current = false; }, 300);
 
     const compute = () => {
-      const guest = guests.find((g) => g.id === hoveredGuestId)
-      if (!guest || guest.rsvpStatus !== 'confirmed') return []
+      const guest = guests.find((g) => g.id === hoveredGuestId);
+      if (!guest || guest.rsvpStatus !== 'confirmed') return [];
 
-      const isUnassigned = !guest.assignedTableId
-      const currentGuestScore = guest.satisfactionScore
-      const currentResult = recalculateAll(guests, tables, avoidPairs)
-      const currentOverall = currentResult.overallAverage
-      const results: Recommendation[] = []
+      const isUnassigned = !guest.assignedTableId;
+      const currentGuestScore = guest.satisfactionScore;
+      const currentResult = recalculateAll(guests, tables, avoidPairs);
+      const currentOverall = currentResult.overallAverage;
+      const results: Recommendation[] = [];
 
       for (const t of tables) {
-        if (t.id === guest.assignedTableId) continue
+        if (t.id === guest.assignedTableId) continue;
 
         const tableGuests = guests.filter(
           (g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed',
-        )
-        const seatCount = tableGuests.reduce((s, g) => s + g.seatCount, 0)
-        if (seatCount + guest.seatCount > t.capacity) continue
+        );
+        const seatCount = tableGuests.reduce((s, g) => s + g.seatCount, 0);
+        if (seatCount + guest.seatCount > t.capacity) continue;
 
         const simGuests = guests.map((g) =>
           g.id === hoveredGuestId ? { ...g, assignedTableId: t.id } : g,
-        )
-        const simResult = recalculateAll(simGuests, tables, avoidPairs)
+        );
+        const simResult = recalculateAll(simGuests, tables, avoidPairs);
 
-        const newGuestScore = simResult.guests.find((g) => g.id === hoveredGuestId)?.satisfactionScore ?? 0
-        const newTableAvg = simResult.tables.find((ts) => ts.id === t.id)?.averageSatisfaction ?? 0
+        const newGuestScore = simResult.guests.find((g) => g.id === hoveredGuestId)?.satisfactionScore ?? 0;
+        const newTableAvg = simResult.tables.find((ts) => ts.id === t.id)?.averageSatisfaction ?? 0;
 
-        const guestDelta = Math.round(newGuestScore - currentGuestScore)
-        const rawTableDelta = newTableAvg - t.averageSatisfaction
-        const rawOverallDelta = simResult.overallAverage - currentOverall
+        const guestDelta = Math.round(newGuestScore - currentGuestScore);
+        const rawTableDelta = newTableAvg - t.averageSatisfaction;
+        const rawOverallDelta = simResult.overallAverage - currentOverall;
 
         if (isUnassigned) {
           if (newGuestScore > 55) {
-            const newGuestScores = new Map<string, number>()
-            for (const gs of simResult.guests) newGuestScores.set(gs.id, gs.satisfactionScore)
+            const newGuestScores = new Map<string, number>();
+            for (const gs of simResult.guests) newGuestScores.set(gs.id, gs.satisfactionScore);
             results.push({
               tableId: t.id,
               guestDelta: Math.round(newGuestScore),
@@ -278,12 +277,12 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
               newGuestScore,
               newOverallAvg: simResult.overallAverage,
               newGuestScores,
-            })
+            });
           }
         } else {
           if (guestDelta > 0 && (rawTableDelta > 0.1 || rawOverallDelta > 0.1)) {
-            const newGuestScores = new Map<string, number>()
-            for (const gs of simResult.guests) newGuestScores.set(gs.id, gs.satisfactionScore)
+            const newGuestScores = new Map<string, number>();
+            for (const gs of simResult.guests) newGuestScores.set(gs.id, gs.satisfactionScore);
             results.push({
               tableId: t.id,
               guestDelta,
@@ -293,94 +292,94 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
               newGuestScore,
               newOverallAvg: simResult.overallAverage,
               newGuestScores,
-            })
+            });
           }
         }
       }
 
-      results.sort((a, b) => (b.guestDelta + b.tableDelta) - (a.guestDelta + a.tableDelta))
-      return results.slice(0, 3)
-    }
+      results.sort((a, b) => (b.guestDelta + b.tableDelta) - (a.guestDelta + a.tableDelta));
+      return results.slice(0, 3);
+    };
 
-    const result = compute()
-    recCacheRef.current.set(hoveredGuestId, result)
-    setRecommendations(result)
-    syncRecToStore(result, hoveredGuestId)
-  }, [hoveredGuestId, activeDragGuestId, guests, tables, zoom])
+    const result = compute();
+    recCacheRef.current.set(hoveredGuestId, result);
+    setRecommendations(result);
+    syncRecToStore(result, hoveredGuestId);
+  }, [hoveredGuestId, activeDragGuestId, guests, tables, zoom]);
 
   // ResizeObserver 追蹤容器大小
   useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
+    const el = containerRef.current;
+    if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect
-      if (width > 0 && height > 0) setContainerSize({ w: width, h: height })
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) setContainerSize({ w: width, h: height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // ViewBox 計算（division-by-zero guard）
-  const cw = containerSize.w || CANVAS_WIDTH
-  const ch = containerSize.h || CANVAS_HEIGHT
-  const viewBoxX = -panX / zoom
-  const viewBoxY = -panY / zoom
-  const viewBoxW = cw / zoom
-  const viewBoxH = ch / zoom
-  const viewBoxStr = `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`
+  const cw = containerSize.w || CANVAS_WIDTH;
+  const ch = containerSize.h || CANVAS_HEIGHT;
+  const viewBoxX = -panX / zoom;
+  const viewBoxY = -panY / zoom;
+  const viewBoxW = cw / zoom;
+  const viewBoxH = ch / zoom;
+  const viewBoxStr = `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`;
 
   // Pan 狀態追蹤
-  const isPanningRef = useRef(false)
-  const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
   // Wheel zoom — 用 native listener 確保 non-passive（trackpad pinch 需要 preventDefault）
-  const wheelRafRef = useRef<number | null>(null)
+  const wheelRafRef = useRef<number | null>(null);
   const handleWheelNative = useCallback((e: WheelEvent) => {
-    e.preventDefault() // 阻止瀏覽器預設縮放（trackpad pinch）和捲動
-    if (wheelRafRef.current) return
+    e.preventDefault(); // 阻止瀏覽器預設縮放（trackpad pinch）和捲動
+    if (wheelRafRef.current) return;
 
-    const clientX = e.clientX
-    const clientY = e.clientY
-    const deltaY = e.deltaY
-    const isPinch = e.ctrlKey // trackpad pinch → ctrlKey=true
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+    const deltaY = e.deltaY;
+    const isPinch = e.ctrlKey; // trackpad pinch → ctrlKey=true
 
     wheelRafRef.current = requestAnimationFrame(() => {
-      wheelRafRef.current = null
-      const svg = svgRef.current
-      if (!svg) return
+      wheelRafRef.current = null;
+      const svg = svgRef.current;
+      if (!svg) return;
 
-      const prevZoom = zoomRef.current
-      const prevPanX = panXRef.current
-      const prevPanY = panYRef.current
+      const prevZoom = zoomRef.current;
+      const prevPanX = panXRef.current;
+      const prevPanY = panYRef.current;
 
-      const delta = isPinch ? -deltaY * 0.01 : -deltaY * 0.001
-      const nextZoom = Math.max(0.25, Math.min(1, prevZoom * (1 + delta)))
-      if (nextZoom === prevZoom) return
+      const delta = isPinch ? -deltaY * 0.01 : -deltaY * 0.001;
+      const nextZoom = Math.max(0.25, Math.min(1, prevZoom * (1 + delta)));
+      if (nextZoom === prevZoom) return;
 
-      const rect = svg.getBoundingClientRect()
-      const cx = clientX - rect.left
-      const cy = clientY - rect.top
-      const scale = nextZoom / prevZoom
-      const nextPanX = Math.round(cx - scale * (cx - prevPanX))
-      const nextPanY = Math.round(cy - scale * (cy - prevPanY))
+      const rect = svg.getBoundingClientRect();
+      const cx = clientX - rect.left;
+      const cy = clientY - rect.top;
+      const scale = nextZoom / prevZoom;
+      const nextPanX = Math.round(cx - scale * (cx - prevPanX));
+      const nextPanY = Math.round(cy - scale * (cy - prevPanY));
 
-      setZoom(nextZoom)
-      setPanX(nextPanX)
-      setPanY(nextPanY)
-    })
-  }, [])
+      setZoom(nextZoom);
+      setPanX(nextPanX);
+      setPanY(nextPanY);
+    });
+  }, []);
 
   // 掛載 native wheel listener（non-passive），確保 trackpad pinch 的 preventDefault 生效
   useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    el.addEventListener('wheel', handleWheelNative, { passive: false })
-    return () => el.removeEventListener('wheel', handleWheelNative)
-  }, [handleWheelNative])
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheelNative);
+  }, [handleWheelNative]);
 
 
   // ─── Viewport 動畫 ──────────────────────────────────
-  const animRef = useRef<number | null>(null)
+  const animRef = useRef<number | null>(null);
 
   const animateViewport = useCallback((
     targetZoom: number,
@@ -388,126 +387,126 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     targetPanY: number,
     duration = 300,
   ) => {
-    if (animRef.current) cancelAnimationFrame(animRef.current)
+    if (animRef.current) cancelAnimationFrame(animRef.current);
     // 從 ref 讀取起始值（避免 stale closure）
-    const startZoom = zoomRef.current, startPanX = panXRef.current, startPanY = panYRef.current
-    const startTime = performance.now()
+    const startZoom = zoomRef.current, startPanX = panXRef.current, startPanY = panYRef.current;
+    const startTime = performance.now();
     const tick = (now: number) => {
-      const t = Math.min((now - startTime) / duration, 1)
-      const ease = 1 - Math.pow(1 - t, 3) // ease-out cubic
-      setZoom(startZoom + (targetZoom - startZoom) * ease)
-      setPanX(Math.round(startPanX + (targetPanX - startPanX) * ease))
-      setPanY(Math.round(startPanY + (targetPanY - startPanY) * ease))
+      const t = Math.min((now - startTime) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      setZoom(startZoom + (targetZoom - startZoom) * ease);
+      setPanX(Math.round(startPanX + (targetPanX - startPanX) * ease));
+      setPanY(Math.round(startPanY + (targetPanY - startPanY) * ease));
       if (t < 1) {
-        animRef.current = requestAnimationFrame(tick)
+        animRef.current = requestAnimationFrame(tick);
       } else {
-        animRef.current = null
+        animRef.current = null;
       }
-    }
-    animRef.current = requestAnimationFrame(tick)
-  }, [])
+    };
+    animRef.current = requestAnimationFrame(tick);
+  }, []);
 
   // cleanup animation on unmount
-  useEffect(() => () => { if (animRef.current) cancelAnimationFrame(animRef.current) }, [])
+  useEffect(() => () => { if (animRef.current) cancelAnimationFrame(animRef.current); }, []);
 
   const fitAll = useCallback((animated = true) => {
-    const { zoom: z, panX: px, panY: py } = calculateFitAll(tables, cw, ch)
+    const { zoom: z, panX: px, panY: py } = calculateFitAll(tables, cw, ch);
     if (animated) {
-      animateViewport(z, px, py, 300)
+      animateViewport(z, px, py, 300);
     } else {
-      setZoom(z)
-      setPanX(px)
-      setPanY(py)
+      setZoom(z);
+      setPanX(px);
+      setPanY(py);
     }
-  }, [tables, cw, ch, animateViewport])
+  }, [tables, cw, ch, animateViewport]);
 
   const panToPoint = useCallback((x: number, y: number) => {
-    const z = zoomRef.current
-    const { panX: px, panY: py } = centerOnPoint(x, y, z, cw, ch)
-    animateViewport(z, px, py, 300)
-  }, [cw, ch, animateViewport])
+    const z = zoomRef.current;
+    const { panX: px, panY: py } = centerOnPoint(x, y, z, cw, ch);
+    animateViewport(z, px, py, 300);
+  }, [cw, ch, animateViewport]);
 
-  useImperativeHandle(ref, () => ({ fitAll, panToPoint }), [fitAll, panToPoint])
+  useImperativeHandle(ref, () => ({ fitAll, panToPoint }), [fitAll, panToPoint]);
 
   // 初始載入時 fit-all（等桌子載完）
-  const initialFitDoneRef = useRef(false)
+  const initialFitDoneRef = useRef(false);
   useEffect(() => {
     if (tables.length > 0 && !initialFitDoneRef.current) {
-      initialFitDoneRef.current = true
-      const { zoom: z, panX: px, panY: py } = calculateFitAll(tables, cw, ch)
-      setZoom(z)
-      setPanX(px)
-      setPanY(py)
+      initialFitDoneRef.current = true;
+      const { zoom: z, panX: px, panY: py } = calculateFitAll(tables, cw, ch);
+      setZoom(z);
+      setPanX(px);
+      setPanY(py);
     }
-  }, [tables.length, cw, ch])
+  }, [tables.length, cw, ch]);
 
   // 螢幕座標的座位位置（給 HTML drop zone + draggable overlay 用）
-  const [screenSeats, setScreenSeats] = useState<ScreenSeat[]>([])
+  const [screenSeats, setScreenSeats] = useState<ScreenSeat[]>([]);
 
   const getSvgPoint = useCallback((clientX: number, clientY: number) => {
-    const svg = svgRef.current
-    if (!svg) return { x: 0, y: 0 }
-    const ctm = svg.getScreenCTM()
-    if (!ctm) return { x: 0, y: 0 }
-    const inverse = ctm.inverse()
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+    const inverse = ctm.inverse();
     return {
       x: inverse.a * clientX + inverse.c * clientY + inverse.e,
       y: inverse.b * clientX + inverse.d * clientY + inverse.f,
-    }
-  }, [])
+    };
+  }, []);
 
   // 把 SVG 座標轉成容器內的螢幕座標（給 HTML overlay 定位）
   const updateScreenPositions = useCallback(() => {
-    const svg = svgRef.current
-    const container = containerRef.current
-    if (!svg || !container) return
+    const svg = svgRef.current;
+    const container = containerRef.current;
+    if (!svg || !container) return;
 
-    const ctm = svg.getScreenCTM()
-    if (!ctm) return
-    const containerRect = container.getBoundingClientRect()
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return;
+    const containerRect = container.getBoundingClientRect();
 
-    const scale = ctm.a // 均勻縮放係數
+    const scale = ctm.a; // 均勻縮放係數
 
-    const allScreenSeats: ScreenSeat[] = []
+    const allScreenSeats: ScreenSeat[] = [];
 
     for (const t of tables) {
-      const tableGuests = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed')
-      const tableRadius = Math.max(58 + Math.min(t.capacity, 12) * 7, 88)
-      const seatRadius = tableRadius - 34
-      const tableCenterX = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - containerRect.left
-      const tableCenterY = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - containerRect.top
-      const totalSlots = t.capacity
+      const tableGuests = guests.filter((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed');
+      const tableRadius = Math.max(58 + Math.min(t.capacity, 12) * 7, 88);
+      const seatRadius = tableRadius - 34;
+      const tableCenterX = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - containerRect.left;
+      const tableCenterY = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - containerRect.top;
+      const totalSlots = t.capacity;
 
       // 建立 slot map（哪個 seatIndex 有誰）
-      const slotMap = new Map<number, Guest>()
+      const slotMap = new Map<number, Guest>();
       for (const g of tableGuests) {
         if (g.seatIndex !== null) {
-          slotMap.set(g.seatIndex, g)
+          slotMap.set(g.seatIndex, g);
         }
       }
 
       // 為每個座位建立螢幕座標
       for (let i = 0; i < totalSlots; i++) {
-        const angle = ((2 * Math.PI) / totalSlots) * i - Math.PI / 2
+        const angle = ((2 * Math.PI) / totalSlots) * i - Math.PI / 2;
         // 檢查是否為眷屬座位
-        let isCompanionSlot = false
-        let companionOwner: Guest | null = null
+        let isCompanionSlot = false;
+        let companionOwner: Guest | null = null;
         for (const g of tableGuests) {
           if (g.seatIndex !== null && g.seatCount > 1) {
             for (let c = 1; c < g.seatCount; c++) {
               if ((g.seatIndex + c) % totalSlots === i) {
-                isCompanionSlot = true
-                companionOwner = g
-                break
+                isCompanionSlot = true;
+                companionOwner = g;
+                break;
               }
             }
           }
-          if (isCompanionSlot) break
+          if (isCompanionSlot) break;
         }
 
         // 眷屬座位也可以當 drop target（shift 會保持群組完整）
         // 但不需要 draggable overlay（拖主人即可）
-        const guest = isCompanionSlot ? companionOwner : (slotMap.get(i) || null)
+        const guest = isCompanionSlot ? companionOwner : (slotMap.get(i) || null);
 
         allScreenSeats.push({
           tableId: t.id,
@@ -517,229 +516,229 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           x: tableCenterX + Math.cos(angle) * seatRadius * scale,
           y: tableCenterY + Math.sin(angle) * seatRadius * scale,
           radius: 20 * scale,
-        })
+        });
       }
     }
 
-    setScreenSeats(allScreenSeats)
-  }, [tables, guests])
+    setScreenSeats(allScreenSeats);
+  }, [tables, guests]);
 
   // 桌次位置、大小、或 zoom/pan 改變時更新 overlay
   // useLayoutEffect 確保在 paint 前更新，避免 overlay 閃爍
   // double-rAF：SVG viewBox 在 state 更新後可能需要兩幀才完全生效
   useLayoutEffect(() => {
-    updateScreenPositions()
-    let raf2 = 0
+    updateScreenPositions();
+    let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
-      updateScreenPositions()
-      raf2 = requestAnimationFrame(() => updateScreenPositions())
-    })
-    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2) }
-  }, [updateScreenPositions, zoom, panX, panY])
+      updateScreenPositions();
+      raf2 = requestAnimationFrame(() => updateScreenPositions());
+    });
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+  }, [updateScreenPositions, zoom, panX, panY]);
 
   useEffect(() => {
-    window.addEventListener('resize', updateScreenPositions)
-    return () => window.removeEventListener('resize', updateScreenPositions)
-  }, [updateScreenPositions])
+    window.addEventListener('resize', updateScreenPositions);
+    return () => window.removeEventListener('resize', updateScreenPositions);
+  }, [updateScreenPositions]);
 
   // 拖曳開始時強制重算 screenSeats（頁面切換後 CTM 可能過期）
   useLayoutEffect(() => {
-    if (activeDragGuestId) updateScreenPositions()
-  }, [activeDragGuestId, updateScreenPositions])
+    if (activeDragGuestId) updateScreenPositions();
+  }, [activeDragGuestId, updateScreenPositions]);
 
   // 開始 pan（共用邏輯）
   const startPan = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    isPanningRef.current = true
-    setIsPanning(true)
-    panStartRef.current = { x: e.clientX, y: e.clientY, panX, panY }
-  }, [panX, panY])
+    e.preventDefault();
+    isPanningRef.current = true;
+    setIsPanning(true);
+    panStartRef.current = { x: e.clientX, y: e.clientY, panX, panY };
+  }, [panX, panY]);
 
   const handleMouseDown = useCallback(
     (tableId: string, e: React.MouseEvent) => {
       // 中鍵 → pan 模式，不拖桌子
       if (e.button === 1) {
-        startPan(e)
-        return
+        startPan(e);
+        return;
       }
-      e.stopPropagation()
+      e.stopPropagation();
 
-      const table = tables.find((t) => t.id === tableId)
-      if (!table) return
+      const table = tables.find((t) => t.id === tableId);
+      if (!table) return;
 
-      const point = getSvgPoint(e.clientX, e.clientY)
-      setDraggingTableId(tableId)
-      dragOffsetRef.current = { x: point.x - table.positionX, y: point.y - table.positionY }
-      dragStartPosRef.current = { x: table.positionX, y: table.positionY }
-      didDragRef.current = false
-      setSelectedTable(tableId)
+      const point = getSvgPoint(e.clientX, e.clientY);
+      setDraggingTableId(tableId);
+      dragOffsetRef.current = { x: point.x - table.positionX, y: point.y - table.positionY };
+      dragStartPosRef.current = { x: table.positionX, y: table.positionY };
+      didDragRef.current = false;
+      setSelectedTable(tableId);
     },
     [tables, getSvgPoint, setSelectedTable, startPan],
-  )
+  );
 
   // SVG 上的 mousedown（畫布背景拖曳 → pan，或中鍵）
   const handleSvgMouseDown = useCallback((e: React.MouseEvent) => {
     // 中鍵 → 永遠 pan
     if (e.button === 1) {
-      startPan(e)
-      return
+      startPan(e);
+      return;
     }
     // 左鍵點擊畫布背景 → 也觸發 pan（不是點在桌子上）
-    const target = e.target as SVGElement
+    const target = e.target as SVGElement;
     if (target === svgRef.current || target.tagName === 'rect' || target.tagName === 'pattern') {
-      startPan(e)
+      startPan(e);
     }
-  }, [startPan])
+  }, [startPan]);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
       // Pan 模式
       if (isPanningRef.current) {
-        const dx = e.clientX - panStartRef.current.x
-        const dy = e.clientY - panStartRef.current.y
-        setPanX(Math.round(panStartRef.current.panX + dx))
-        setPanY(Math.round(panStartRef.current.panY + dy))
-        return
+        const dx = e.clientX - panStartRef.current.x;
+        const dy = e.clientY - panStartRef.current.y;
+        setPanX(Math.round(panStartRef.current.panX + dx));
+        setPanY(Math.round(panStartRef.current.panY + dy));
+        return;
       }
       // 桌子拖曳
-      if (!draggingTableId) return
-      didDragRef.current = true
-      const point = getSvgPoint(e.clientX, e.clientY)
-      const offset = dragOffsetRef.current
+      if (!draggingTableId) return;
+      didDragRef.current = true;
+      const point = getSvgPoint(e.clientX, e.clientY);
+      const offset = dragOffsetRef.current;
       // Grid snap: 拖曳時即時吸附到 50px 格線
-      const rawX = point.x - offset.x
-      const rawY = point.y - offset.y
-      const snappedX = Math.round(rawX / 50) * 50
-      const snappedY = Math.round(rawY / 50) * 50
-      updateTablePosition(draggingTableId, snappedX, snappedY)
-      updateScreenPositions()
+      const rawX = point.x - offset.x;
+      const rawY = point.y - offset.y;
+      const snappedX = Math.round(rawX / 50) * 50;
+      const snappedY = Math.round(rawY / 50) * 50;
+      updateTablePosition(draggingTableId, snappedX, snappedY);
+      updateScreenPositions();
       // 偵測是否跟其他桌重疊
-      const dragTable = tables.find((t) => t.id === draggingTableId)
+      const dragTable = tables.find((t) => t.id === draggingTableId);
       if (dragTable) {
-        const rDrag = Math.max(58 + Math.min(dragTable.capacity, 12) * 7, 88)
+        const rDrag = Math.max(58 + Math.min(dragTable.capacity, 12) * 7, 88);
         const overlaps = tables.some((t) => {
-          if (t.id === draggingTableId) return false
-          const rOther = Math.max(58 + Math.min(t.capacity, 12) * 7, 88)
-          const dx = snappedX - t.positionX
-          const dy = snappedY - t.positionY
-          return Math.sqrt(dx * dx + dy * dy) < rDrag + rOther - 10
-        })
-        setDragOverlap(overlaps)
+          if (t.id === draggingTableId) return false;
+          const rOther = Math.max(58 + Math.min(t.capacity, 12) * 7, 88);
+          const dx = snappedX - t.positionX;
+          const dy = snappedY - t.positionY;
+          return Math.sqrt(dx * dx + dy * dy) < rDrag + rOther - 10;
+        });
+        setDragOverlap(overlaps);
       }
     },
     [draggingTableId, getSvgPoint, updateTablePosition, updateScreenPositions, tables],
-  )
+  );
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     if (isPanningRef.current) {
-      const dx = e.clientX - panStartRef.current.x
-      const dy = e.clientY - panStartRef.current.y
-      const didMove = Math.abs(dx) > 3 || Math.abs(dy) > 3
-      isPanningRef.current = false
-      setIsPanning(false)
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      const didMove = Math.abs(dx) > 3 || Math.abs(dy) > 3;
+      isPanningRef.current = false;
+      setIsPanning(false);
       // 只有真的拖動過才算 pan（防止 click 取消選中被吞掉）
-      wasPanningRef.current = didMove
-      return
+      wasPanningRef.current = didMove;
+      return;
     }
     if (draggingTableId && didDragRef.current) {
       if (dragOverlap) {
         // 重疊 → 回到原位
-        updateTablePosition(draggingTableId, dragStartPosRef.current.x, dragStartPosRef.current.y)
-        updateScreenPositions()
+        updateTablePosition(draggingTableId, dragStartPosRef.current.x, dragStartPosRef.current.y);
+        updateScreenPositions();
       } else {
-        saveTablePosition(draggingTableId, dragStartPosRef.current.x, dragStartPosRef.current.y)
+        saveTablePosition(draggingTableId, dragStartPosRef.current.x, dragStartPosRef.current.y);
       }
     }
-    setDraggingTableId(null)
-    setDragOverlap(false)
-  }, [draggingTableId, dragOverlap, saveTablePosition, updateTablePosition, updateScreenPositions])
+    setDraggingTableId(null);
+    setDragOverlap(false);
+  }, [draggingTableId, dragOverlap, saveTablePosition, updateTablePosition, updateScreenPositions]);
 
-  const wasPanningRef = useRef(false)
+  const wasPanningRef = useRef(false);
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
       // pan 結束後不觸發（真的拖動過才算）
-      if (wasPanningRef.current) { wasPanningRef.current = false; return }
+      if (wasPanningRef.current) { wasPanningRef.current = false; return; }
       // 點在桌子的 <g> 裡面 → 不取消選取（由 TableNode 處理）
-      const target = e.target as SVGElement
-      const isOnTable = target.closest?.('[data-table-id]')
+      const target = e.target as SVGElement;
+      const isOnTable = target.closest?.('[data-table-id]');
       if (!isOnTable) {
-        setSelectedTable(null)
+        setSelectedTable(null);
       }
     },
     [setSelectedTable],
-  )
+  );
 
   // 追蹤滑鼠在容器中的位置（+/- 快捷鍵 zoom 以滑鼠為中心）
-  const mousePosRef = useRef({ x: 0, y: 0 })
+  const mousePosRef = useRef({ x: 0, y: 0 });
   const handleGlobalMouseMove = useCallback((e: React.MouseEvent) => {
-    const container = containerRef.current
-    if (!container) return
-    const rect = container.getBoundingClientRect()
-    mousePosRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
-  }, [])
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    mousePosRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }, []);
 
   // 以滑鼠位置為中心的 animated zoom helper
   const zoomByFactor = useCallback((factor: number) => {
-    const prev = zoomRef.current
-    const next = Math.max(0.25, Math.min(1, prev * factor))
-    if (next === prev) return
-    const scale = next / prev
-    const cx = mousePosRef.current.x
-    const cy = mousePosRef.current.y
-    const targetPanX = Math.round(cx - scale * (cx - panXRef.current))
-    const targetPanY = Math.round(cy - scale * (cy - panYRef.current))
-    animateViewport(next, targetPanX, targetPanY, 150)
-  }, [animateViewport])
+    const prev = zoomRef.current;
+    const next = Math.max(0.25, Math.min(1, prev * factor));
+    if (next === prev) return;
+    const scale = next / prev;
+    const cx = mousePosRef.current.x;
+    const cy = mousePosRef.current.y;
+    const targetPanX = Math.round(cx - scale * (cx - panXRef.current));
+    const targetPanY = Math.round(cy - scale * (cy - panYRef.current));
+    animateViewport(next, targetPanX, targetPanY, 150);
+  }, [animateViewport]);
 
   // ─── 鍵盤快捷鍵（window listener，不依賴 SVG focus）─────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // 輸入框、dialog 內不攔截
-      const tag = (document.activeElement?.tagName || '').toLowerCase()
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return
-      if (document.activeElement?.hasAttribute('contenteditable')) return
-      if (document.activeElement?.closest('[role="dialog"]')) return
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (document.activeElement?.hasAttribute('contenteditable')) return;
+      if (document.activeElement?.closest('[role="dialog"]')) return;
 
       if (e.key === '+' || e.key === '=') {
-        e.preventDefault()
-        zoomByFactor(1.25)
+        e.preventDefault();
+        zoomByFactor(1.25);
       } else if (e.key === '-') {
-        e.preventDefault()
-        zoomByFactor(1 / 1.25)
+        e.preventDefault();
+        zoomByFactor(1 / 1.25);
       } else if (e.key === '0') {
-        e.preventDefault()
-        fitAll(true)
+        e.preventDefault();
+        fitAll(true);
       } else if (e.key === '1') {
-        e.preventDefault()
+        e.preventDefault();
         // 100% zoom，保持當前視圖中心
-        const cx = (-panXRef.current + cw / 2) / zoomRef.current
-        const cy = (-panYRef.current + ch / 2) / zoomRef.current
-        const { panX: px, panY: py } = centerOnPoint(cx, cy, 1, cw, ch)
-        animateViewport(1, px, py, 200)
+        const cx = (-panXRef.current + cw / 2) / zoomRef.current;
+        const cy = (-panYRef.current + ch / 2) / zoomRef.current;
+        const { panX: px, panY: py } = centerOnPoint(cx, cy, 1, cw, ch);
+        animateViewport(1, px, py, 200);
       } else if (e.key === 'ArrowLeft') {
-        e.preventDefault()
-        animateViewport(zoomRef.current, panXRef.current + 100, panYRef.current, 150)
+        e.preventDefault();
+        animateViewport(zoomRef.current, panXRef.current + 100, panYRef.current, 150);
       } else if (e.key === 'ArrowRight') {
-        e.preventDefault()
-        animateViewport(zoomRef.current, panXRef.current - 100, panYRef.current, 150)
+        e.preventDefault();
+        animateViewport(zoomRef.current, panXRef.current - 100, panYRef.current, 150);
       } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        animateViewport(zoomRef.current, panXRef.current, panYRef.current + 100, 150)
+        e.preventDefault();
+        animateViewport(zoomRef.current, panXRef.current, panYRef.current + 100, 150);
       } else if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        animateViewport(zoomRef.current, panXRef.current, panYRef.current - 100, 150)
+        e.preventDefault();
+        animateViewport(zoomRef.current, panXRef.current, panYRef.current - 100, 150);
       }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [zoomByFactor, fitAll, animateViewport])
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [zoomByFactor, fitAll, animateViewport]);
 
   // Pan 游標狀態（用 state 而非 ref，確保 re-render 更新游標）
-  const [isPanning, setIsPanning] = useState(false)
+  const [isPanning, setIsPanning] = useState(false);
 
   const cursorStyle = isPanning ? 'grabbing'
     : draggingTableId ? 'default'
-    : undefined
+    : undefined;
 
   return (
     <div ref={containerRef} className="relative w-full h-full [clip-path:inset(0_0_0_-200px)]" style={{ cursor: cursorStyle }} onMouseMove={handleGlobalMouseMove}>
@@ -772,60 +771,60 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         {/* 推薦虛線時需要 dim 的桌子 */}
         {(() => {
           // 計算哪些桌不需要 dim（來源桌 + 推薦目標桌）
-          const highlightedIds = new Set<string>()
+          const highlightedIds = new Set<string>();
           if (recommendations.length > 0 && hoveredGuestId) {
-            const g = guests.find((gg) => gg.id === hoveredGuestId)
-            if (g?.assignedTableId) highlightedIds.add(g.assignedTableId)
-            for (const rec of recommendations) highlightedIds.add(rec.tableId)
+            const g = guests.find((gg) => gg.id === hoveredGuestId);
+            if (g?.assignedTableId) highlightedIds.add(g.assignedTableId);
+            for (const rec of recommendations) highlightedIds.add(rec.tableId);
           }
           // 待排賓客的推薦不受 zoom 限制，已入座賓客的推薦 zoom >= 0.7 才 dim
-          const hoveredGuest = hoveredGuestId ? guests.find((gg) => gg.id === hoveredGuestId) : null
-          const shouldDim = highlightedIds.size > 0 && (zoom >= 0.7 || (hoveredGuest && !hoveredGuest.assignedTableId))
+          const hoveredGuest = hoveredGuestId ? guests.find((gg) => gg.id === hoveredGuestId) : null;
+          const shouldDim = highlightedIds.size > 0 && (zoom >= 0.7 || Boolean(hoveredGuest && !hoveredGuest.assignedTableId));
 
           // 選中的桌子排到陣列最後，確保 SVG DOM 順序最後 = 圖層最上面
           const orderedTables = [
             ...tables.filter((t) => t.id !== selectedTableId),
             ...tables.filter((t) => t.id === selectedTableId),
-          ]
+          ];
 
           /* 智慧推薦虛線：線+箭頭在桌子下層，badge 在桌子上層 */
           /* zoom < 0.7 時名字已淡出，無法辨識賓客，關閉推薦線 */
-          const recData: Array<{ pathD: string; endX: number; endY: number; ax1: number; ay1: number; ax2: number; ay2: number; midpoint: { x: number; y: number }; badgeColor: string; lineColor: string; opacity: number; delta: number; animIdx: number; tableId: string }> = []
+          const recData: Array<{ pathD: string; endX: number; endY: number; ax1: number; ay1: number; ax2: number; ay2: number; midpoint: { x: number; y: number }; badgeColor: string; lineColor: string; opacity: number; delta: number; animIdx: number; tableId: string }> = [];
           if (recommendations.length > 0 && hoveredGuestId && zoom >= 0.7) {
-            const guest = guests.find((g) => g.id === hoveredGuestId)
+            const guest = guests.find((g) => g.id === hoveredGuestId);
             if (guest && guest.assignedTableId && guest.seatIndex !== null) {
-              const srcTable = tables.find((t) => t.id === guest.assignedTableId)
+              const srcTable = tables.find((t) => t.id === guest.assignedTableId);
               if (srcTable) {
-                const srcRadius = Math.max(58 + Math.min(srcTable.capacity, 12) * 7, 88)
-                const seatRadius = srcRadius - 34
-                const totalSlots = srcTable.capacity
-                const angle = ((2 * Math.PI) / totalSlots) * guest.seatIndex - Math.PI / 2
-                const guestX = srcTable.positionX + Math.cos(angle) * seatRadius
-                const guestY = srcTable.positionY + Math.sin(angle) * seatRadius
+                const srcRadius = Math.max(58 + Math.min(srcTable.capacity, 12) * 7, 88);
+                const seatRadius = srcRadius - 34;
+                const totalSlots = srcTable.capacity;
+                const angle = ((2 * Math.PI) / totalSlots) * guest.seatIndex - Math.PI / 2;
+                const guestX = srcTable.positionX + Math.cos(angle) * seatRadius;
+                const guestY = srcTable.positionY + Math.sin(angle) * seatRadius;
 
-                const seatedDeltas = recommendations.map((r) => r.guestDelta)
-                const seatedMaxDelta = Math.max(...seatedDeltas)
-                const seatedAllSame = new Set(seatedDeltas).size === 1
-                const seatedOnlyOne = recommendations.length === 1
+                const seatedDeltas = recommendations.map((r) => r.guestDelta);
+                const seatedMaxDelta = Math.max(...seatedDeltas);
+                const seatedAllSame = new Set(seatedDeltas).size === 1;
+                const seatedOnlyOne = recommendations.length === 1;
 
                 recommendations.forEach((rec, i) => {
-                  const targetTable = tables.find((t) => t.id === rec.tableId)
-                  if (!targetTable) return
+                  const targetTable = tables.find((t) => t.id === rec.tableId);
+                  if (!targetTable) return;
 
-                  const tx = targetTable.positionX
-                  const ty = targetTable.positionY
-                  const targetRadius = Math.max(58 + Math.min(targetTable.capacity, 12) * 7, 88)
+                  const tx = targetTable.positionX;
+                  const ty = targetTable.positionY;
+                  const targetRadius = Math.max(58 + Math.min(targetTable.capacity, 12) * 7, 88);
 
-                  const dx0 = tx - guestX
-                  const dy0 = ty - guestY
-                  const dist0 = Math.sqrt(dx0 * dx0 + dy0 * dy0) || 1
-                  const ux0 = dx0 / dist0
-                  const uy0 = dy0 / dist0
+                  const dx0 = tx - guestX;
+                  const dy0 = ty - guestY;
+                  const dist0 = Math.sqrt(dx0 * dx0 + dy0 * dy0) || 1;
+                  const ux0 = dx0 / dist0;
+                  const uy0 = dy0 / dist0;
 
-                  const startX = guestX + ux0 * 27
-                  const startY = guestY + uy0 * 27
-                  const endX = tx - ux0 * (targetRadius + 4)
-                  const endY = ty - uy0 * (targetRadius + 4)
+                  const startX = guestX + ux0 * 27;
+                  const startY = guestY + uy0 * 27;
+                  const endX = tx - ux0 * (targetRadius + 4);
+                  const endY = ty - uy0 * (targetRadius + 4);
 
                   const obstacles = tables
                     .filter((t) => t.id !== rec.tableId)
@@ -833,9 +832,9 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                       cx: t.positionX,
                       cy: t.positionY,
                       r: Math.max(58 + Math.min(t.capacity, 12) * 7, 88),
-                    }))
+                    }));
 
-                  const srcObstacle = { cx: srcTable.positionX, cy: srcTable.positionY, r: srcRadius }
+                  const srcObstacle = { cx: srcTable.positionX, cy: srcTable.positionY, r: srcRadius };
 
                   const { d: pathD, midpoint } = computeAvoidancePath(
                     { x: startX, y: startY },
@@ -844,20 +843,20 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                     srcObstacle,
                     Math.max(CANVAS_WIDTH, ...tables.map((t) => t.positionX + 200)),
                     Math.max(CANVAS_HEIGHT, ...tables.map((t) => t.positionY + 200)),
-                  )
+                  );
 
-                  const { ux, uy } = getPathEndDirection(pathD)
-                  const arrowSize = 16
-                  const ax1 = endX - ux * arrowSize - uy * arrowSize * 0.5
-                  const ay1 = endY - uy * arrowSize + ux * arrowSize * 0.5
-                  const ax2 = endX - ux * arrowSize + uy * arrowSize * 0.5
-                  const ay2 = endY - uy * arrowSize - ux * arrowSize * 0.5
+                  const { ux, uy } = getPathEndDirection(pathD);
+                  const arrowSize = 16;
+                  const ax1 = endX - ux * arrowSize - uy * arrowSize * 0.5;
+                  const ay1 = endY - uy * arrowSize + ux * arrowSize * 0.5;
+                  const ax2 = endX - ux * arrowSize + uy * arrowSize * 0.5;
+                  const ay2 = endY - uy * arrowSize - ux * arrowSize * 0.5;
 
-                  const badgeColor = seatedOnlyOne ? '#16A34A' : (seatedAllSame ? '#CA8A04' : (rec.guestDelta === seatedMaxDelta ? '#16A34A' : '#CA8A04'))
-                  const lineColor = badgeColor === '#16A34A' ? '#16A34A' : '#B08D57'
+                  const badgeColor = seatedOnlyOne ? '#16A34A' : (seatedAllSame ? '#CA8A04' : (rec.guestDelta === seatedMaxDelta ? '#16A34A' : '#CA8A04'));
+                  const lineColor = badgeColor === '#16A34A' ? '#16A34A' : '#B08D57';
 
-                  recData.push({ pathD, endX, endY, ax1, ay1, ax2, ay2, midpoint, badgeColor, lineColor, opacity: 0.9 - i * 0.15, delta: rec.guestDelta, animIdx: i, tableId: rec.tableId })
-                })
+                  recData.push({ pathD, endX, endY, ax1, ay1, ax2, ay2, midpoint, badgeColor, lineColor, opacity: 0.9 - i * 0.15, delta: rec.guestDelta, animIdx: i, tableId: rec.tableId });
+                });
               }
             }
           }
@@ -865,8 +864,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           const recLines = recData.length > 0 ? (
             <g className="pointer-events-none">
               {recData.map((r) => {
-                const isSwapTarget = longPressActive && r.tableId === bestSwapTableId
-                const strokeW = isSwapTarget ? 5 : 2.5
+                const isSwapTarget = longPressActive && r.tableId === bestSwapTableId;
+                const strokeW = isSwapTarget ? 5 : 2.5;
                 return (
                   <g key={`rec-line-${r.animIdx}`} opacity={isSwapTarget ? 1 : r.opacity}>
                     <style>{`
@@ -878,10 +877,10 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                     <path d={r.pathD} fill="none" stroke={r.lineColor} strokeWidth={strokeW} strokeDasharray="10 6" style={{ animation: `rec-flow-${r.animIdx} 0.6s linear infinite`, transition: 'stroke-width 200ms' }} />
                     <polygon points={`${r.endX},${r.endY} ${r.ax1},${r.ay1} ${r.ax2},${r.ay2}`} fill={r.lineColor} />
                   </g>
-                )
+                );
               })}
             </g>
-          ) : null
+          ) : null;
 
           const recBadges = recData.length > 0 ? (
             <g className="pointer-events-none">
@@ -894,7 +893,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                 </g>
               ))}
             </g>
-          ) : null
+          ) : null;
 
           return (
             <>
@@ -910,13 +909,17 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                   zoom={zoom}
                   onMouseDown={(e) => handleMouseDown(table.id, e)}
                   onEmptySeatClick={(tableId, seatIndex, e) => {
-                    setSeatPopover({ tableId, seatIndex, x: e.clientX, y: e.clientY })
+                    const svg = svgRef.current;
+                    const ctm = svg?.getScreenCTM();
+                    const tableCenterX = ctm ? ctm.a * table.positionX + ctm.c * table.positionY + ctm.e : e.clientX;
+                    const tableCenterY = ctm ? ctm.b * table.positionX + ctm.d * table.positionY + ctm.f : e.clientY;
+                    setSeatPopover({ tableId, seatIndex, x: e.clientX, y: e.clientY, tableCenterX, tableCenterY });
                   }}
                 />
               ))}
               {recBadges}
             </>
-          )
+          );
         })()}
 
         {tables.length === 0 && (
@@ -928,24 +931,24 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
       {/* 待排賓客的推薦虛線 — 用 HTML overlay 渲染，讓線從側欄賓客 chip 出發 */}
       {recommendations.length > 0 && hoveredGuestId && (() => {
-        const guest = guests.find((g) => g.id === hoveredGuestId)
-        if (!guest || guest.assignedTableId) return null // 只處理待排賓客
+        const guest = guests.find((g) => g.id === hoveredGuestId);
+        if (!guest || guest.assignedTableId) return null; // 只處理待排賓客
 
-        const svgEl = svgRef.current
-        const chipEl = document.querySelector(`[data-guest-id="${guest.id}"]`)
-        if (!svgEl || !chipEl) return null
-        const chipRect = chipEl.getBoundingClientRect()
-        const ctm = svgEl.getScreenCTM()
-        if (!ctm) return null
+        const svgEl = svgRef.current;
+        const chipEl = document.querySelector(`[data-guest-id="${guest.id}"]`);
+        if (!svgEl || !chipEl) return null;
+        const chipRect = chipEl.getBoundingClientRect();
+        const ctm = svgEl.getScreenCTM();
+        if (!ctm) return null;
 
         // 起點：賓客 chip 的右邊緣
-        const startScreenX = chipRect.right + 4
-        const startScreenY = chipRect.top + chipRect.height / 2
+        const startScreenX = chipRect.right + 4;
+        const startScreenY = chipRect.top + chipRect.height / 2;
 
         // 待排賓客的 guestDelta 是絕對分數（newGuestScore），直接當 +N 顯示
-        const deltas = recommendations.map((r) => r.guestDelta)
-        const maxDelta = Math.max(...deltas)
-        const allSame = new Set(deltas).size === 1
+        const deltas = recommendations.map((r) => r.guestDelta);
+        const maxDelta = Math.max(...deltas);
+        const allSame = new Set(deltas).size === 1;
 
         return createPortal(
           <svg
@@ -958,53 +961,53 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
               }
             `}</style>
             {recommendations.map((rec, i) => {
-              const targetTable = tables.find((t) => t.id === rec.tableId)
-              if (!targetTable) return null
+              const targetTable = tables.find((t) => t.id === rec.tableId);
+              if (!targetTable) return null;
 
-              const targetRadius = Math.max(58 + Math.min(targetTable.capacity, 12) * 7, 88)
+              const targetRadius = Math.max(58 + Math.min(targetTable.capacity, 12) * 7, 88);
 
               // 目標桌邊緣的螢幕座標
-              const pt = svgEl.createSVGPoint()
-              pt.x = targetTable.positionX
-              pt.y = targetTable.positionY
-              const tableScreen = pt.matrixTransform(ctm)
+              const pt = svgEl.createSVGPoint();
+              pt.x = targetTable.positionX;
+              pt.y = targetTable.positionY;
+              const tableScreen = pt.matrixTransform(ctm);
 
               // 從起點到桌心的方向
-              const dx = tableScreen.x - startScreenX
-              const dy = tableScreen.y - startScreenY
-              const dist = Math.sqrt(dx * dx + dy * dy) || 1
-              const ux = dx / dist
-              const uy = dy / dist
+              const dx = tableScreen.x - startScreenX;
+              const dy = tableScreen.y - startScreenY;
+              const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+              const ux = dx / dist;
+              const uy = dy / dist;
 
               // 終點在桌邊緣
-              const screenRadius = targetRadius * (ctm.a) // SVG scale → screen scale
-              const endScreenX = tableScreen.x - ux * (screenRadius + 4)
-              const endScreenY = tableScreen.y - uy * (screenRadius + 4)
+              const screenRadius = targetRadius * (ctm.a); // SVG scale → screen scale
+              const endScreenX = tableScreen.x - ux * (screenRadius + 4);
+              const endScreenY = tableScreen.y - uy * (screenRadius + 4);
 
               // 簡單的二次貝茲曲線（垂直偏移 12%）
-              const mx = (startScreenX + endScreenX) / 2
-              const my = (startScreenY + endScreenY) / 2
-              const offset = dist * 0.12
-              const cx = mx - uy * offset
-              const cy = my + ux * offset
+              const mx = (startScreenX + endScreenX) / 2;
+              const my = (startScreenY + endScreenY) / 2;
+              const offset = dist * 0.12;
+              const cx = mx - uy * offset;
+              const cy = my + ux * offset;
 
-              const pathD = `M${startScreenX},${startScreenY} Q${cx},${cy} ${endScreenX},${endScreenY}`
+              const pathD = `M${startScreenX},${startScreenY} Q${cx},${cy} ${endScreenX},${endScreenY}`;
 
               // 箭頭
-              const arrowSize = 12
-              const ax1 = endScreenX - ux * arrowSize - uy * arrowSize * 0.5
-              const ay1 = endScreenY - uy * arrowSize + ux * arrowSize * 0.5
-              const ax2 = endScreenX - ux * arrowSize + uy * arrowSize * 0.5
-              const ay2 = endScreenY - uy * arrowSize - ux * arrowSize * 0.5
+              const arrowSize = 12;
+              const ax1 = endScreenX - ux * arrowSize - uy * arrowSize * 0.5;
+              const ay1 = endScreenY - uy * arrowSize + ux * arrowSize * 0.5;
+              const ax2 = endScreenX - ux * arrowSize + uy * arrowSize * 0.5;
+              const ay2 = endScreenY - uy * arrowSize - ux * arrowSize * 0.5;
 
-              const delta = rec.guestDelta
+              const delta = rec.guestDelta;
               // 只有1條 → 綠色；多條且分數都一樣 → 都黃色；多條不同分 → 最高綠色其餘黃色
-              const onlyOne = recommendations.length === 1
-              const badgeColor = onlyOne ? '#16A34A' : (allSame ? '#CA8A04' : (delta === maxDelta ? '#16A34A' : '#CA8A04'))
-              const lineColor = badgeColor === '#16A34A' ? '#16A34A' : '#B08D57'
+              const onlyOne = recommendations.length === 1;
+              const badgeColor = onlyOne ? '#16A34A' : (allSame ? '#CA8A04' : (delta === maxDelta ? '#16A34A' : '#CA8A04'));
+              const lineColor = badgeColor === '#16A34A' ? '#16A34A' : '#B08D57';
 
-              const isSwapTarget = longPressActive && rec.tableId === bestSwapTableId
-              const strokeW = isSwapTarget ? 5 : 2.5
+              const isSwapTarget = longPressActive && rec.tableId === bestSwapTableId;
+              const strokeW = isSwapTarget ? 5 : 2.5;
 
               return (
                 <g key={`rec-overlay-${i}`} opacity={isSwapTarget ? 1 : 0.9 - i * 0.15}>
@@ -1022,10 +1025,10 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                   />
                   {(() => {
                     // badge 位置：貝茲曲線上靠近出發點（待排區賓客）~50px 處
-                    const chordLen = Math.sqrt((endScreenX - startScreenX) ** 2 + (endScreenY - startScreenY) ** 2) || 1
-                    const bt = Math.min(0.4, 200 / chordLen)
-                    const badgeX = (1-bt)*(1-bt)*startScreenX + 2*(1-bt)*bt*cx + bt*bt*endScreenX
-                    const badgeY = (1-bt)*(1-bt)*startScreenY + 2*(1-bt)*bt*cy + bt*bt*endScreenY
+                    const chordLen = Math.sqrt((endScreenX - startScreenX) ** 2 + (endScreenY - startScreenY) ** 2) || 1;
+                    const bt = Math.min(0.4, 200 / chordLen);
+                    const badgeX = (1-bt)*(1-bt)*startScreenX + 2*(1-bt)*bt*cx + bt*bt*endScreenX;
+                    const badgeY = (1-bt)*(1-bt)*startScreenY + 2*(1-bt)*bt*cy + bt*bt*endScreenY;
                     return (
                       <g transform={`translate(${badgeX}, ${badgeY})`}>
                         <rect x={-20} y={-12} width={40} height={24} rx={12} fill={badgeColor} />
@@ -1033,75 +1036,75 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                           +{delta}
                         </text>
                       </g>
-                    )
+                    );
                   })()}
                 </g>
-              )
+              );
             })}
           </svg>,
           document.body,
-        )
+        );
       })()}
 
       {/* 畫布外的推薦目的桌指示器 */}
       {recommendations.length > 0 && hoveredGuestId && (() => {
-        const svg = svgRef.current
-        const container = containerRef.current
-        if (!svg || !container) return null
-        const ctm = svg.getScreenCTM()
-        if (!ctm) return null
-        const cRect = container.getBoundingClientRect()
-        const margin = 12 // 邊緣內縮
+        const svg = svgRef.current;
+        const container = containerRef.current;
+        if (!svg || !container) return null;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return null;
+        const cRect = container.getBoundingClientRect();
+        const margin = 12; // 邊緣內縮
 
-        const indicators: Array<{ x: number; y: number; name: string; delta: number; color: string; edge: 'left' | 'right' | 'top' | 'bottom' }> = []
+        const indicators: Array<{ x: number; y: number; name: string; delta: number; color: string; edge: 'left' | 'right' | 'top' | 'bottom' }> = [];
 
         for (const rec of recommendations) {
-          const t = tables.find((tb) => tb.id === rec.tableId)
-          if (!t) continue
+          const t = tables.find((tb) => tb.id === rec.tableId);
+          if (!t) continue;
 
           // 桌子的螢幕座標（相對於容器）
-          const screenX = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - cRect.left
-          const screenY = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - cRect.top
-          const tableRadius = Math.max(58 + Math.min(t.capacity, 12) * 7, 88) * ctm.a
+          const screenX = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - cRect.left;
+          const screenY = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - cRect.top;
+          const tableRadius = Math.max(58 + Math.min(t.capacity, 12) * 7, 88) * ctm.a;
 
           // 檢查桌子是否在可見範圍內（含半徑）
           if (screenX + tableRadius > 0 && screenX - tableRadius < cw &&
-              screenY + tableRadius > 0 && screenY - tableRadius < ch) continue
+              screenY + tableRadius > 0 && screenY - tableRadius < ch) continue;
 
           // 桌子在畫布外 — 計算指示器位置（容器邊緣）
-          const cx = cw / 2
-          const cy = ch / 2
-          const dx = screenX - cx
-          const dy = screenY - cy
-          const absDx = Math.abs(dx)
-          const absDy = Math.abs(dy)
+          const cx = cw / 2;
+          const cy = ch / 2;
+          const dx = screenX - cx;
+          const dy = screenY - cy;
+          const absDx = Math.abs(dx);
+          const absDy = Math.abs(dy);
 
-          let edgeX: number, edgeY: number, edge: 'left' | 'right' | 'top' | 'bottom'
+          let edgeX: number, edgeY: number, edge: 'left' | 'right' | 'top' | 'bottom';
           // 用斜率判斷碰到哪個邊
           if (absDx / (cw / 2) > absDy / (ch / 2)) {
             // 碰左右邊
-            edge = dx > 0 ? 'right' : 'left'
-            edgeX = dx > 0 ? cw - margin : margin
-            edgeY = cy + dy * ((edgeX - cx) / dx)
+            edge = dx > 0 ? 'right' : 'left';
+            edgeX = dx > 0 ? cw - margin : margin;
+            edgeY = cy + dy * ((edgeX - cx) / dx);
           } else {
             // 碰上下邊
-            edge = dy > 0 ? 'bottom' : 'top'
-            edgeY = dy > 0 ? ch - margin : margin
-            edgeX = cx + dx * ((edgeY - cy) / dy)
+            edge = dy > 0 ? 'bottom' : 'top';
+            edgeY = dy > 0 ? ch - margin : margin;
+            edgeX = cx + dx * ((edgeY - cy) / dy);
           }
-          edgeX = Math.max(margin, Math.min(cw - margin, edgeX))
-          edgeY = Math.max(margin + 10, Math.min(ch - margin - 10, edgeY))
+          edgeX = Math.max(margin, Math.min(cw - margin, edgeX));
+          edgeY = Math.max(margin + 10, Math.min(ch - margin - 10, edgeY));
 
-          const onlyOne = recommendations.length === 1
-          const deltas = recommendations.map((r) => r.guestDelta)
-          const maxDelta = Math.max(...deltas)
-          const allSame = new Set(deltas).size === 1
-          const badgeColor = onlyOne ? '#16A34A' : (allSame ? '#CA8A04' : (rec.guestDelta === maxDelta ? '#16A34A' : '#CA8A04'))
+          const onlyOne = recommendations.length === 1;
+          const deltas = recommendations.map((r) => r.guestDelta);
+          const maxDelta = Math.max(...deltas);
+          const allSame = new Set(deltas).size === 1;
+          const badgeColor = onlyOne ? '#16A34A' : (allSame ? '#CA8A04' : (rec.guestDelta === maxDelta ? '#16A34A' : '#CA8A04'));
 
-          indicators.push({ x: edgeX, y: edgeY, name: t.name, delta: rec.guestDelta, color: badgeColor, edge })
+          indicators.push({ x: edgeX, y: edgeY, name: t.name, delta: rec.guestDelta, color: badgeColor, edge });
         }
 
-        if (indicators.length === 0) return null
+        if (indicators.length === 0) return null;
 
         return indicators.map((ind, i) => (
           <div
@@ -1118,7 +1121,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           >
             {ind.name} +{ind.delta}
           </div>
-        ))
+        ));
       })()}
 
       {/* HTML overlay 層（拖桌子或重排動畫時禁用） */}
@@ -1126,9 +1129,9 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         {/* 每個座位的 drop zone（含空位） */}
         {screenSeats.map((ss) => {
           // 計算桌子中心螢幕座標（從同桌所有座位的幾何中心推算）
-          const tableSiblings = screenSeats.filter((s) => s.tableId === ss.tableId)
-          const tcx = tableSiblings.reduce((s, s2) => s + s2.x, 0) / tableSiblings.length
-          const tcy = tableSiblings.reduce((s, s2) => s + s2.y, 0) / tableSiblings.length
+          const tableSiblings = screenSeats.filter((s) => s.tableId === ss.tableId);
+          const tcx = tableSiblings.reduce((s, s2) => s + s2.x, 0) / tableSiblings.length;
+          const tcy = tableSiblings.reduce((s, s2) => s + s2.y, 0) / tableSiblings.length;
           return (
             <SeatDropZone
               key={`drop-${ss.tableId}-${ss.seatIndex}`}
@@ -1144,33 +1147,33 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
               onEmptyClick={(tableId, seatIndex, seatX, seatY, cx, cy) => {
                 // 桌子右邊緣 + popover 寬度（280 + 32 gap + 16 margin）
                 const tableScreenRadius = Math.abs(seatX - cx) > Math.abs(seatY - cy)
-                  ? Math.abs(seatX - cx) : Math.abs(seatY - cy)
-                const popoverRight = cx + tableScreenRadius + 32 + 280 + 16
-                const overflow = popoverRight - cw
+                  ? Math.abs(seatX - cx) : Math.abs(seatY - cy);
+                const popoverRight = cx + tableScreenRadius + 32 + 280 + 16;
+                const overflow = popoverRight - cw;
                 if (overflow > 0) {
                   // 平移畫布讓 popover 不超出右邊
-                  animateViewport(zoomRef.current, panXRef.current - overflow - 20, panYRef.current, 200)
+                  animateViewport(zoomRef.current, panXRef.current - overflow - 20, panYRef.current, 200);
                   // 延遲打開 popover，等平移完成後座標才正確
                   setTimeout(() => {
                     // 重新計算平移後的螢幕座標
-                    const svg = svgRef.current
-                    const container = containerRef.current
-                    if (!svg || !container) return
-                    const ctm = svg.getScreenCTM()
-                    if (!ctm) return
-                    const t = tables.find((tb) => tb.id === tableId)
-                    if (!t) return
-                    const cRect = container.getBoundingClientRect()
-                    const newCx = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - cRect.left
-                    const newCy = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - cRect.top
-                    setSeatPopover({ tableId, seatIndex, x: seatX - overflow - 20, y: seatY, tableCenterX: newCx + cRect.left, tableCenterY: newCy + cRect.top })
-                  }, 220)
+                    const svg = svgRef.current;
+                    const container = containerRef.current;
+                    if (!svg || !container) return;
+                    const ctm = svg.getScreenCTM();
+                    if (!ctm) return;
+                    const t = tables.find((tb) => tb.id === tableId);
+                    if (!t) return;
+                    const cRect = container.getBoundingClientRect();
+                    const newCx = ctm.a * t.positionX + ctm.c * t.positionY + ctm.e - cRect.left;
+                    const newCy = ctm.b * t.positionX + ctm.d * t.positionY + ctm.f - cRect.top;
+                    setSeatPopover({ tableId, seatIndex, x: seatX - overflow - 20, y: seatY, tableCenterX: newCx + cRect.left, tableCenterY: newCy + cRect.top });
+                  }, 220);
                 } else {
-                  setSeatPopover({ tableId, seatIndex, x: seatX, y: seatY, tableCenterX: cx, tableCenterY: cy })
+                  setSeatPopover({ tableId, seatIndex, x: seatX, y: seatY, tableCenterX: cx, tableCenterY: cy });
                 }
               }}
             />
-          )
+          );
         })}
 
         {/* 賓客座位 draggable overlay（主人 + 眷屬都可拖，拖眷屬 = 拖整組） */}
@@ -1205,8 +1208,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
               targetZoom,
               cw,
               ch,
-            )
-            animateViewport(targetZoom, px, py, 200)
+            );
+            animateViewport(targetZoom, px, py, 200);
           }}
         />
       )}
@@ -1231,14 +1234,14 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
               />
             </div>
             {autoAssignProgress.detail && (() => {
-              const parts = autoAssignProgress.detail.split(' · ')
+              const parts = autoAssignProgress.detail.split(' · ');
               return (
                 <div className="text-center">
                   {parts.map((p, i) => (
                     <div key={i} className="text-sm text-[var(--text-secondary,#78716C)] leading-[1.6]">{p}</div>
                   ))}
                 </div>
-              )
+              );
             })()}
             <div className="text-sm text-[var(--text-muted,#A8A29E)]">
               {autoAssignProgress.remainingSeconds !== null && autoAssignProgress.remainingSeconds > 0 ? (
@@ -1269,5 +1272,5 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         />
       )}
     </div>
-  )
-})
+  );
+});

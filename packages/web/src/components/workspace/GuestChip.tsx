@@ -1,42 +1,41 @@
-import { useRef, useState, useMemo } from 'react'
-import { createPortal } from 'react-dom'
-import { useDraggable } from '@dnd-kit/core'
-import { useSeatingStore, type Guest } from '@/stores/seating'
-import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors'
+import { useRef, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { useDraggable } from '@dnd-kit/core';
+import { useSeatingStore, type Guest } from '@/stores/seating';
+import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors';
 
 interface Props {
   guest: Guest
   animIndex?: number
 }
 
-export function GuestChip({ guest, animIndex }: Props) {
+export function GuestChip({ guest, animIndex: _animIndex }: Props) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: guest.id,
     data: { type: 'guest', guest },
-  })
-  const setHoveredGuest = useSeatingStore((s) => s.setHoveredGuest)
-  const bestSwapTableId = useSeatingStore((s) => s.bestSwapTableId)
-  const moveGuestToSeat = useSeatingStore((s) => s.moveGuestToSeat)
-  const setEditingGuest = useSeatingStore((s) => s.setEditingGuest)
-  const eventId = useSeatingStore((s) => s.eventId)
+  });
+  const setHoveredGuest = useSeatingStore((s) => s.setHoveredGuest);
+  const bestSwapTableId = useSeatingStore((s) => s.bestSwapTableId);
+  const moveGuestToSeat = useSeatingStore((s) => s.moveGuestToSeat);
+  const setEditingGuest = useSeatingStore((s) => s.setEditingGuest);
+  const eventId = useSeatingStore((s) => s.eventId);
 
-  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [longPressProgress, setLongPressProgress] = useState(false)
-  const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null)
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [longPressProgress, setLongPressProgress] = useState(false);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null);
 
-  const colors = useMemo(() => loadCategoryColors(eventId || ''), [eventId])
-  const catColor = getCategoryColor(guest.category, colors)
-  const categoryStyle = { background: catColor.background, borderColor: catColor.border, color: catColor.color }
+  const colors = useMemo(() => loadCategoryColors(eventId || ''), [eventId]);
+  const catColor = getCategoryColor(guest.category, colors);
+  const categoryStyle = { background: catColor.background, borderColor: catColor.border, color: catColor.color };
 
   // 入場動畫已移除（人多時等太久）
-  const animClass = ''
-  const animDelay = undefined
+  const animClass = '';
 
   const cancelLongPress = () => {
-    if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null }
-    setLongPressProgress(false)
-    useSeatingStore.setState({ longPressActive: false })
-  }
+    if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
+    setLongPressProgress(false);
+    useSeatingStore.setState({ longPressActive: false });
+  };
 
   return (
     <>
@@ -56,43 +55,43 @@ export function GuestChip({ guest, animIndex }: Props) {
       onPointerDown={(e) => {
         // 長按 1.5 秒自動分配到最佳推薦桌
         if (bestSwapTableId) {
-          setLongPressProgress(true)
-          useSeatingStore.setState({ longPressActive: true })
+          setLongPressProgress(true);
+          useSeatingStore.setState({ longPressActive: true });
           longPressRef.current = setTimeout(() => {
-            setLongPressProgress(false)
-            useSeatingStore.setState({ longPressActive: false })
-            setTooltip(null)
-            setHoveredGuest(null)
-            const targetTable = useSeatingStore.getState().tables.find((t) => t.id === bestSwapTableId)
-            if (!targetTable) return
+            setLongPressProgress(false);
+            useSeatingStore.setState({ longPressActive: false });
+            setTooltip(null);
+            setHoveredGuest(null);
+            const targetTable = useSeatingStore.getState().tables.find((t) => t.id === bestSwapTableId);
+            if (!targetTable) return;
             const tableGuests = useSeatingStore.getState().guests.filter(
               (g) => g.assignedTableId === bestSwapTableId && g.rsvpStatus === 'confirmed',
-            )
-            const usedIndices = new Set<number>()
+            );
+            const usedIndices = new Set<number>();
             for (const g of tableGuests) {
               if (g.seatIndex !== null) {
-                usedIndices.add(g.seatIndex)
-                for (let c = 1; c < g.seatCount; c++) usedIndices.add((g.seatIndex + c) % targetTable.capacity)
+                usedIndices.add(g.seatIndex);
+                for (let c = 1; c < g.seatCount; c++) usedIndices.add((g.seatIndex + c) % targetTable.capacity);
               }
             }
-            let freeSeat = 0
-            while (usedIndices.has(freeSeat)) freeSeat++
-            moveGuestToSeat(guest.id, bestSwapTableId, freeSeat)
-          }, 1500)
+            let freeSeat = 0;
+            while (usedIndices.has(freeSeat)) freeSeat++;
+            moveGuestToSeat(guest.id, bestSwapTableId, freeSeat);
+          }, 1500);
         }
-        listeners?.onPointerDown?.(e as any)
+        listeners?.onPointerDown?.(e as any);
       }}
       onPointerUp={() => cancelLongPress()}
-      onClick={() => { if (!isDragging) setEditingGuest(guest.id) }}
+      onClick={() => { if (!isDragging) setEditingGuest(guest.id); }}
       onMouseEnter={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect()
-        setHoveredGuest(guest.id, rect.top + rect.height / 2)
-        setTooltip({ x: rect.right + 6, y: rect.top + rect.height / 2 })
+        const rect = e.currentTarget.getBoundingClientRect();
+        setHoveredGuest(guest.id, rect.top + rect.height / 2);
+        setTooltip({ x: rect.right + 6, y: rect.top + rect.height / 2 });
       }}
       onMouseLeave={() => {
-        cancelLongPress()
-        setHoveredGuest(null)
-        setTooltip(null)
+        cancelLongPress();
+        setHoveredGuest(null);
+        setTooltip(null);
       }}
       title={`${guest.name}${guest.aliases.length > 0 ? ` (${guest.aliases[0]})` : ''}${guest.companionCount > 0 ? ` +${guest.companionCount}` : ''}${guest.dietaryNote ? ` [${guest.dietaryNote}]` : ''}`}
     >
@@ -118,5 +117,5 @@ export function GuestChip({ guest, animIndex }: Props) {
       document.body,
     )}
     </>
-  )
+  );
 }

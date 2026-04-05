@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
-import { Info } from 'lucide-react'
-import type { ParseResult } from '@/lib/csv-parser'
+import { useState, useMemo } from 'react';
+import { Info } from 'lucide-react';
+import type { ParseResult } from '@/lib/csv-parser';
 import {
   detectColumns,
   normalizeGuest,
@@ -9,8 +9,8 @@ import {
   type MultiColumnMapping,
   type SystemField,
   type RawGuest,
-} from '@/lib/column-detector'
-import { diffGuests } from '@/lib/guest-diff'
+} from '@/lib/column-detector';
+import { diffGuests } from '@/lib/guest-diff';
 
 /** 每個欄位的用途說明（tooltip 用） */
 const FIELD_TOOLTIPS: Record<SystemField, string> = {
@@ -24,7 +24,7 @@ const FIELD_TOOLTIPS: Record<SystemField, string> = {
   specialNote: '嬰兒椅、輪椅等特殊需求',
   seatPreferences: '希望同桌的人（最多 3 位）',
   avoidGuests: '不希望同桌的人',
-}
+};
 
 interface Props {
   data: ParseResult
@@ -34,48 +34,48 @@ interface Props {
 }
 
 export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props) {
-  const detection = useMemo(() => detectColumns(data.headers), [data.headers])
+  const detection = useMemo(() => detectColumns(data.headers), [data.headers]);
 
   // 可編輯的欄位對應
-  const [mapping, setMapping] = useState<ColumnMapping>(detection.mapping)
-  const [multiMapping] = useState<MultiColumnMapping>(detection.multiMapping)
+  const [mapping, setMapping] = useState<ColumnMapping>(detection.mapping);
+  const [multiMapping] = useState<MultiColumnMapping>(detection.multiMapping);
 
   const updateMapping = (field: SystemField, header: string | null) => {
-    setMapping((prev) => ({ ...prev, [field]: header }))
-  }
+    setMapping((prev) => ({ ...prev, [field]: header }));
+  };
 
   // 全部賓客
   const allGuests = useMemo(() => {
     return data.rows
       .map((row) => normalizeGuest(row, mapping, multiMapping))
-      .filter((g): g is RawGuest => g !== null)
-  }, [data.rows, mapping, multiMapping])
+      .filter((g): g is RawGuest => g !== null);
+  }, [data.rows, mapping, multiMapping]);
 
   // diff 計算（重新匯入時）
   const diff = useMemo(() => {
-    if (!existingGuests || existingGuests.length === 0) return null
-    return diffGuests(allGuests, existingGuests)
-  }, [allGuests, existingGuests])
+    if (!existingGuests || existingGuests.length === 0) return null;
+    return diffGuests(allGuests, existingGuests);
+  }, [allGuests, existingGuests]);
 
-  const isReimport = !!diff
+  const isReimport = !!diff;
   const newGuestNames = useMemo(() => {
-    if (!diff) return new Set<string>()
-    return new Set(diff.newGuests.map((g) => g.name.trim().toLowerCase()))
-  }, [diff])
+    if (!diff) return new Set<string>();
+    return new Set(diff.newGuests.map((g) => g.name.trim().toLowerCase()));
+  }, [diff]);
 
-  const confirmedCount = allGuests.filter((g) => g.rsvpStatus === 'confirmed').length
-  const declinedCount = allGuests.filter((g) => g.rsvpStatus === 'declined').length
+  const confirmedCount = allGuests.filter((g) => g.rsvpStatus === 'confirmed').length;
+  const declinedCount = allGuests.filter((g) => g.rsvpStatus === 'declined').length;
   const totalSeats = allGuests
     .filter((g) => g.rsvpStatus === 'confirmed')
-    .reduce((sum, g) => sum + g.companionCount + 1, 0)
+    .reduce((sum, g) => sum + g.companionCount + 1, 0);
 
   // 必填欄位檢查
   const missingRequired = SYSTEM_FIELDS
     .filter((f) => f.required && !mapping[f.field])
-    .map((f) => f.label)
+    .map((f) => f.label);
 
-  const importCount = diff ? diff.newGuests.length : allGuests.length
-  const canConfirm = missingRequired.length === 0 && importCount > 0
+  const importCount = diff ? diff.newGuests.length : allGuests.length;
+  const canConfirm = missingRequired.length === 0 && importCount > 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -127,8 +127,8 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
             <h3 className="text-sm font-medium mb-4 text-[var(--text-primary)]">欄位對應</h3>
             <div className="space-y-2">
               {SYSTEM_FIELDS.map((sf) => {
-                const isMulti = mapping[sf.field] === '__multi__'
-                const isMissing = !mapping[sf.field]
+                const isMulti = mapping[sf.field] === '__multi__';
+                const isMissing = !mapping[sf.field];
                 return (
                   <div key={sf.field} className="flex items-center gap-2">
                     <label className="text-sm flex-shrink-0 flex items-center gap-1 text-[var(--text-secondary)] whitespace-nowrap">
@@ -170,7 +170,7 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
                       </select>
                     )}
                   </div>
-                )
+                );
               })}
             </div>
           </div>
@@ -195,8 +195,8 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
             </thead>
             <tbody>
               {allGuests.map((g, i) => {
-                const isNew = !isReimport || newGuestNames.has(g.name.trim().toLowerCase())
-                const isSkipped = isReimport && !isNew
+                const isNew = !isReimport || newGuestNames.has(g.name.trim().toLowerCase());
+                const isSkipped = isReimport && !isNew;
                 return (
                 <tr key={i} className="border-t border-[var(--border)]" style={{ opacity: isSkipped ? 0.4 : g.rsvpStatus === 'declined' ? 0.5 : 1 }}>
                   <td className="px-3 py-2 text-xs font-data text-[var(--text-muted)]">{i + 1}</td>
@@ -224,12 +224,12 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
                   <td className="px-3 py-2 text-[var(--text-secondary)]">{g.rawPreferences.join(', ') || '—'}</td>
                   <td className="px-3 py-2" style={{ color: g.rawAvoids.length > 0 ? 'var(--error)' : 'var(--text-secondary)' }}>{g.rawAvoids.join(', ') || '—'}</td>
                 </tr>
-                )
+                );
               })}
             </tbody>
           </table>
         </div>
       </div>
     </div>
-  )
+  );
 }

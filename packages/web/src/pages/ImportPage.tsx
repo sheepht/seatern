@@ -1,16 +1,16 @@
-import { useState, useCallback, useEffect } from 'react'
-import { authFetch } from '@/lib/api'
-import { useNavigate } from 'react-router-dom'
-import { useSeatingStore } from '@/stores/seating'
-import type { ParseResult } from '@/lib/csv-parser'
-import { parseCSV } from '@/lib/csv-parser'
-import type { RawGuest } from '@/lib/column-detector'
-import type { PreferenceMatch as PrefMatch } from '@/lib/preference-matcher'
-import { matchAllPreferences } from '@/lib/preference-matcher'
-import { diffGuests, type DiffResult } from '@/lib/guest-diff'
-import { CsvUpload } from '@/components/import/CsvUpload'
-import { ImportPreview } from '@/components/import/ImportPreview'
-import { PreferenceMatch } from '@/components/import/PreferenceMatch'
+import { useState, useCallback } from 'react';
+import { authFetch } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
+import { useSeatingStore } from '@/stores/seating';
+import type { ParseResult } from '@/lib/csv-parser';
+import { parseCSV } from '@/lib/csv-parser';
+import type { RawGuest } from '@/lib/column-detector';
+import type { PreferenceMatch as PrefMatch } from '@/lib/preference-matcher';
+import { matchAllPreferences } from '@/lib/preference-matcher';
+import { diffGuests, type DiffResult } from '@/lib/guest-diff';
+import { CsvUpload } from '@/components/import/CsvUpload';
+import { ImportPreview } from '@/components/import/ImportPreview';
+import { PreferenceMatch } from '@/components/import/PreferenceMatch';
 
 type Step = 'input' | 'preview' | 'preferences'
 
@@ -21,108 +21,108 @@ interface ExistingGuest {
 }
 
 export default function ImportPage() {
-  const navigate = useNavigate()
-  const eventId = useSeatingStore((s) => s.eventId)
-  const storeGuests = useSeatingStore((s) => s.guests)
+  const navigate = useNavigate();
+  const eventId = useSeatingStore((s) => s.eventId);
+  const storeGuests = useSeatingStore((s) => s.guests);
 
-  const [step, setStep] = useState<Step>('input')
-  const [parseResult, setParseResult] = useState<ParseResult | null>(null)
-  const [guests, setGuests] = useState<RawGuest[]>([])
-  const [matches, setMatches] = useState<PrefMatch[]>([])
-  const [importing, setImporting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [step, setStep] = useState<Step>('input');
+  const [parseResult, setParseResult] = useState<ParseResult | null>(null);
+  const [guests, setGuests] = useState<RawGuest[]>([]);
+  const [matches, setMatches] = useState<PrefMatch[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Google Sheet URL 匯入
-  const [sheetUrl, setSheetUrl] = useState('')
-  const [sheetLoading, setSheetLoading] = useState(false)
+  const [sheetUrl, setSheetUrl] = useState('');
+  const [sheetLoading, setSheetLoading] = useState(false);
 
   // 重新匯入：從 store 讀取現有賓客名單
-  const existingGuests: ExistingGuest[] = storeGuests.map((g) => ({ id: g.id, name: g.name, aliases: g.aliases || [] }))
-  const existingLoading = false
-  const [diff, setDiff] = useState<DiffResult | null>(null)
+  const existingGuests: ExistingGuest[] = storeGuests.map((g) => ({ id: g.id, name: g.name, aliases: g.aliases || [] }));
+  const existingLoading = false;
+  const [_diff, setDiff] = useState<DiffResult | null>(null);
 
   const handleParsed = useCallback((result: ParseResult) => {
-    setParseResult(result)
-    setStep('preview')
-    setError(null)
-    setDiff(null)
-  }, [])
+    setParseResult(result);
+    setStep('preview');
+    setError(null);
+    setDiff(null);
+  }, []);
 
   // Google Sheet URL → CSV export → parse
   const handleSheetImport = useCallback(async () => {
-    const url = sheetUrl.trim()
-    if (!url) return
+    const url = sheetUrl.trim();
+    if (!url) return;
 
     // 從 URL 中提取 spreadsheet ID
-    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)
+    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
     if (!match) {
-      setError('無法辨識 Google Sheet 網址，請確認格式正確')
-      return
+      setError('無法辨識 Google Sheet 網址，請確認格式正確');
+      return;
     }
-    const sheetId = match[1]
-    setSheetLoading(true)
-    setError(null)
+    const sheetId = match[1];
+    setSheetLoading(true);
+    setError(null);
 
     try {
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`
-      const res = await fetch(csvUrl)
-      if (!res.ok) throw new Error('無法存取此 Google Sheet，請確認已設為「任何人都可以檢視」')
-      const text = await res.text()
-      const result = parseCSV(text)
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+      const res = await fetch(csvUrl);
+      if (!res.ok) throw new Error('無法存取此 Google Sheet，請確認已設為「任何人都可以檢視」');
+      const text = await res.text();
+      const result = parseCSV(text);
       if (result.rows.length === 0) {
-        setError('Sheet 內容為空')
-        return
+        setError('Sheet 內容為空');
+        return;
       }
-      handleParsed(result)
+      handleParsed(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '匯入 Google Sheet 失敗')
+      setError(err instanceof Error ? err.message : '匯入 Google Sheet 失敗');
     } finally {
-      setSheetLoading(false)
+      setSheetLoading(false);
     }
-  }, [sheetUrl, handleParsed])
+  }, [sheetUrl, handleParsed]);
 
   const handlePreviewConfirm = useCallback((confirmedGuests: RawGuest[]) => {
-    const hasExisting = existingGuests.length > 0
-    let guestsToImport = confirmedGuests
+    const hasExisting = existingGuests.length > 0;
+    let guestsToImport = confirmedGuests;
 
     if (hasExisting) {
-      const result = diffGuests(confirmedGuests, existingGuests)
-      setDiff(result)
-      guestsToImport = result.newGuests
+      const result = diffGuests(confirmedGuests, existingGuests);
+      setDiff(result);
+      guestsToImport = result.newGuests;
     }
 
     if (guestsToImport.length === 0) {
-      setError('沒有新賓客需要匯入')
-      return
+      setError('沒有新賓客需要匯入');
+      return;
     }
 
-    setGuests(guestsToImport)
+    setGuests(guestsToImport);
 
     // 有已存在賓客時，用全部賓客作為搜尋範圍，讓新賓客能配對到已存在的人
-    const hasPreferences = guestsToImport.some((g) => g.rawPreferences.length > 0)
+    const hasPreferences = guestsToImport.some((g) => g.rawPreferences.length > 0);
     if (hasPreferences) {
-      const prefMatches = matchAllPreferences(guestsToImport, hasExisting ? confirmedGuests : undefined)
-      setMatches(prefMatches)
-      setStep('preferences')
+      const prefMatches = matchAllPreferences(guestsToImport, hasExisting ? confirmedGuests : undefined);
+      setMatches(prefMatches);
+      setStep('preferences');
     } else {
-      doImport(guestsToImport, [])
+      doImport(guestsToImport, []);
     }
-  }, [existingGuests])
+  }, [existingGuests]);
 
   const handlePreferencesConfirm = useCallback((resolved: PrefMatch[]) => {
-    doImport(guests, resolved)
-  }, [guests])
+    doImport(guests, resolved);
+  }, [guests]);
 
   const handleSkipAll = useCallback(() => {
-    doImport(guests, [])
-  }, [guests])
+    doImport(guests, []);
+  }, [guests]);
 
   const doImport = async (guestList: RawGuest[], prefMatches: PrefMatch[]) => {
-    setImporting(true)
-    setError(null)
+    setImporting(true);
+    setError(null);
 
     try {
-      if (!eventId) throw new Error('缺少活動 ID')
+      if (!eventId) throw new Error('缺少活動 ID');
 
       // 批次匯入賓客
       const guestRes = await authFetch(`/api/events/${eventId}/guests/batch`, {
@@ -140,31 +140,31 @@ export default function ImportPage() {
             specialNote: g.specialNote || undefined,
           })),
         }),
-      })
-      if (!guestRes.ok) throw new Error('匯入賓客失敗')
-      const { guests: createdGuests } = await guestRes.json()
+      });
+      if (!guestRes.ok) throw new Error('匯入賓客失敗');
+      const { guests: createdGuests } = await guestRes.json();
 
       // 建立座位偏好（如果有配對結果）
       // fromIndex 永遠指向 guestList（新賓客），selectedIndex 可能指向 searchPool（全部賓客）
       const validPrefs = prefMatches.filter(
         (m) => m.selectedIndex !== null && m.selectedIndex >= 0,
-      )
+      );
       if (validPrefs.length > 0) {
         // 建立名字 → DB ID 的 lookup（新建的 + 已存在的）
-        const nameToId = new Map<string, string>()
-        createdGuests.forEach((g: any) => nameToId.set(g.name.trim().toLowerCase(), g.id))
-        existingGuests.forEach((g) => nameToId.set(g.name.trim().toLowerCase(), g.id))
+        const nameToId = new Map<string, string>();
+        createdGuests.forEach((g: any) => nameToId.set(g.name.trim().toLowerCase(), g.id));
+        existingGuests.forEach((g) => nameToId.set(g.name.trim().toLowerCase(), g.id));
 
         const preferences = validPrefs
           .map((m) => {
-            const fromId = createdGuests[m.fromIndex]?.id
+            const fromId = createdGuests[m.fromIndex]?.id;
             // selectedIndex 指向 searchPool，用候選人的 name 查找 DB ID
-            const preferredName = m.candidates.find((c) => c.guestIndex === m.selectedIndex)?.name
-            const preferredId = preferredName ? nameToId.get(preferredName.trim().toLowerCase()) : undefined
-            if (!fromId || !preferredId) return null
-            return { guestId: fromId, preferredGuestId: preferredId, rank: m.rank }
+            const preferredName = m.candidates.find((c) => c.guestIndex === m.selectedIndex)?.name;
+            const preferredId = preferredName ? nameToId.get(preferredName.trim().toLowerCase()) : undefined;
+            if (!fromId || !preferredId) return null;
+            return { guestId: fromId, preferredGuestId: preferredId, rank: m.rank };
           })
-          .filter((p): p is NonNullable<typeof p> => p !== null)
+          .filter((p): p is NonNullable<typeof p> => p !== null);
 
         if (preferences.length > 0) {
           const prefRes = await authFetch(`/api/events/${eventId}/preferences/batch`, {
@@ -172,77 +172,77 @@ export default function ImportPage() {
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ preferences }),
-          })
-          if (!prefRes.ok) throw new Error('建立座位偏好失敗')
+          });
+          if (!prefRes.ok) throw new Error('建立座位偏好失敗');
         }
       }
 
       // 建立子分類（如果有）
-      const subcatAssignments: Array<{ guestId: string; subcategoryName: string; category: string }> = []
+      const subcatAssignments: Array<{ guestId: string; subcategoryName: string; category: string }> = [];
       guestList.forEach((g, i) => {
-        if (!g.rawSubcategory || !g.category) return
-        const guestId = createdGuests[i]?.id
-        if (!guestId) return
+        if (!g.rawSubcategory || !g.category) return;
+        const guestId = createdGuests[i]?.id;
+        if (!guestId) return;
         subcatAssignments.push({
           guestId,
           subcategoryName: g.rawSubcategory,
           category: g.category || '',
-        })
-      })
+        });
+      });
       if (subcatAssignments.length > 0) {
         await authFetch(`/api/events/${eventId}/subcategories/batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ assignments: subcatAssignments }),
-        })
+        });
       }
 
       // 建立避免同桌（如果有）
-      const avoidPairs: Array<{ guestAId: string; guestBId: string }> = []
-      const seenAvoidPairs = new Set<string>()
+      const avoidPairs: Array<{ guestAId: string; guestBId: string }> = [];
+      const seenAvoidPairs = new Set<string>();
       guestList.forEach((g, i) => {
-        if (g.rawAvoids.length === 0) return
-        const guestAId = createdGuests[i]?.id
-        if (!guestAId) return
+        if (g.rawAvoids.length === 0) return;
+        const guestAId = createdGuests[i]?.id;
+        if (!guestAId) return;
         for (const avoidName of g.rawAvoids) {
-          const targetIdx = guestList.findIndex((t) => t.name === avoidName)
-          if (targetIdx < 0) continue
-          const guestBId = createdGuests[targetIdx]?.id
-          if (!guestBId) continue
-          const key = [guestAId, guestBId].sort().join('-')
-          if (seenAvoidPairs.has(key)) continue
-          seenAvoidPairs.add(key)
-          avoidPairs.push({ guestAId, guestBId })
+          const targetIdx = guestList.findIndex((t) => t.name === avoidName);
+          if (targetIdx < 0) continue;
+          const guestBId = createdGuests[targetIdx]?.id;
+          if (!guestBId) continue;
+          const key = [guestAId, guestBId].sort().join('-');
+          if (seenAvoidPairs.has(key)) continue;
+          seenAvoidPairs.add(key);
+          avoidPairs.push({ guestAId, guestBId });
         }
-      })
+      });
       if (avoidPairs.length > 0) {
         await authFetch(`/api/events/${eventId}/avoid-pairs/batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ pairs: avoidPairs }),
-        })
+        });
       }
 
       // 自動補桌次（根據新增的確認出席席位數）
       const newConfirmedSeats = guestList
         .filter((g) => g.rsvpStatus === 'confirmed')
-        .reduce((sum, g) => sum + g.companionCount + 1, 0)
+        .reduce((sum, g) => sum + g.companionCount + 1, 0);
 
       if (newConfirmedSeats > 0) {
-        const newTableCount = Math.ceil(newConfirmedSeats / 10)
+        const newTableCount = Math.ceil(newConfirmedSeats / 10);
         // 取得現有桌次數量來決定新桌的名稱和位置
-        const eventRes = await authFetch(`/api/events/${eventId}`, { credentials: 'include' })
-        const eventData = await eventRes.json()
-        const existingTableCount = eventData.tables?.length || 0
+        const eventRes = await authFetch(`/api/events/${eventId}`, { credentials: 'include' });
+        const eventData = await eventRes.json();
+        const existingTableCount = eventData.tables?.length || 0;
         for (let i = 0; i < newTableCount; i++) {
-          const tableNum = existingTableCount + i + 1
-          const totalTables = existingTableCount + newTableCount
-          const cols = Math.ceil(Math.sqrt(totalTables))
-          const idx = existingTableCount + i
-          const row = Math.floor(idx / cols)
-          const col = idx % cols
+          const tableNum = existingTableCount + i + 1;
+          const totalTables = existingTableCount + newTableCount;
+          const cols = Math.ceil(Math.sqrt(totalTables));
+          const idx = existingTableCount + i;
+          const row = Math.floor(idx / cols);
+          const col = idx % cols;
           await authFetch(`/api/events/${eventId}/tables`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -253,19 +253,19 @@ export default function ImportPage() {
               positionX: 200 + col * 350,
               positionY: 200 + row * 350,
             }),
-          })
+          });
         }
       }
 
       // 重新載入 store 再導頁，避免畫布/名單頁看不到新資料
-      await useSeatingStore.getState().loadEvent()
-      navigate('/')
+      await useSeatingStore.getState().loadEvent();
+      navigate('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '匯入失敗')
+      setError(err instanceof Error ? err.message : '匯入失敗');
     } finally {
-      setImporting(false)
+      setImporting(false);
     }
-  }
+  };
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col bg-[var(--bg-primary)]">
@@ -303,7 +303,7 @@ export default function ImportPage() {
                   <input
                     value={sheetUrl}
                     onChange={(e) => setSheetUrl(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSheetImport() }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSheetImport(); }}
                     placeholder="https://docs.google.com/spreadsheets/d/..."
                     className="settings-input text-sm mb-3"
                   />
@@ -401,5 +401,5 @@ export default function ImportPage() {
         <div className="text-center py-8 text-sm text-[var(--text-secondary)]">匯入中...</div>
       )}
     </div>
-  )
+  );
 }

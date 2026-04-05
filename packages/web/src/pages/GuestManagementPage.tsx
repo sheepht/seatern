@@ -1,14 +1,14 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
-import { authFetch } from '@/lib/api'
-import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
-import { Plus, Trash2, Search, X } from 'lucide-react'
-import { useSeatingStore } from '@/stores/seating'
-import { getSatisfactionColor } from '@/lib/satisfaction'
-import { loadCategoryColors, saveCategoryColors, getCategoryColor, COLOR_PRESETS, PALETTE_HUES, PALETTE_SATS, FALLBACK_COLOR, type CategoryColor } from '@/lib/category-colors'
-import GuestFormModal, { type GuestFormData } from '@/components/GuestFormModal'
-import { AvoidPairModal } from '@/components/workspace/AvoidPairModal'
-import type { Guest } from '@/lib/types'
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { authFetch } from '@/lib/api';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Trash2, Search, X } from 'lucide-react';
+import { useSeatingStore } from '@/stores/seating';
+import { getSatisfactionColor } from '@/lib/satisfaction';
+import { loadCategoryColors, saveCategoryColors, getCategoryColor, COLOR_PRESETS, PALETTE_HUES, PALETTE_SATS, type CategoryColor } from '@/lib/category-colors';
+import GuestFormModal from '@/components/GuestFormModal';
+import { AvoidPairModal } from '@/components/workspace/AvoidPairModal';
+import type { Guest } from '@/lib/types';
 
 // ─── Types ──────────────────────────────────────────
 
@@ -21,16 +21,16 @@ type CategoryFilter = '全部' | string
 const RSVP_LABELS: Record<string, string> = {
   confirmed: '確認',
   declined: '婉拒',
-}
+};
 
-const RSVP_CYCLE: string[] = ['confirmed', 'declined']
+const RSVP_CYCLE: string[] = ['confirmed', 'declined'];
 
 function rsvpIcon(status: string) {
-  return status === 'confirmed' ? '✓' : '✗'
+  return status === 'confirmed' ? '✓' : '✗';
 }
 
 function rsvpColor(status: string) {
-  return status === 'confirmed' ? 'var(--success)' : 'var(--error)'
+  return status === 'confirmed' ? 'var(--success)' : 'var(--error)';
 }
 
 // ─── Category Color Picker ──────────────────────────
@@ -39,8 +39,8 @@ function CategoryColorPicker({ current, onPick, onPreview, rect, onEnter, onClos
   current: CategoryColor; onPick: (c: CategoryColor) => void; onPreview: (c: CategoryColor | null) => void
   rect: { left: number; bottom: number }; onEnter: () => void; onClose: () => void
 }) {
-  const cols = PALETTE_HUES.length + 1 // hues + gray column
-  const rows = PALETTE_SATS.length
+  const cols = PALETTE_HUES.length + 1; // hues + gray column
+  const rows = PALETTE_SATS.length;
 
   return createPortal(
     <div
@@ -69,16 +69,16 @@ function CategoryColorPicker({ current, onPick, onPreview, rect, onEnter, onClos
       </div>
     </div>,
     document.body,
-  )
+  );
 }
 
 // ─── Toast ──────────────────────────────────────────
 
 function Toast({ message, onUndo, onClose }: { message: string; onUndo?: () => void; onClose: () => void }) {
   useEffect(() => {
-    const t = setTimeout(onClose, 5000)
-    return () => clearTimeout(t)
-  }, [onClose])
+    const t = setTimeout(onClose, 5000);
+    return () => clearTimeout(t);
+  }, [onClose]);
 
   return (
     <div
@@ -91,28 +91,28 @@ function Toast({ message, onUndo, onClose }: { message: string; onUndo?: () => v
         </button>
       )}
     </div>
-  )
+  );
 }
 
 function NumberStepper({ value, min, max, onSave, maxTooltip }: { value: number; min: number; max: number; onSave: (v: number) => void; maxTooltip?: string }) {
-  const atMax = value >= max
-  const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null)
-  const popoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const btnRef = useRef<HTMLSpanElement>(null)
+  const atMax = value >= max;
+  const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null);
+  const popoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const btnRef = useRef<HTMLSpanElement>(null);
 
   const handleMaxHover = () => {
-    if (!atMax || !maxTooltip) return
+    if (!atMax || !maxTooltip) return;
     popoverTimer.current = setTimeout(() => {
       if (btnRef.current) {
-        const r = btnRef.current.getBoundingClientRect()
-        setPopoverPos({ x: r.right, y: r.top - 6 })
+        const r = btnRef.current.getBoundingClientRect();
+        setPopoverPos({ x: r.right, y: r.top - 6 });
       }
-    }, 300)
-  }
+    }, 300);
+  };
   const handleMaxLeave = () => {
-    if (popoverTimer.current) clearTimeout(popoverTimer.current)
-    setPopoverPos(null)
-  }
+    if (popoverTimer.current) clearTimeout(popoverTimer.current);
+    setPopoverPos(null);
+  };
 
   return (
     <div className="flex items-center gap-1">
@@ -149,7 +149,7 @@ function NumberStepper({ value, min, max, onSave, maxTooltip }: { value: number;
         document.body
       )}
     </div>
-  )
+  );
 }
 
 // ─── Delete Confirm Modal ───────────────────────────
@@ -176,7 +176,7 @@ function DeleteConfirmModal({ guestName, tableName, onConfirm, onCancel }: {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Stats Bar ──────────────────────────────────────
@@ -184,14 +184,14 @@ function DeleteConfirmModal({ guestName, tableName, onConfirm, onCancel }: {
 function StatsBar({
   guests, onFilterClick,
 }: { guests: Guest[]; onFilterClick: (status: string) => void }) {
-  const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed').length
-  const declined = guests.filter((g) => g.rsvpStatus === 'declined').length
-  const totalSeats = guests.filter((g) => g.rsvpStatus === 'confirmed').reduce((s, g) => s + g.seatCount, 0)
-  const assigned = guests.filter((g) => g.assignedTableId && g.rsvpStatus === 'confirmed')
-  const avgSat = assigned.length > 0 ? assigned.reduce((s, g) => s + g.satisfactionScore, 0) / assigned.length : 0
+  const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed').length;
+  const declined = guests.filter((g) => g.rsvpStatus === 'declined').length;
+  const totalSeats = guests.filter((g) => g.rsvpStatus === 'confirmed').reduce((s, g) => s + g.seatCount, 0);
+  const assigned = guests.filter((g) => g.assignedTableId && g.rsvpStatus === 'confirmed');
+  const avgSat = assigned.length > 0 ? assigned.reduce((s, g) => s + g.satisfactionScore, 0) / assigned.length : 0;
 
-  const statClass = "flex items-baseline gap-1 cursor-pointer px-2 py-1 rounded-[var(--radius-sm,4px)]"
-  const numClass = "font-[family-name:var(--font-data)] font-bold text-xl tabular-nums"
+  const statClass = "flex items-baseline gap-1 cursor-pointer px-2 py-1 rounded-[var(--radius-sm,4px)]";
+  const numClass = "font-[family-name:var(--font-data)] font-bold text-xl tabular-nums";
 
   return (
     <>
@@ -215,238 +215,235 @@ function StatsBar({
         <span>平均滿意度</span>
       </div>
     </>
-  )
+  );
 }
 
 // ─── Main Page ──────────────────────────────────────
 
 export default function GuestManagementPage() {
-  const navigate = useNavigate()
-  const eventId = useSeatingStore((s) => s.eventId)
-  const guests = useSeatingStore((s) => s.guests)
-  const tables = useSeatingStore((s) => s.tables)
-  const eventName = useSeatingStore((s) => s.eventName)
-  const avoidPairs = useSeatingStore((s) => s.avoidPairs)
-  const updateGuest = useSeatingStore((s) => s.updateGuest)
-  const deleteGuest = useSeatingStore((s) => s.deleteGuest)
-  const addGuest = useSeatingStore((s) => s.addGuest)
-  const moveGuest = useSeatingStore((s) => s.moveGuest)
-  const updateGuestPreferences = useSeatingStore((s) => s.updateGuestPreferences)
-  const setGuestSubcategory = useSeatingStore((s) => s.setGuestSubcategory)
-  const subcategories = useSeatingStore((s) => s.subcategories)
-  const addAvoidPair = useSeatingStore((s) => s.addAvoidPair)
-  const removeAvoidPair = useSeatingStore((s) => s.removeAvoidPair)
+  const navigate = useNavigate();
+  const eventId = useSeatingStore((s) => s.eventId);
+  const guests = useSeatingStore((s) => s.guests);
+  const tables = useSeatingStore((s) => s.tables);
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs);
+  const updateGuest = useSeatingStore((s) => s.updateGuest);
+  const addGuest = useSeatingStore((s) => s.addGuest);
+  const moveGuest = useSeatingStore((s) => s.moveGuest);
+  const updateGuestPreferences = useSeatingStore((s) => s.updateGuestPreferences);
+  const setGuestSubcategory = useSeatingStore((s) => s.setGuestSubcategory);
+  const subcategories = useSeatingStore((s) => s.subcategories);
+  const addAvoidPair = useSeatingStore((s) => s.addAvoidPair);
+  const removeAvoidPair = useSeatingStore((s) => s.removeAvoidPair);
 
   // Category colors (localStorage-backed)
-  const [categoryColors, setCategoryColors] = useState<Record<string, CategoryColor>>(() => loadCategoryColors(eventId || ''))
+  const [categoryColors, setCategoryColors] = useState<Record<string, CategoryColor>>(() => loadCategoryColors(eventId || ''));
   const handleColorChange = useCallback((cat: string, c: CategoryColor) => {
     setCategoryColors((prev) => {
-      const next = { ...prev, [cat]: c }
-      saveCategoryColors(eventId || '', next)
-      return next
-    })
-  }, [eventId])
+      const next = { ...prev, [cat]: c };
+      saveCategoryColors(eventId || '', next);
+      return next;
+    });
+  }, [eventId]);
 
   // Color picker state
-  const [pickerCat, setPickerCat] = useState<{ cat: string; rect: { left: number; bottom: number } } | null>(null)
-  const [previewColor, setPreviewColor] = useState<{ cat: string; color: CategoryColor } | null>(null)
-  const [holdingCat, setHoldingCat] = useState<string | null>(null) // which button shows progress bar
-  const pickerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pickerCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const PICKER_DELAY = 800
+  const [pickerCat, setPickerCat] = useState<{ cat: string; rect: { left: number; bottom: number } } | null>(null);
+  const [previewColor, setPreviewColor] = useState<{ cat: string; color: CategoryColor } | null>(null);
+  const [holdingCat, setHoldingCat] = useState<string | null>(null); // which button shows progress bar
+  const pickerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pickerCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const PICKER_DELAY = 800;
   const cancelPickerClose = useCallback(() => {
-    if (pickerCloseTimer.current) { clearTimeout(pickerCloseTimer.current); pickerCloseTimer.current = null }
-  }, [])
+    if (pickerCloseTimer.current) { clearTimeout(pickerCloseTimer.current); pickerCloseTimer.current = null; }
+  }, []);
   const schedulePickerClose = useCallback(() => {
-    cancelPickerClose()
-    pickerCloseTimer.current = setTimeout(() => setPickerCat(null), 150)
-  }, [cancelPickerClose])
+    cancelPickerClose();
+    pickerCloseTimer.current = setTimeout(() => setPickerCat(null), 150);
+  }, [cancelPickerClose]);
 
   // UI state
-  const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('全部')
-  const [rsvpFilter, setRsvpFilter] = useState<string | null>(null)
-  const [showDeclined, setShowDeclined] = useState(false)
-  const [sortField, setSortField] = useState<SortField>('name')
-  const [sortDir, setSortDir] = useState<SortDir>('asc')
-  const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null)
-  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false)
-  const [clearingAll, setClearingAll] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState<{ guestId: string; guestName: string; tableName: string } | null>(null)
-  const deleteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
-  const [editingGuestId, setEditingGuestId] = useState<string | null>(null)
-  const [showAvoidModal, setShowAvoidModal] = useState(false)
-  const [showAddModal, setShowAddModal] = useState(false)
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('全部');
+  const [rsvpFilter, setRsvpFilter] = useState<string | null>(null);
+  const [showDeclined, setShowDeclined] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null);
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ guestId: string; guestName: string; tableName: string } | null>(null);
+  const deleteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const [editingGuestId, setEditingGuestId] = useState<string | null>(null);
+  const [showAvoidModal, setShowAvoidModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Cleanup delete timers on unmount / navigate away
   useEffect(() => {
     return () => {
       deleteTimers.current.forEach((timer, guestId) => {
-        clearTimeout(timer)
+        clearTimeout(timer);
         // Fire pending deletes immediately
-        const { eventId } = useSeatingStore.getState()
+        const { eventId } = useSeatingStore.getState();
         if (eventId) {
-          authFetch(`/api/events/${eventId}/guests/${guestId}`, { method: 'DELETE', credentials: 'include' })
+          authFetch(`/api/events/${eventId}/guests/${guestId}`, { method: 'DELETE', credentials: 'include' });
         }
-      })
-      deleteTimers.current.clear()
-    }
-  }, [])
+      });
+      deleteTimers.current.clear();
+    };
+  }, []);
 
   // Get unique categories from event
-  const eventCategories = useSeatingStore((s) => s.eventCategories)
-  const categories = eventCategories.length > 0 ? eventCategories : ['男方', '女方', '共同']
+  const eventCategories = useSeatingStore((s) => s.eventCategories);
+  const categories = eventCategories.length > 0 ? eventCategories : ['男方', '女方', '共同'];
 
   // Merge preview color into effective colors
   const effectiveColors = previewColor
     ? { ...categoryColors, [previewColor.cat]: previewColor.color }
-    : categoryColors
+    : categoryColors;
 
   // Lookup maps
-  const tableNameMap = new Map(tables.map((t) => [t.id, t.name]))
-  const guestNameMap = new Map(guests.map((g) => [g.id, g.name]))
+  const tableNameMap = new Map(tables.map((t) => [t.id, t.name]));
 
   // Filter + sort
   const filtered = guests.filter((g) => {
-    if (categoryFilter !== '全部' && g.category !== categoryFilter) return false
-    if (rsvpFilter && g.rsvpStatus !== rsvpFilter) return false
-    if (!showDeclined && !search && g.rsvpStatus === 'declined') return false
+    if (categoryFilter !== '全部' && g.category !== categoryFilter) return false;
+    if (rsvpFilter && g.rsvpStatus !== rsvpFilter) return false;
+    if (!showDeclined && !search && g.rsvpStatus === 'declined') return false;
     if (search) {
-      const q = search.toLowerCase()
-      const nameMatch = g.name.toLowerCase().includes(q)
-      const aliasMatch = g.aliases.some((a) => a.toLowerCase().includes(q))
-      if (!nameMatch && !aliasMatch) return false
+      const q = search.toLowerCase();
+      const nameMatch = g.name.toLowerCase().includes(q);
+      const aliasMatch = g.aliases.some((a) => a.toLowerCase().includes(q));
+      if (!nameMatch && !aliasMatch) return false;
     }
-    return true
+    return true;
   }).sort((a, b) => {
-    let cmp = 0
-    const avoidCount = (g: Guest) => avoidPairs.filter((ap) => ap.guestAId === g.id || ap.guestBId === g.id).length
+    let cmp = 0;
+    const avoidCount = (g: Guest) => avoidPairs.filter((ap) => ap.guestAId === g.id || ap.guestBId === g.id).length;
     switch (sortField) {
-      case 'name': cmp = a.name.localeCompare(b.name, 'zh-Hant'); break
-      case 'category': cmp = (a.category || '').localeCompare(b.category || '', 'zh-Hant'); break
-      case 'rsvpStatus': cmp = a.rsvpStatus.localeCompare(b.rsvpStatus); break
+      case 'name': cmp = a.name.localeCompare(b.name, 'zh-Hant'); break;
+      case 'category': cmp = (a.category || '').localeCompare(b.category || '', 'zh-Hant'); break;
+      case 'rsvpStatus': cmp = a.rsvpStatus.localeCompare(b.rsvpStatus); break;
       case 'satisfactionScore': {
         // 未排桌的賓客視為 -1 分，確保排序能區分已排/未排
-        const aScore = a.assignedTableId ? a.satisfactionScore : -1
-        const bScore = b.assignedTableId ? b.satisfactionScore : -1
-        cmp = aScore - bScore
-        break
+        const aScore = a.assignedTableId ? a.satisfactionScore : -1;
+        const bScore = b.assignedTableId ? b.satisfactionScore : -1;
+        cmp = aScore - bScore;
+        break;
       }
-      case 'assignedTableId': cmp = (a.assignedTableId || '').localeCompare(b.assignedTableId || ''); break
-      case 'companionCount': cmp = a.companionCount - b.companionCount; break
-      case 'prefCount': cmp = a.seatPreferences.length - b.seatPreferences.length; break
-      case 'avoidCount': cmp = avoidCount(a) - avoidCount(b); break
-      case 'dietaryNote': cmp = (a.dietaryNote || '').localeCompare(b.dietaryNote || '', 'zh-Hant'); break
-      case 'specialNote': cmp = (a.specialNote || '').localeCompare(b.specialNote || '', 'zh-Hant'); break
+      case 'assignedTableId': cmp = (a.assignedTableId || '').localeCompare(b.assignedTableId || ''); break;
+      case 'companionCount': cmp = a.companionCount - b.companionCount; break;
+      case 'prefCount': cmp = a.seatPreferences.length - b.seatPreferences.length; break;
+      case 'avoidCount': cmp = avoidCount(a) - avoidCount(b); break;
+      case 'dietaryNote': cmp = (a.dietaryNote || '').localeCompare(b.dietaryNote || '', 'zh-Hant'); break;
+      case 'specialNote': cmp = (a.specialNote || '').localeCompare(b.specialNote || '', 'zh-Hant'); break;
     }
-    return sortDir === 'asc' ? cmp : -cmp
-  })
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
 
   // Handlers
   const handleSave = useCallback(async (guestId: string, patch: Partial<Guest>) => {
-    const ok = await updateGuest(guestId, patch)
-    if (!ok) setToast({ message: '儲存失敗，已還原' })
-  }, [updateGuest])
+    const ok = await updateGuest(guestId, patch);
+    if (!ok) setToast({ message: '儲存失敗，已還原' });
+  }, [updateGuest]);
 
   const handleDelete = useCallback((guest: Guest) => {
     if (guest.assignedTableId) {
-      const tableName = tableNameMap.get(guest.assignedTableId) || '未知桌'
-      setDeleteConfirm({ guestId: guest.id, guestName: guest.name, tableName })
+      const tableName = tableNameMap.get(guest.assignedTableId) || '未知桌';
+      setDeleteConfirm({ guestId: guest.id, guestName: guest.name, tableName });
     } else {
       // Soft delete: 先從 local state 移除，延遲刪 DB。Undo 時恢復 state 並取消 API call。
-      const state = useSeatingStore.getState()
-      const prevGuests = state.guests
-      const prevAvoidPairs = state.avoidPairs
+      const state = useSeatingStore.getState();
+      const prevGuests = state.guests;
+      const prevAvoidPairs = state.avoidPairs;
 
       // 從 local state 移除（不呼叫 deleteGuest，避免立即刪 DB）
-      const nextGuests = prevGuests.filter((g) => g.id !== guest.id)
+      const nextGuests = prevGuests.filter((g) => g.id !== guest.id);
       const nextAvoidPairs = prevAvoidPairs.filter(
         (ap) => ap.guestAId !== guest.id && ap.guestBId !== guest.id,
-      )
-      useSeatingStore.setState({ guests: nextGuests, avoidPairs: nextAvoidPairs })
+      );
+      useSeatingStore.setState({ guests: nextGuests, avoidPairs: nextAvoidPairs });
 
       const timer = setTimeout(async () => {
-        deleteTimers.current.delete(guest.id)
-        setToast(null)
+        deleteTimers.current.delete(guest.id);
+        setToast(null);
         // Timer 到了才真正刪 DB
         try {
           await authFetch(`/api/events/${eventId}/guests/${guest.id}`, {
             method: 'DELETE',
             credentials: 'include',
-          })
+          });
         } catch { /* ignore */ }
-      }, 5000)
-      deleteTimers.current.set(guest.id, timer)
+      }, 5000);
+      deleteTimers.current.set(guest.id, timer);
 
       setToast({
         message: `已刪除 ${guest.name}`,
         onUndo: () => {
-          clearTimeout(timer)
-          deleteTimers.current.delete(guest.id)
+          clearTimeout(timer);
+          deleteTimers.current.delete(guest.id);
           // 恢復 local state（DB 還沒刪，不需要重建）
-          useSeatingStore.setState({ guests: prevGuests, avoidPairs: prevAvoidPairs })
-          setToast(null)
+          useSeatingStore.setState({ guests: prevGuests, avoidPairs: prevAvoidPairs });
+          setToast(null);
         },
-      })
+      });
     }
-  }, [eventId, tableNameMap])
+  }, [eventId, tableNameMap]);
 
   const handleConfirmDelete = useCallback(() => {
-    if (!deleteConfirm) return
-    const { guestId, guestName } = deleteConfirm
-    setDeleteConfirm(null)
+    if (!deleteConfirm) return;
+    const { guestId, guestName } = deleteConfirm;
+    setDeleteConfirm(null);
 
     // Soft delete：同未入座邏輯，先移 local state，延遲刪 DB
-    const state = useSeatingStore.getState()
-    const prevGuests = state.guests
-    const prevAvoidPairs = state.avoidPairs
+    const state = useSeatingStore.getState();
+    const prevGuests = state.guests;
+    const prevAvoidPairs = state.avoidPairs;
 
-    const nextGuests = prevGuests.filter((g) => g.id !== guestId)
+    const nextGuests = prevGuests.filter((g) => g.id !== guestId);
     const nextAvoidPairs = prevAvoidPairs.filter(
       (ap) => ap.guestAId !== guestId && ap.guestBId !== guestId,
-    )
-    useSeatingStore.setState({ guests: nextGuests, avoidPairs: nextAvoidPairs })
+    );
+    useSeatingStore.setState({ guests: nextGuests, avoidPairs: nextAvoidPairs });
 
     const timer = setTimeout(async () => {
-      deleteTimers.current.delete(guestId)
-      setToast(null)
+      deleteTimers.current.delete(guestId);
+      setToast(null);
       try {
         await authFetch(`/api/events/${eventId}/guests/${guestId}`, {
           method: 'DELETE',
           credentials: 'include',
-        })
+        });
       } catch { /* ignore */ }
-    }, 5000)
-    deleteTimers.current.set(guestId, timer)
+    }, 5000);
+    deleteTimers.current.set(guestId, timer);
 
     setToast({
       message: `已刪除 ${guestName}`,
       onUndo: () => {
-        clearTimeout(timer)
-        deleteTimers.current.delete(guestId)
-        useSeatingStore.setState({ guests: prevGuests, avoidPairs: prevAvoidPairs })
-        setToast(null)
+        clearTimeout(timer);
+        deleteTimers.current.delete(guestId);
+        useSeatingStore.setState({ guests: prevGuests, avoidPairs: prevAvoidPairs });
+        setToast(null);
       },
-    })
-  }, [deleteConfirm, eventId])
+    });
+  }, [deleteConfirm, eventId]);
 
   const handleRsvpToggle = useCallback((guest: Guest) => {
-    const idx = RSVP_CYCLE.indexOf(guest.rsvpStatus)
-    const next = RSVP_CYCLE[(idx + 1) % RSVP_CYCLE.length]
-    handleSave(guest.id, { rsvpStatus: next as any })
-  }, [handleSave])
+    const idx = RSVP_CYCLE.indexOf(guest.rsvpStatus);
+    const next = RSVP_CYCLE[(idx + 1) % RSVP_CYCLE.length];
+    handleSave(guest.id, { rsvpStatus: next as any });
+  }, [handleSave]);
 
   const handleSort = (field: SortField) => {
-    if (sortField === field) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
-    else { setSortField(field); setSortDir('asc') }
-  }
+    if (sortField === field) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('asc'); }
+  };
 
-  const sortArrow = (field: SortField) => sortField === field ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+  const sortArrow = (field: SortField) => sortField === field ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
   const handleRsvpFilterClick = (status: string) => {
-    setRsvpFilter((prev) => prev === status ? null : status)
-    if (status === 'declined') setShowDeclined(true)
-  }
+    setRsvpFilter((prev) => prev === status ? null : status);
+    if (status === 'declined') setShowDeclined(true);
+  };
 
   // ─── Main table view ────────────────────────────────
   return (
@@ -473,24 +470,24 @@ export default function GuestManagementPage() {
 
           <div className="flex border border-[var(--border)] rounded-[var(--radius-sm,4px)] overflow-hidden">
             {(() => {
-              const visible = !showDeclined ? guests.filter((g) => g.rsvpStatus !== 'declined') : guests
+              const visible = !showDeclined ? guests.filter((g) => g.rsvpStatus !== 'declined') : guests;
               return ['全部', ...categories].map((cat) => {
-              const count = cat === '全部' ? visible.length : visible.filter((g) => g.category === cat).length
+              const count = cat === '全部' ? visible.length : visible.filter((g) => g.category === cat).length;
               return (
                 <button
                   key={cat}
-                  onClick={() => { setCategoryFilter(cat as CategoryFilter); setRsvpFilter(null) }}
+                  onClick={() => { setCategoryFilter(cat as CategoryFilter); setRsvpFilter(null); }}
                   onMouseEnter={(e) => {
-                    if (cat === '全部') return
-                    if (pickerTimer.current) clearTimeout(pickerTimer.current)
-                    setHoldingCat(cat)
-                    const r = e.currentTarget.getBoundingClientRect()
-                    pickerTimer.current = setTimeout(() => { setHoldingCat(null); setPickerCat({ cat, rect: { left: r.left, bottom: r.bottom } }) }, PICKER_DELAY)
+                    if (cat === '全部') return;
+                    if (pickerTimer.current) clearTimeout(pickerTimer.current);
+                    setHoldingCat(cat);
+                    const r = e.currentTarget.getBoundingClientRect();
+                    pickerTimer.current = setTimeout(() => { setHoldingCat(null); setPickerCat({ cat, rect: { left: r.left, bottom: r.bottom } }); }, PICKER_DELAY);
                   }}
                   onMouseLeave={() => {
-                    if (pickerTimer.current) clearTimeout(pickerTimer.current)
-                    setHoldingCat(null)
-                    schedulePickerClose()
+                    if (pickerTimer.current) clearTimeout(pickerTimer.current);
+                    setHoldingCat(null);
+                    schedulePickerClose();
                   }}
                   className="relative overflow-hidden px-3 py-[5px] border-none text-[13px] font-[family-name:var(--font-ui)] font-medium cursor-pointer"
                   style={{
@@ -498,12 +495,12 @@ export default function GuestManagementPage() {
                       if (cat === '全部') {
                         return categoryFilter === cat
                           ? { background: 'var(--accent)', color: '#fff' }
-                          : { background: 'var(--bg-surface)', color: 'var(--text-secondary)' }
+                          : { background: 'var(--bg-surface)', color: 'var(--text-secondary)' };
                       }
-                      const badge = getCategoryColor(cat, effectiveColors)
+                      const badge = getCategoryColor(cat, effectiveColors);
                       return categoryFilter === cat
                         ? { background: badge.color, color: '#fff' }
-                        : { background: badge.background, color: badge.color }
+                        : { background: badge.background, color: badge.color };
                     })(),
                   }}
                 >
@@ -518,8 +515,8 @@ export default function GuestManagementPage() {
                     />
                   )}
                 </button>
-              )
-            })
+              );
+            });
             })()}
           </div>
 
@@ -527,11 +524,11 @@ export default function GuestManagementPage() {
           {pickerCat && (
             <CategoryColorPicker
               current={getCategoryColor(pickerCat.cat, effectiveColors)}
-              onPick={(c) => { setPreviewColor(null); handleColorChange(pickerCat.cat, c); setPickerCat(null) }}
+              onPick={(c) => { setPreviewColor(null); handleColorChange(pickerCat.cat, c); setPickerCat(null); }}
               onPreview={(c) => setPreviewColor(c ? { cat: pickerCat.cat, color: c } : null)}
               rect={pickerCat.rect}
               onEnter={cancelPickerClose}
-              onClose={() => { setPreviewColor(null); schedulePickerClose() }}
+              onClose={() => { setPreviewColor(null); schedulePickerClose(); }}
             />
           )}
 
@@ -610,23 +607,23 @@ export default function GuestManagementPage() {
             </thead>
             <tbody>
               {filtered.map((guest) => {
-                const tableName = guest.assignedTableId ? tableNameMap.get(guest.assignedTableId) || '—' : '未排座'
-                const satColor = guest.assignedTableId ? getSatisfactionColor(guest.satisfactionScore) : 'var(--text-muted)'
-                const subcatName = guest.subcategory?.name ?? ''
+                const tableName = guest.assignedTableId ? tableNameMap.get(guest.assignedTableId) || '—' : '未排座';
+                const satColor = guest.assignedTableId ? getSatisfactionColor(guest.satisfactionScore) : 'var(--text-muted)';
+                const subcatName = guest.subcategory?.name ?? '';
 
                 // Compute dynamic max companionCount based on table capacity
-                let maxCompanion = 9
-                let maxCompanionTooltip: string | undefined
+                let maxCompanion = 4;
+                let maxCompanionTooltip: string | undefined;
                 if (guest.assignedTableId) {
-                  const table = tables.find((t) => t.id === guest.assignedTableId)
+                  const table = tables.find((t) => t.id === guest.assignedTableId);
                   if (table) {
                     const othersSeats = guests
                       .filter((g) => g.assignedTableId === table.id && g.id !== guest.id && g.rsvpStatus === 'confirmed')
-                      .reduce((sum, g) => sum + g.seatCount, 0)
-                    maxCompanion = Math.min(9, table.capacity - othersSeats - 1)
+                      .reduce((sum, g) => sum + g.seatCount, 0);
+                    maxCompanion = Math.min(4, table.capacity - othersSeats - 1);
                     if (maxCompanion <= guest.companionCount) {
-                      const used = othersSeats + guest.seatCount
-                      maxCompanionTooltip = `${table.name}已滿 (${used}/${table.capacity})`
+                      const used = othersSeats + guest.seatCount;
+                      maxCompanionTooltip = `${table.name}已滿 (${used}/${table.capacity})`;
                     }
                   }
                 }
@@ -635,16 +632,16 @@ export default function GuestManagementPage() {
                 const prefGuests = guest.seatPreferences
                   .slice().sort((a, b) => a.rank - b.rank)
                   .map((p) => guests.find((g) => g.id === p.preferredGuestId))
-                  .filter(Boolean) as Guest[]
+                  .filter(Boolean) as Guest[];
 
                 // Avoid pair guests for this guest
                 const avoidGuests = avoidPairs
                   .filter((ap) => ap.guestAId === guest.id || ap.guestBId === guest.id)
                   .map((ap) => {
-                    const otherId = ap.guestAId === guest.id ? ap.guestBId : ap.guestAId
-                    return guests.find((g) => g.id === otherId)
+                    const otherId = ap.guestAId === guest.id ? ap.guestBId : ap.guestAId;
+                    return guests.find((g) => g.id === otherId);
                   })
-                  .filter(Boolean) as Guest[]
+                  .filter(Boolean) as Guest[];
 
                 return (
                   <GuestRow
@@ -664,7 +661,7 @@ export default function GuestManagementPage() {
                     onDelete={() => handleDelete(guest)}
                     onEdit={() => setEditingGuestId(guest.id)}
                   />
-                )
+                );
               })}
 
               {/* Empty search result */}
@@ -731,14 +728,14 @@ export default function GuestManagementPage() {
               <button
                 disabled={clearingAll}
                 onClick={async () => {
-                  setClearingAll(true)
+                  setClearingAll(true);
                   try {
-                    await authFetch(`/api/events/${eventId}/reset`, { method: 'DELETE' })
-                    const { loadEvent } = useSeatingStore.getState()
-                    if (eventId) await loadEvent()
+                    await authFetch(`/api/events/${eventId}/reset`, { method: 'DELETE' });
+                    const { loadEvent } = useSeatingStore.getState();
+                    if (eventId) await loadEvent();
                   } finally {
-                    setClearingAll(false)
-                    setShowClearAllConfirm(false)
+                    setClearingAll(false);
+                    setShowClearAllConfirm(false);
                   }
                 }}
                 className="px-4 py-2 rounded-md border-none bg-[#DC2626] text-white text-sm font-medium"
@@ -764,8 +761,8 @@ export default function GuestManagementPage() {
 
       {/* Guest edit modal */}
       {editingGuestId && (() => {
-        const editGuest = guests.find((g) => g.id === editingGuestId)
-        if (!editGuest) return null
+        const editGuest = guests.find((g) => g.id === editingGuestId);
+        if (!editGuest) return null;
         return (
           <GuestFormModal
             mode="edit"
@@ -786,26 +783,26 @@ export default function GuestManagementPage() {
                 companionCount: data.companionCount,
                 dietaryNote: data.dietaryNote,
                 specialNote: data.specialNote,
-              })
+              });
               // Move table if changed
               if (data.assignedTableId !== (editGuest.assignedTableId || null)) {
-                moveGuest(editGuest.id, data.assignedTableId)
+                moveGuest(editGuest.id, data.assignedTableId);
               }
               // Update preferences
-              const prefs = data.preferredGuestIds.map((gid, i) => ({ preferredGuestId: gid, rank: i + 1 }))
-              await updateGuestPreferences(editGuest.id, prefs)
+              const prefs = data.preferredGuestIds.map((gid, i) => ({ preferredGuestId: gid, rank: i + 1 }));
+              await updateGuestPreferences(editGuest.id, prefs);
               // Handle avoid pairs: remove old ones not in new list, add new ones not in old list
               const oldAvoidIds = avoidPairs
                 .filter((ap) => ap.guestAId === editGuest.id || ap.guestBId === editGuest.id)
-                .map((ap) => ({ pairId: ap.id, otherId: ap.guestAId === editGuest.id ? ap.guestBId : ap.guestAId }))
+                .map((ap) => ({ pairId: ap.id, otherId: ap.guestAId === editGuest.id ? ap.guestBId : ap.guestAId }));
               for (const old of oldAvoidIds) {
                 if (!data.avoidGuestIds.includes(old.otherId)) {
-                  await removeAvoidPair(old.pairId)
+                  await removeAvoidPair(old.pairId);
                 }
               }
               for (const gid of data.avoidGuestIds) {
                 if (!oldAvoidIds.some((o) => o.otherId === gid)) {
-                  await addAvoidPair(editGuest.id, gid)
+                  await addAvoidPair(editGuest.id, gid);
                 }
               }
               // Handle subcategory
@@ -816,20 +813,20 @@ export default function GuestManagementPage() {
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({ assignments: [{ guestId: editGuest.id, subcategoryName: data.subcategoryName, category: data.category }] }),
-                  })
-                } catch {}
+                  });
+                } catch { /* no-op */ }
               } else if (editGuest.subcategory) {
-                await setGuestSubcategory(editGuest.id, null)
+                await setGuestSubcategory(editGuest.id, null);
               }
               // Reload to get fresh data
-              const { loadEvent } = useSeatingStore.getState()
-              if (eventId) await loadEvent()
-              setEditingGuestId(null)
+              const { loadEvent } = useSeatingStore.getState();
+              if (eventId) await loadEvent();
+              setEditingGuestId(null);
             }}
-            onDelete={(gid) => { setEditingGuestId(null); handleDelete(guests.find((g) => g.id === gid)!) }}
+            onDelete={(gid) => { setEditingGuestId(null); handleDelete(guests.find((g) => g.id === gid)!); }}
             onClose={() => setEditingGuestId(null)}
           />
-        )
+        );
       })()}
       {showAvoidModal && <AvoidPairModal onClose={() => setShowAvoidModal(false)} />}
 
@@ -844,16 +841,16 @@ export default function GuestManagementPage() {
           avoidPairs={avoidPairs}
           categoryColors={effectiveColors}
           onSubmit={async (data) => {
-            const { subcategoryName, assignedTableId, preferredGuestIds, avoidGuestIds, ...guestData } = data
-            const guest = await addGuest(guestData)
+            const { subcategoryName, assignedTableId, preferredGuestIds, avoidGuestIds, ...guestData } = data;
+            const guest = await addGuest(guestData);
             if (guest) {
-              if (assignedTableId) moveGuest(guest.id, assignedTableId)
+              if (assignedTableId) moveGuest(guest.id, assignedTableId);
               if (preferredGuestIds.length > 0) {
-                const prefs = preferredGuestIds.map((gid, i) => ({ preferredGuestId: gid, rank: i + 1 }))
-                await updateGuestPreferences(guest.id, prefs)
+                const prefs = preferredGuestIds.map((gid, i) => ({ preferredGuestId: gid, rank: i + 1 }));
+                await updateGuestPreferences(guest.id, prefs);
               }
               for (const gid of avoidGuestIds) {
-                await addAvoidPair(guest.id, gid)
+                await addAvoidPair(guest.id, gid);
               }
               if (subcategoryName && data.category) {
                 try {
@@ -862,20 +859,20 @@ export default function GuestManagementPage() {
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({ assignments: [{ guestId: guest.id, subcategoryName, category: data.category }] }),
-                  })
-                } catch {}
+                  });
+                } catch { /* no-op */ }
               }
-              const { loadEvent } = useSeatingStore.getState()
-              if (eventId) await loadEvent()
-              setShowAddModal(false)
-              setToast({ message: `已新增 ${data.name}` })
+              const { loadEvent } = useSeatingStore.getState();
+              if (eventId) await loadEvent();
+              setShowAddModal(false);
+              setToast({ message: `已新增 ${data.name}` });
             }
           }}
           onClose={() => setShowAddModal(false)}
         />
       )}
     </div>
-  )
+  );
 }
 
 // ─── Guest Row (read-only display + quick edits) ───
@@ -888,7 +885,7 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxCompanion, maxCom
   onSave: (patch: Partial<Guest>) => void; onRsvpToggle: () => void; onDelete: () => void
   onEdit: () => void
 }) => {
-  const [hovered, setHovered] = useState(false)
+  const [hovered, setHovered] = useState(false);
 
   return (
     <tr
@@ -975,12 +972,12 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxCompanion, maxCom
         {prefGuests.length > 0 ? (
           <div className="flex gap-[3px] flex-wrap">
             {prefGuests.map((g) => {
-              const cc = getCategoryColor(g.category, categoryColors)
+              const cc = getCategoryColor(g.category, categoryColors);
               return (
                 <span key={g.id} className="px-1.5 py-px rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)]" style={{
                   background: cc.background, border: `1px solid ${cc.border}`, color: cc.color,
                 }}>{g.aliases.length > 0 ? g.aliases[0] : g.name}</span>
-              )
+              );
             })}
           </div>
         ) : (
@@ -993,12 +990,12 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxCompanion, maxCom
         {avoidGuests.length > 0 ? (
           <div className="flex gap-[3px] flex-wrap">
             {avoidGuests.map((g) => {
-              const cc = getCategoryColor(g.category, categoryColors)
+              const cc = getCategoryColor(g.category, categoryColors);
               return (
                 <span key={g.id} className="px-1.5 py-px rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)]" style={{
                   background: cc.background, border: `1px solid ${cc.border}`, color: cc.color,
                 }}>{g.aliases.length > 0 ? g.aliases[0] : g.name}</span>
-              )
+              );
             })}
           </div>
         ) : (
@@ -1023,7 +1020,7 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxCompanion, maxCom
       {/* Delete button */}
       <td className="w-9 px-1">
         <button
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
           className="bg-transparent border-none cursor-pointer p-1 rounded-[var(--radius-sm,4px)] transition-colors duration-100"
           style={{ color: hovered ? 'var(--error)' : 'transparent' }}
           title="刪除"
@@ -1032,11 +1029,11 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxCompanion, maxCom
         </button>
       </td>
     </tr>
-  )
-}
+  );
+};
 
 // ─── Styles ─────────────────────────────────────────
 
-const thClass = "px-3 py-2 text-left font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--text-muted)] uppercase cursor-pointer select-none whitespace-nowrap"
+const thClass = "px-3 py-2 text-left font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--text-muted)] uppercase cursor-pointer select-none whitespace-nowrap";
 
-const tdClass = "px-3 py-2 align-middle"
+const tdClass = "px-3 py-2 align-middle";

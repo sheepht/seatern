@@ -42,5 +42,5 @@ export function ViolationModal({ guestName, conflictName, reason, onConfirm, onC
         </div>
       </div>
     </div>
-  )
+  );
 }

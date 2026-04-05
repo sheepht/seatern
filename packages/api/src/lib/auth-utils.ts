@@ -1,57 +1,57 @@
-import { jwtVerify, createRemoteJWKSet } from 'jose'
-import { prisma } from '@seatern/db'
+import { jwtVerify, createRemoteJWKSet } from 'jose';
+import { prisma } from '@seatern/db';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 
-let jwks: ReturnType<typeof createRemoteJWKSet> | null = null
+let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
 function getJWKS() {
   if (!jwks) {
     if (!SUPABASE_URL) {
-      throw new Error('SUPABASE_URL is not configured')
+      throw new Error('SUPABASE_URL is not configured');
     }
     jwks = createRemoteJWKSet(
       new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
-    )
+    );
   }
-  return jwks
+  return jwks;
 }
 
 export async function verifyToken(token: string) {
   const { payload } = await jwtVerify(token, getJWKS(), {
     issuer: `${SUPABASE_URL}/auth/v1`,
-  })
-  return payload
+  });
+  return payload;
 }
 
 export async function ensureUser(payload: { sub?: string; email?: unknown; user_metadata?: unknown }) {
-  const userId = payload.sub
-  if (!userId) throw new Error('Invalid token: missing sub claim')
+  const userId = payload.sub;
+  if (!userId) throw new Error('Invalid token: missing sub claim');
 
-  const email = (payload.email as string) || `${userId}@unknown`
-  const metadata = (payload.user_metadata as Record<string, unknown>) || {}
+  const email = (payload.email as string) || `${userId}@unknown`;
+  const metadata = (payload.user_metadata as Record<string, unknown>) || {};
   const name =
     (metadata.full_name as string) ||
     (metadata.name as string) ||
-    email.split('@')[0]
-  const avatarUrl = (metadata.avatar_url as string) || undefined
+    email.split('@')[0];
+  const avatarUrl = (metadata.avatar_url as string) || undefined;
 
   // Try by id first, then by email (handles OAuth linking where Supabase id differs)
-  const byId = await prisma.user.findUnique({ where: { id: userId } })
+  const byId = await prisma.user.findUnique({ where: { id: userId } });
   if (byId) {
-    if (byId.deletedAt) throw new Error('Account deleted')
-    await prisma.user.update({ where: { id: userId }, data: { name, avatarUrl } })
+    if (byId.deletedAt) throw new Error('Account deleted');
+    await prisma.user.update({ where: { id: userId }, data: { name, avatarUrl } });
   } else {
-    const byEmail = await prisma.user.findUnique({ where: { email } })
+    const byEmail = await prisma.user.findUnique({ where: { email } });
     if (byEmail) {
-      if (byEmail.deletedAt) throw new Error('Account deleted')
+      if (byEmail.deletedAt) throw new Error('Account deleted');
       // Same email, different Supabase id (e.g. LINE + Google same person)
       // Update the existing record's id to the new Supabase id
-      await prisma.user.update({ where: { email }, data: { id: userId, name, avatarUrl } })
+      await prisma.user.update({ where: { email }, data: { id: userId, name, avatarUrl } });
     } else {
-      await prisma.user.create({ data: { id: userId, email, name, avatarUrl } })
+      await prisma.user.create({ data: { id: userId, email, name, avatarUrl } });
     }
   }
 
-  return userId
+  return userId;
 }
