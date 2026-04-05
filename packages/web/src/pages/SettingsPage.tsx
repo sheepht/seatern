@@ -9,9 +9,9 @@ export default function SettingsPage() {
   const navigate = useNavigate()
   const { user, signOut } = useAuthStore()
 
-  // 進入設定頁時重新取得最新 user（LINE 綁定後 metadata 會更新）
+  // 進入設定頁時強制刷新 session，取得最新 user_metadata（LINE 綁定後 admin API 更新的 metadata 需要 refresh 才能拿到）
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.refreshSession().then(({ data }) => {
       if (data.user) useAuthStore.setState({ user: data.user })
     })
   }, [])
