@@ -95,11 +95,18 @@ events.get('/:id', async (c) => {
   return c.json(event)
 })
 
-// POST /events — 建立新活動
+// POST /events — 建立新活動（同一 owner 已有活動時直接回傳，防重複建立）
 events.post('/', async (c) => {
   const ownerId = c.get('ownerId')
   const ownerType = c.get('ownerType')
   const body = await c.req.json<{ name: string; date?: string; type?: string; categories?: string[] }>()
+
+  // 先查是否已有活動，防 race condition 產生重複
+  const existing = await prisma.event.findFirst({
+    where: { ownerId, ownerType },
+    orderBy: { updatedAt: 'desc' },
+  })
+  if (existing) return c.json(existing, 200)
 
   const event = await prisma.event.create({
     data: {
