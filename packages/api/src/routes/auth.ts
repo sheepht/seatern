@@ -59,6 +59,10 @@ auth.get('/line/callback', async (c) => {
   if (!code || !state) return loginError('LINE 登入失敗')
   if (state !== storedState) return loginError('登入驗證失敗，請重試')
 
+  // 判斷是 link mode 還是 login mode
+  const isLinkMode = state.startsWith('link:')
+  const linkUserId = isLinkMode ? state.split(':')[1] : null
+
   if (!LINE_CHANNEL_ID || !LINE_CHANNEL_SECRET || !LINE_CALLBACK_URL) {
     return loginError('LINE Login 未設定')
   }
@@ -112,6 +116,28 @@ auth.get('/line/callback', async (c) => {
       pictureUrl?: string
     }
 
+    // ─── Link mode：綁定 LINE 到現有帳號 ──────────────
+    if (isLinkMode && linkUserId) {
+      // 把 LINE 資訊寫入現有用戶的 user_metadata
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(linkUserId, {
+        user_metadata: {
+          line_user_id: profile.userId,
+          line_display_name: profile.displayName,
+          line_avatar_url: profile.pictureUrl,
+        },
+      })
+
+      if (updateError) {
+        console.error('LINE link failed:', updateError)
+        return loginError('LINE 綁定失敗')
+      }
+
+      // Redirect 回設定頁
+      const frontendOrigin = process.env.VITE_FRONTEND_URL || 'http://localhost:5173'
+      return c.redirect(`${frontendOrigin}/workspace/settings?linked=line`)
+    }
+
+    // ─── Login mode：正常 LINE 登入 ──────────────────
     // Use real email if available, fallback to synthetic email
     const email = lineEmail || `line_${profile.userId}@seatern.app`
     let supabaseUserId: string
@@ -168,8 +194,8 @@ auth.get('/line/callback', async (c) => {
     }
 
     // Redirect to frontend auth callback with token_hash for supabase.auth.verifyOtp
-    const frontendOrigin = process.env.VITE_FRONTEND_URL || 'http://localhost:5173'
-    const redirectUrl = new URL('/auth/callback', frontendOrigin)
+    const frontendOrigin2 = process.env.VITE_FRONTEND_URL || 'http://localhost:5173'
+    const redirectUrl = new URL('/auth/callback', frontendOrigin2)
     redirectUrl.searchParams.set('token_hash', linkData.properties.hashed_token)
     redirectUrl.searchParams.set('type', 'magiclink')
 
@@ -178,6 +204,80 @@ auth.get('/line/callback', async (c) => {
     console.error('LINE OAuth error:', err)
     return loginError('LINE 登入失敗')
   }
+})
+
+// ─── LINE Link（綁定 LINE 到現有帳號）─────────────────
+
+// GET /auth/line/link — 發起 LINE OAuth，帶 link mode
+auth.get('/line/link', async (c) => {
+  if (!LINE_CHANNEL_ID || !LINE_CALLBACK_URL) {
+    return c.json({ error: 'LINE Login not configured' }, 500)
+  }
+
+  // 驗證目前登入的用戶
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  const token = authHeader.slice(7)
+  let userId: string
+  if (process.env.NODE_ENV !== 'production' && token.startsWith('dev-bypass-')) {
+    userId = token.slice('dev-bypass-'.length)
+  } else {
+    const payload = await verifyToken(token)
+    userId = await ensureUser(payload)
+  }
+
+  // state 裡編碼 link mode + userId
+  const state = `link:${userId}:${crypto.randomUUID()}`
+  setCookie(c, LINE_STATE_COOKIE, state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Lax',
+    maxAge: 60 * 10,
+    path: '/',
+  })
+
+  // 回傳 LINE OAuth URL 讓前端 redirect（因為前端需要帶 auth header）
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: LINE_CHANNEL_ID,
+    redirect_uri: LINE_CALLBACK_URL,
+    state,
+    scope: 'profile openid email',
+  })
+
+  return c.json({ url: `https://access.line.me/oauth2/v2.1/authorize?${params}` })
+})
+
+// POST /auth/line/unlink — 解除 LINE 綁定
+auth.post('/line/unlink', async (c) => {
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  const token = authHeader.slice(7)
+  let userId: string
+  if (process.env.NODE_ENV !== 'production' && token.startsWith('dev-bypass-')) {
+    userId = token.slice('dev-bypass-'.length)
+  } else {
+    const payload = await verifyToken(token)
+    userId = await ensureUser(payload)
+  }
+
+  // 清除 user_metadata 裡的 LINE 資訊
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      provider: 'email',
+      line_user_id: null,
+    },
+  })
+
+  if (error) {
+    return c.json({ error: '解除綁定失敗' }, 500)
+  }
+
+  return c.json({ ok: true })
 })
 
 // ─── Claim Event ─────────────────────────────────────

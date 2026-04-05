@@ -49,12 +49,13 @@ export default function SettingsPage() {
   const avatarUrl = user?.user_metadata?.avatar_url
   const initial = name ? name[0] : '?'
 
-  // Identities
+  // Identities — Google/Email 用 Supabase identities，LINE 用 user_metadata
   const identities = (user as any)?.identities ?? []
   const linkedGoogle = identities.find((i: any) => i.provider === 'google')
-  const linkedLine = identities.find((i: any) => i.provider === 'line')
   const linkedEmail = identities.find((i: any) => i.provider === 'email')
-  const identityCount = identities.length
+  const linkedLine = !!(user as any)?.user_metadata?.line_user_id
+  // 計算已綁定的登入方式數量（用於防止解除最後一個）
+  const linkedCount = (linkedGoogle ? 1 : 0) + (linkedEmail ? 1 : 0) + (linkedLine ? 1 : 0)
 
   // --- Handlers ---
 
@@ -133,17 +134,35 @@ export default function SettingsPage() {
     })
   }
 
-  const handleLinkLine = () => {
-    // LINE OAuth 由後端處理, 完成後 redirect 回設定頁
-    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/line?redirect=/workspace/settings`
+  const handleLinkLine = async () => {
+    try {
+      const res = await api.get('/auth/line/link')
+      window.location.href = res.data.url
+    } catch {
+      // ignore
+    }
   }
 
-  const handleUnlink = async (identity: any) => {
-    if (identityCount <= 1) return // 不能解除最後一個登入方式
-    setUnlinking(identity.provider)
+  const handleUnlinkLine = async () => {
+    setUnlinking('line')
+    try {
+      await api.post('/auth/line/unlink')
+      // 重新取得 user 更新 metadata
+      const { data } = await supabase.auth.getUser()
+      if (data.user) {
+        useAuthStore.setState({ user: data.user })
+      }
+    } catch {
+      // ignore
+    } finally {
+      setUnlinking(null)
+    }
+  }
+
+  const handleUnlinkGoogle = async (identity: any) => {
+    setUnlinking('google')
     try {
       await supabase.auth.unlinkIdentity(identity)
-      // 重新取得 session 更新 identities
       const { data } = await supabase.auth.getUser()
       if (data.user) {
         useAuthStore.setState({ user: data.user })
@@ -295,10 +314,10 @@ export default function SettingsPage() {
                   <span style={{ fontSize: 13 }}>Google</span>
                   {linkedGoogle ? (
                     <button
-                      onClick={() => handleUnlink(linkedGoogle)}
-                      disabled={identityCount <= 1 || unlinking === 'google'}
-                      style={{ ...smallBtnStyle, color: identityCount <= 1 ? 'var(--text-muted)' : 'var(--error)', opacity: identityCount <= 1 ? 0.5 : 1 }}
-                      title={identityCount <= 1 ? '至少需要保留一個登入方式' : ''}
+                      onClick={() => handleUnlinkGoogle(linkedGoogle)}
+                      disabled={linkedCount <= 1 || unlinking === 'google'}
+                      style={{ ...smallBtnStyle, color: linkedCount <= 1 ? 'var(--text-muted)' : 'var(--error)', opacity: linkedCount <= 1 ? 0.5 : 1 }}
+                      title={linkedCount <= 1 ? '至少需要保留一個登入方式' : ''}
                     >
                       {unlinking === 'google' ? '...' : '解除'}
                     </button>
@@ -313,10 +332,10 @@ export default function SettingsPage() {
                   <span style={{ fontSize: 13 }}>LINE</span>
                   {linkedLine ? (
                     <button
-                      onClick={() => handleUnlink(linkedLine)}
-                      disabled={identityCount <= 1 || unlinking === 'line'}
-                      style={{ ...smallBtnStyle, color: identityCount <= 1 ? 'var(--text-muted)' : 'var(--error)', opacity: identityCount <= 1 ? 0.5 : 1 }}
-                      title={identityCount <= 1 ? '至少需要保留一個登入方式' : ''}
+                      onClick={handleUnlinkLine}
+                      disabled={linkedCount <= 1 || unlinking === 'line'}
+                      style={{ ...smallBtnStyle, color: linkedCount <= 1 ? 'var(--text-muted)' : 'var(--error)', opacity: linkedCount <= 1 ? 0.5 : 1 }}
+                      title={linkedCount <= 1 ? '至少需要保留一個登入方式' : ''}
                     >
                       {unlinking === 'line' ? '...' : '解除'}
                     </button>
