@@ -119,7 +119,7 @@ export default function SettingsPage() {
   }
 
   const handleLinkGoogle = async () => {
-    await supabase.auth.linkIdentity({ provider: 'google', options: { redirectTo: `${window.location.origin}/workspace/settings` } })
+    await supabase.auth.linkIdentity({ provider: 'google', options: { redirectTo: `${window.location.origin}/settings` } })
   }
   const handleLinkLine = async () => {
     try { const res = await api.get('/auth/line/link'); window.location.href = res.data.url } catch { /* */ }
@@ -148,10 +148,10 @@ export default function SettingsPage() {
 
   // Provider badge
   const providerBadge = {
-    google: { bg: '#E8F0FE', color: '#4285F4', label: 'Google' },
-    line: { bg: '#E6F9ED', color: '#06C755', label: 'LINE' },
-    email: { bg: 'var(--accent-light)', color: 'var(--accent)', label: 'Email' },
-  }[provider] ?? { bg: 'var(--accent-light)', color: 'var(--accent)', label: provider }
+    google: { cls: 'bg-blue-50 text-blue-600', label: 'Google' },
+    line: { cls: 'bg-green-50 text-green-600', label: 'LINE' },
+    email: { cls: 'bg-[var(--accent-light)] text-[var(--accent)]', label: 'Email' },
+  }[provider] ?? { cls: 'bg-[var(--accent-light)] text-[var(--accent)]', label: provider }
 
   const pct = Math.min(100, (tables.length / tableLimit) * 100)
 
@@ -180,7 +180,7 @@ export default function SettingsPage() {
                       <input value={name} onChange={(e) => setName(e.target.value)} className="settings-input" />
                       <div className="mt-2 text-[13px] text-[var(--text-muted)]">{user?.email}</div>
                       <div className="mt-1">
-                        <span className="inline-block text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: providerBadge.bg, color: providerBadge.color }}>
+                        <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${providerBadge.cls}`}>
                           {providerBadge.label}
                         </span>
                       </div>
@@ -269,12 +269,6 @@ export default function SettingsPage() {
                     <span className="text-lg font-bold text-[var(--text-primary)] font-[family-name:var(--font-display)]">專業版</span>
                     <span className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold bg-[var(--bg-primary)] text-[var(--text-muted)]">即將推出</span>
                   </div>
-                  <ul className="text-[13px] pl-4 flex flex-col gap-1 m-0 mb-3 text-[var(--text-muted)]">
-                    <li>最多 50+ 桌</li>
-                    <li>多活動管理</li>
-                    <li>匯出 PDF 座位表</li>
-                    <li>優先客服支援</li>
-                  </ul>
                   <button disabled className="btn-primary !cursor-not-allowed bg-[var(--border)] text-[var(--text-muted)]">敬請期待</button>
                 </div>
               </div>
