@@ -160,11 +160,13 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
   const setSelectedTable = useSeatingStore((s) => s.setSelectedTable)
   const removeTable = useSeatingStore((s) => s.removeTable)
   const updateTableName = useSeatingStore((s) => s.updateTableName)
+  const updateTableCapacity = useSeatingStore((s) => s.updateTableCapacity)
 
   const [isHovered, setIsHovered] = useState(false)
   const [showRenameModal, setShowRenameModal] = useState(false)
   const [showActionConfirm, setShowActionConfirm] = useState(false)
   const [renameValue, setRenameValue] = useState(table.name)
+  const [capacityValue, setCapacityValue] = useState(table.capacity)
   // 量測桌名文字長度，用來精確定位圖示
   const namePathRef = useRef<SVGTextPathElement>(null)
   const [nameTextLength, setNameTextLength] = useState(table.name.length * 20)
@@ -293,6 +295,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
   const handleRename = () => {
     const trimmed = renameValue.trim()
     if (trimmed && trimmed !== table.name) updateTableName(table.id, trimmed)
+    if (capacityValue !== table.capacity) updateTableCapacity(table.id, capacityValue)
     setShowRenameModal(false)
   }
 
@@ -347,7 +350,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
             className="table-btn-edit cursor-pointer"
             transform={`translate(${editX}, ${editY}) scale(${counterScale})`}
             onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => { e.stopPropagation(); setRenameValue(table.name); setShowRenameModal(true) }}
+            onClick={(e) => { e.stopPropagation(); setRenameValue(table.name); setCapacityValue(table.capacity); setShowRenameModal(true) }}
           >
             <g className="table-icon-pop" style={{ '--icon-from-x': `${editFromX * zoom}px`, '--icon-from-y': `${editFromY * zoom}px` } as React.CSSProperties}>
               <circle r={iconR} fill="white" stroke="#D6D3D1" strokeWidth="1.5" />
@@ -774,7 +777,8 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
       <div className="fixed inset-0 z-[999] flex items-center justify-center">
         <div className="absolute inset-0 bg-black/25" onClick={() => setShowRenameModal(false)} />
         <div className="relative bg-[var(--bg-surface)] rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] p-6 w-[300px] border border-[var(--border)]">
-          <p className="text-[13px] font-semibold text-[var(--text-primary)] mb-3">修改桌名</p>
+          <p className="text-[13px] font-semibold text-[var(--text-primary)] mb-3">編輯桌次</p>
+          <label className="block text-[12px] text-[var(--text-muted)] mb-1">桌名</label>
           <input
             autoFocus
             value={renameValue}
@@ -782,6 +786,21 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
             onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setShowRenameModal(false) }}
             className="w-full px-2.5 py-2 border border-[var(--accent)] rounded-md text-[13px] outline-none bg-[var(--bg-surface)] text-[var(--text-primary)] box-border font-inherit"
           />
+          <label className="block text-[12px] text-[var(--text-muted)] mt-3 mb-1">座位數</label>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCapacityValue((v) => Math.max(Math.max(8, seatCount), v - 1))}
+              disabled={capacityValue <= Math.max(8, seatCount)}
+              className="w-8 h-8 rounded-md border border-[var(--border)] flex items-center justify-center text-base bg-[var(--bg-surface)] cursor-pointer disabled:opacity-40 disabled:cursor-default text-[var(--text-secondary)]"
+            >−</button>
+            <span className="text-[15px] font-semibold text-[var(--text-primary)] min-w-[32px] text-center tabular-nums">{capacityValue}</span>
+            <button
+              onClick={() => setCapacityValue((v) => Math.min(12, v + 1))}
+              disabled={capacityValue >= 12}
+              className="w-8 h-8 rounded-md border border-[var(--border)] flex items-center justify-center text-base bg-[var(--bg-surface)] cursor-pointer disabled:opacity-40 disabled:cursor-default text-[var(--text-secondary)]"
+            >+</button>
+            <span className="text-[12px] text-[var(--text-muted)] ml-1">位</span>
+          </div>
           <div className="flex gap-2 justify-end mt-4">
             <button onClick={() => setShowRenameModal(false)} className="px-3.5 py-1.5 rounded-md text-xs border border-[var(--border)] bg-transparent text-[var(--text-secondary)] cursor-pointer">取消</button>
             <button onClick={handleRename} className="px-3.5 py-1.5 rounded-md text-xs border-none bg-[var(--accent)] text-white cursor-pointer font-semibold">確認</button>

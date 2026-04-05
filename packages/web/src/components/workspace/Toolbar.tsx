@@ -50,8 +50,6 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
   const [renameEventValue, setRenameEventValue] = useState('')
   const [showMenu, setShowMenu] = useState(false)
   const [showArrangeConfirm, setShowArrangeConfirm] = useState(false)
-  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false)
-  const [clearingAll, setClearingAll] = useState(false)
   const [arranging, setArranging] = useState(false)
   const autoArrangeTables = useSeatingStore((s) => s.autoArrangeTables)
   const removeTable = useSeatingStore((s) => s.removeTable)
@@ -574,20 +572,6 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                 <div
                   className="absolute right-0 top-full mt-1 z-50 py-1 min-w-[200px] bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-md,8px)] shadow-[0_8px_30px_rgba(0,0,0,0.12)]"
                 >
-                  {/* 清除所有資料 */}
-                  <button
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-[#FEF2F2] disabled:hover:bg-transparent disabled:opacity-40 disabled:cursor-default text-[#DC2626] font-[family-name:var(--font-body)]"
-                    style={{ cursor: guests.length === 0 && tables.length === 0 ? 'default' : 'pointer' }}
-                    disabled={guests.length === 0 && tables.length === 0}
-                    onClick={() => { setShowMenu(false); setShowClearAllConfirm(true) }}
-                  >
-                    <Trash2 size={16} className="shrink-0" />
-                    <span>清除所有資料</span>
-                  </button>
-
-                  {/* 分隔線 */}
-                  <div className="border-t border-[var(--border)] my-1" />
-
                   {/* 登入 / 用戶資訊 */}
                   {authUser ? (
                     <>
@@ -782,47 +766,6 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
           </div>
         )
       })()}
-      {showClearAllConfirm && createPortal(
-        <div className="fixed inset-0 z-[999] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/25" onClick={() => setShowClearAllConfirm(false)} />
-          <div className="relative bg-[var(--bg-surface)] rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] p-6 w-[360px] border border-[var(--border)]">
-            <p className="text-base font-semibold text-[#DC2626] mb-2">清除所有資料</p>
-            <p className="text-sm text-[var(--text-secondary)] mb-2">
-              將刪除此活動的所有賓客（{guests.length} 位）和所有桌次（{tables.length} 桌）。
-            </p>
-            <p className="text-[13px] text-[#DC2626] mb-4 font-medium">
-              此操作無法復原。
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowClearAllConfirm(false)}
-                className="px-4 py-2 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] cursor-pointer text-sm text-[var(--text-secondary)]"
-              >
-                取消
-              </button>
-              <button
-                disabled={clearingAll}
-                onClick={async () => {
-                  setClearingAll(true)
-                  try {
-                    await authFetch(`/api/events/${eid}/reset`, { method: 'DELETE' })
-                    const { loadEvent } = useSeatingStore.getState()
-                    if (eid) await loadEvent()
-                  } finally {
-                    setClearingAll(false)
-                    setShowClearAllConfirm(false)
-                  }
-                }}
-                className="px-4 py-2 rounded-md border-none bg-[#DC2626] text-white text-sm font-medium"
-                style={{ cursor: clearingAll ? 'wait' : 'pointer', opacity: clearingAll ? 0.6 : 1 }}
-              >
-                {clearingAll ? '清除中...' : '確定清除'}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
     </>
   )
 }

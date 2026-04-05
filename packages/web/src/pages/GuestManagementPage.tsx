@@ -270,6 +270,8 @@ export default function GuestManagementPage() {
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null)
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false)
+  const [clearingAll, setClearingAll] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ guestId: string; guestName: string; tableName: string } | null>(null)
   const deleteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const [editingGuestId, setEditingGuestId] = useState<string | null>(null)
@@ -448,11 +450,11 @@ export default function GuestManagementPage() {
 
   // ─── Main table view ────────────────────────────────
   return (
-    <div className="flex-1 bg-[var(--bg-primary)] overflow-auto">
-      <div className="max-w-[1440px] mx-auto p-6 w-full">
+    <div className="flex-1 bg-[var(--bg-primary)] flex flex-col overflow-hidden">
+      <div className="max-w-[1440px] mx-auto px-6 pt-6 w-full flex flex-col flex-1 min-h-0">
 
         {/* Toolbar: Search + Filter (left) | Stats (right) */}
-        <div className="flex flex-wrap items-center gap-3 py-3 font-[family-name:var(--font-body)] text-sm text-[var(--text-secondary)] border-b border-[var(--border)]">
+        <div className="flex flex-wrap items-center gap-3 py-3 font-[family-name:var(--font-body)] text-sm text-[var(--text-secondary)] border-b border-[var(--border)] shrink-0">
           {/* Left: Search + Category + RSVP badge */}
           <div className="relative flex-[0_1_240px]">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
@@ -568,6 +570,18 @@ export default function GuestManagementPage() {
             避桌 {avoidPairs.length > 0 && <span className="font-semibold">{avoidPairs.length}</span>}
           </button>
 
+          {/* 清除所有賓客 */}
+          <button
+            onClick={() => setShowClearAllConfirm(true)}
+            disabled={guests.length === 0}
+            className="flex items-center gap-1 px-3 py-[5px] rounded-[var(--radius-sm,4px)] border border-[var(--border)] text-[13px] font-[family-name:var(--font-ui)] cursor-pointer disabled:opacity-40 disabled:cursor-default"
+            style={{
+              background: guests.length > 0 ? '#FEF2F2' : 'var(--bg-surface)',
+              color: guests.length > 0 ? '#DC2626' : 'var(--text-secondary)',
+            }}
+          >
+            <Trash2 size={14} /> 刪除所有賓客
+          </button>
 
           {/* Right: Stats */}
           <div className="ml-auto flex items-center gap-3">
@@ -576,9 +590,9 @@ export default function GuestManagementPage() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto mt-2">
+        <div className="overflow-auto mt-2 flex-1 min-h-0">
           <table className="w-full border-collapse font-[family-name:var(--font-body)] text-[15px]">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-[var(--bg-primary)]">
               <tr className="border-b-2 border-[var(--border)]">
                 <th onClick={() => handleSort('name')} className={thClass}>姓名{sortArrow('name')}</th>
                 <th onClick={() => handleSort('category')} className={thClass}>分類{sortArrow('category')}</th>
@@ -694,6 +708,49 @@ export default function GuestManagementPage() {
 
       {/* Toast */}
       {toast && <Toast message={toast.message} onUndo={toast.onUndo} onClose={() => setToast(null)} />}
+
+      {/* Clear all guests confirm modal */}
+      {showClearAllConfirm && createPortal(
+        <div className="fixed inset-0 z-[999] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/25" onClick={() => setShowClearAllConfirm(false)} />
+          <div className="relative bg-[var(--bg-surface)] rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] p-6 w-[360px] border border-[var(--border)]">
+            <p className="text-base font-semibold text-[#DC2626] mb-2">刪除所有賓客</p>
+            <p className="text-sm text-[var(--text-secondary)] mb-2">
+              將刪除此活動的所有賓客（{guests.length} 位）和所有桌次（{tables.length} 桌）。
+            </p>
+            <p className="text-[13px] text-[#DC2626] mb-4 font-medium">
+              此操作無法復原。
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowClearAllConfirm(false)}
+                className="px-4 py-2 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] cursor-pointer text-sm text-[var(--text-secondary)]"
+              >
+                取消
+              </button>
+              <button
+                disabled={clearingAll}
+                onClick={async () => {
+                  setClearingAll(true)
+                  try {
+                    await authFetch(`/api/events/${eventId}/reset`, { method: 'DELETE' })
+                    const { loadEvent } = useSeatingStore.getState()
+                    if (eventId) await loadEvent()
+                  } finally {
+                    setClearingAll(false)
+                    setShowClearAllConfirm(false)
+                  }
+                }}
+                className="px-4 py-2 rounded-md border-none bg-[#DC2626] text-white text-sm font-medium"
+                style={{ cursor: clearingAll ? 'wait' : 'pointer', opacity: clearingAll ? 0.6 : 1 }}
+              >
+                {clearingAll ? '清除中...' : '確定清除'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {/* Delete confirm modal */}
       {deleteConfirm && (

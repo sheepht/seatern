@@ -139,6 +139,7 @@ interface SeatingState {
   addTable: (name: string, positionX: number, positionY: number) => Promise<void>
   removeTable: (tableId: string) => Promise<void>
   updateTableName: (tableId: string, name: string) => void
+  updateTableCapacity: (tableId: string, capacity: number) => void
   updateTablePosition: (tableId: string, x: number, y: number) => void
   saveTablePosition: (tableId: string, fromX?: number, fromY?: number) => void
   saveSnapshot: (name: string) => Promise<void>
@@ -900,6 +901,29 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ name }),
+    }).catch(console.error)
+  },
+
+  updateTableCapacity: (tableId, capacity) => {
+    const { eventId, tables, guests, avoidPairs } = get()
+    const updatedTables = tables.map((t) => t.id === tableId ? { ...t, capacity } : t)
+    const result = recalculateAll(guests, updatedTables, avoidPairs)
+    set({
+      tables: updatedTables.map((t) => {
+        const s = result.tables.find((ts) => ts.id === t.id)
+        return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t
+      }),
+      guests: guests.map((g) => {
+        const s = result.guests.find((gs) => gs.id === g.id)
+        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g
+      }),
+    })
+    if (!eventId) return
+    fetch(`/api/events/${eventId}/tables/${tableId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ capacity }),
     }).catch(console.error)
   },
 
