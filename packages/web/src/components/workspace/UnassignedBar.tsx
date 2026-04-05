@@ -16,24 +16,23 @@ export function UnassignedBar() {
   return (
     <div
       ref={setNodeRef}
-      className="px-4 py-3 transition-colors"
+      className="px-4 py-3 transition-colors border-t border-[var(--border)]"
       style={{
-        borderTop: '1px solid var(--border)',
         background: isOver ? 'var(--accent-light)' : 'var(--bg-surface)',
       }}
     >
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+        <span className="text-xs font-medium text-[var(--text-secondary)]">
           未安排（<span className="font-data">{unassigned.length}</span> 人 / <span className="font-data">{totalSeats}</span> 席）
         </span>
-        {isOver && <span className="text-xs" style={{ color: 'var(--accent-dark)' }}>放開以取消安排</span>}
+        {isOver && <span className="text-xs text-[var(--accent-dark)]">放開以取消安排</span>}
       </div>
       <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto min-h-[28px]">
         {unassigned.map((g) => (
           <GuestChip key={g.id} guest={g} />
         ))}
         {unassigned.length === 0 && (
-          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>所有賓客都已安排</span>
+          <span className="text-xs text-[var(--text-muted)]">所有賓客都已安排</span>
         )}
       </div>
     </div>

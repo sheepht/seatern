@@ -22,17 +22,17 @@ export default function WorkspaceLayout() {
 
   if (loading) {
     return (
-      <div className="h-screen flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+      <div className="h-screen flex flex-col bg-[var(--bg-primary)]">
         <Toolbar page={page} />
         <div className="flex-1 flex items-center justify-center">
-          <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>載入中...</p>
+          <p className="text-[var(--text-muted)] font-[family-name:var(--font-body)]">載入中...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="h-screen flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+    <div className="h-screen flex flex-col bg-[var(--bg-primary)]">
       <Toolbar page={page} />
       <Outlet />
       <TableLimitModal />

@@ -68,76 +68,63 @@ function GuestPicker({ guests, excludeIds, value, onChange, categoryColors, plac
     return (
       <span
         onClick={() => onChange(null)}
+        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-sm,4px)] text-[13px] font-[family-name:var(--font-ui)] font-medium cursor-pointer"
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          padding: '4px 10px', borderRadius: 'var(--radius-sm, 4px)',
           background: cc.background, border: `1px solid ${cc.border}`,
-          fontSize: 13, fontFamily: 'var(--font-ui)', color: cc.color,
-          cursor: 'pointer', fontWeight: 500,
+          color: cc.color,
         }}
       >
         {display}
-        <span style={{ fontSize: 10, opacity: 0.6 }}>✕</span>
+        <span className="text-[10px] opacity-60">✕</span>
       </span>
     )
   }
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', flex: 1 }}>
+    <div ref={containerRef} className="relative flex-1">
       <input
         ref={inputRef}
         value={search}
         onChange={(e) => { setSearch(e.target.value); if (!open) setOpen(true) }}
         onFocus={() => setOpen(true)}
         placeholder={placeholder}
-        style={{
-          width: '100%', padding: '5px 10px', fontSize: 13, fontFamily: 'var(--font-ui)',
-          border: '1px solid var(--border)', borderRadius: 'var(--radius-sm, 4px)',
-          outline: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)',
-        }}
+        className="w-full px-2.5 py-[5px] text-[13px] font-[family-name:var(--font-ui)] border border-[var(--border)] rounded-[var(--radius-sm,4px)] outline-none bg-[var(--bg-surface)] text-[var(--text-primary)]"
         onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; setOpen(true) }}
         onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
       />
       {open && (
         <div
           ref={panelRef}
-          style={{
-            position: 'absolute', left: 0, top: '100%', marginTop: 4,
-            width: '100%', maxHeight: 200, overflowY: 'auto', zIndex: 10,
-            background: 'var(--bg-surface)', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-sm, 4px)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-            padding: 4,
-          }}
+          className="absolute left-0 top-full mt-1 w-full max-h-[200px] overflow-y-auto z-10 bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-sm,4px)] shadow-[0_8px_24px_rgba(0,0,0,0.12)] p-1"
         >
           {grouped.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: 6 }}>
+            <div className="text-xs text-[var(--text-muted)] p-1.5">
               {search.trim() ? `找不到「${search}」` : '沒有可選的賓客'}
             </div>
           ) : (
             grouped.map(({ category, subGroups }) => {
               const cc = getCategoryColor(category, categoryColors)
               return (
-                <div key={category} style={{ marginBottom: 6 }}>
-                  <div style={{
-                    fontSize: 11, fontWeight: 600, padding: '2px 6px', marginBottom: 2,
-                    color: cc.color, opacity: 0.7,
-                  }}>{category}</div>
-                  <div style={{ paddingLeft: 6, borderLeft: `2px solid ${cc.border}` }}>
+                <div key={category} className="mb-1.5">
+                  <div
+                    className="text-[11px] font-semibold px-1.5 py-0.5 mb-0.5 opacity-70"
+                    style={{ color: cc.color }}
+                  >{category}</div>
+                  <div className="pl-1.5" style={{ borderLeft: `2px solid ${cc.border}` }}>
                     {subGroups.map(({ tagName, guests: sgGuests }) => (
-                      <div key={tagName ?? '__no_subcat__'} style={{ marginBottom: 4 }}>
+                      <div key={tagName ?? '__no_subcat__'} className="mb-1">
                         {tagName && (
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{tagName}</div>
+                          <div className="text-[11px] text-[var(--text-muted)] mb-0.5">{tagName}</div>
                         )}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                        <div className="flex flex-wrap gap-0.5">
                           {sgGuests.map((g) => (
                             <button
                               key={g.id}
                               onMouseDown={(e) => { e.preventDefault(); onChange(g.id); setOpen(false); setSearch('') }}
+                              className="px-2 py-0.5 text-xs font-[family-name:var(--font-body)] rounded-[var(--radius-sm,4px)] cursor-pointer whitespace-nowrap"
                               style={{
-                                padding: '2px 8px', fontSize: 12, fontFamily: 'var(--font-body)',
-                                borderRadius: 'var(--radius-sm, 4px)', cursor: 'pointer',
                                 border: `1px solid ${cc.border}`, background: cc.background,
-                                color: cc.color, whiteSpace: 'nowrap',
+                                color: cc.color,
                               }}
                               onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-light)'; e.currentTarget.style.borderColor = 'var(--accent)' }}
                               onMouseLeave={(e) => { e.currentTarget.style.background = cc.background; e.currentTarget.style.borderColor = cc.border }}
@@ -224,32 +211,28 @@ export function AvoidPairModal({ onClose }: Props) {
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={onClose}>
       <div
-        className="w-full p-5"
-        style={{
-          background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)',
-          maxWidth: 560, maxHeight: '85vh', display: 'flex', flexDirection: 'column',
-        }}
+        className="w-full p-5 bg-[var(--bg-surface)] rounded-[var(--radius-lg)] shadow-[var(--shadow-md)] max-w-[560px] max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>避免同桌管理</h2>
+            <h2 className="text-lg font-bold font-[family-name:var(--font-display)] text-[var(--text-primary)]">避免同桌管理</h2>
             {avoidPairs.length > 0 && (
-              <span className="text-xs font-data" style={{ color: 'var(--text-muted)' }}>{avoidPairs.length} 組</span>
+              <span className="text-xs font-data text-[var(--text-muted)]">{avoidPairs.length} 組</span>
             )}
           </div>
-          <button onClick={onClose} className="hover:opacity-70" style={{ color: 'var(--text-muted)', fontSize: 18 }}>✕</button>
+          <button onClick={onClose} className="hover:opacity-70 text-[var(--text-muted)] text-lg">✕</button>
         </div>
 
         {/* Add new pair */}
-        <div className="mb-3 p-3" style={{ background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="mb-3 p-3 bg-[var(--bg-primary)] rounded-[var(--radius-sm)] border border-[var(--border)]">
+          <div className="flex items-center gap-2">
             <GuestPicker
               guests={guests} excludeIds={excludeA} value={selectedA}
               onChange={setSelectedA} categoryColors={categoryColors} placeholder="賓客 A..."
             />
-            <span style={{ color: 'var(--text-muted)', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>vs</span>
+            <span className="text-xs font-semibold shrink-0 text-[var(--text-muted)]">vs</span>
             <GuestPicker
               guests={guests} excludeIds={excludeB} value={selectedB}
               onChange={setSelectedB} categoryColors={categoryColors} placeholder="賓客 B..."
@@ -257,26 +240,24 @@ export function AvoidPairModal({ onClose }: Props) {
             <button
               onClick={handleAdd}
               disabled={!canAdd}
+              className="py-[5px] px-4 text-[13px] font-[family-name:var(--font-ui)] font-medium border-none rounded-[var(--radius-sm,4px)] shrink-0"
               style={{
-                padding: '5px 16px', fontSize: 13, fontFamily: 'var(--font-ui)', fontWeight: 500,
-                border: 'none', borderRadius: 'var(--radius-sm, 4px)', flexShrink: 0,
                 background: canAdd ? 'var(--error)' : 'var(--border)',
-                color: canAdd ? '#fff' : 'var(--text-muted)', cursor: canAdd ? 'pointer' : 'default',
+                color: canAdd ? '#fff' : 'var(--text-muted)',
+                cursor: canAdd ? 'pointer' : 'default',
               }}
             >
               新增
             </button>
           </div>
           {isDuplicate && (
-            <div style={{ fontSize: 11, color: '#DC2626', marginTop: 4 }}>此配對已存在</div>
+            <div className="text-[11px] text-[#DC2626] mt-1">此配對已存在</div>
           )}
         </div>
 
         {/* Violation warning */}
         {violationCount > 0 && (
-          <div className="mb-3 px-3 py-2 text-xs" style={{
-            borderRadius: 'var(--radius-sm)', background: '#FEF2F2', color: '#DC2626', fontWeight: 500,
-          }}>
+          <div className="mb-3 px-3 py-2 text-xs rounded-[var(--radius-sm)] bg-[#FEF2F2] text-[#DC2626] font-medium">
             ⚠ {violationCount} 組避桌關係的賓客目前被排在同一桌
           </div>
         )}
@@ -284,11 +265,11 @@ export function AvoidPairModal({ onClose }: Props) {
         {/* Inline pair chips */}
         <div className="flex-1 overflow-y-auto">
           {avoidPairs.length === 0 ? (
-            <div className="text-sm py-6 text-center" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-sm py-6 text-center text-[var(--text-muted)]">
               尚未設定避桌關係
             </div>
           ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div className="flex flex-wrap gap-1.5">
               {avoidPairs.map((ap) => {
                 const a = getGuest(ap.guestAId)
                 const b = getGuest(ap.guestBId)
@@ -303,38 +284,39 @@ export function AvoidPairModal({ onClose }: Props) {
                 return (
                   <span
                     key={ap.id}
+                    className="inline-flex items-center gap-1 py-[5px] px-2.5 rounded-[var(--radius-sm,4px)] text-[15px] font-[family-name:var(--font-ui)]"
                     style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 4,
-                      padding: '5px 10px', borderRadius: 'var(--radius-sm, 4px)',
                       background: sameTable ? '#FEF2F2' : 'var(--bg-primary)',
                       border: `1px solid ${sameTable ? '#FECACA' : 'var(--border)'}`,
-                      fontSize: 15, fontFamily: 'var(--font-ui)',
                     }}
                     title={sameTable ? `⚠ 同在${sameTable}` : undefined}
                   >
                     {/* [tag]名字 */}
-                    <span style={{
-                      fontSize: 12, fontWeight: 600, padding: '1px 5px', borderRadius: 3,
-                      background: ccA.background, color: ccA.color, border: `1px solid ${ccA.border}`,
-                    }}>{tagA}</span>
-                    <span style={{ fontWeight: 500, color: sameTable ? '#DC2626' : 'var(--text-primary)' }}>{nameA}</span>
+                    <span
+                      className="text-xs font-semibold px-[5px] py-px rounded-[3px]"
+                      style={{
+                        background: ccA.background, color: ccA.color, border: `1px solid ${ccA.border}`,
+                      }}
+                    >{tagA}</span>
+                    <span className="font-medium" style={{ color: sameTable ? '#DC2626' : 'var(--text-primary)' }}>{nameA}</span>
 
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>vs</span>
+                    <span className="text-xs font-semibold text-[var(--text-muted)]">vs</span>
 
                     {/* 名字[tag] */}
-                    <span style={{ fontWeight: 500, color: sameTable ? '#DC2626' : 'var(--text-primary)' }}>{nameB}</span>
-                    <span style={{
-                      fontSize: 12, fontWeight: 600, padding: '1px 5px', borderRadius: 3,
-                      background: ccB.background, color: ccB.color, border: `1px solid ${ccB.border}`,
-                    }}>{tagB}</span>
+                    <span className="font-medium" style={{ color: sameTable ? '#DC2626' : 'var(--text-primary)' }}>{nameB}</span>
+                    <span
+                      className="text-xs font-semibold px-[5px] py-px rounded-[3px]"
+                      style={{
+                        background: ccB.background, color: ccB.color, border: `1px solid ${ccB.border}`,
+                      }}
+                    >{tagB}</span>
 
-                    {sameTable && <span style={{ fontSize: 12, color: '#DC2626' }}>⚠</span>}
+                    {sameTable && <span className="text-xs text-[#DC2626]">⚠</span>}
                     <button
                       onClick={() => removeAvoidPair(ap.id)}
+                      className="bg-none border-none cursor-pointer p-0 text-[10px] leading-none opacity-60 ml-px"
                       style={{
-                        background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                        color: sameTable ? '#DC2626' : 'var(--text-muted)', fontSize: 10, lineHeight: 1, opacity: 0.6,
-                        marginLeft: 1,
+                        color: sameTable ? '#DC2626' : 'var(--text-muted)',
                       }}
                       onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
                       onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6' }}

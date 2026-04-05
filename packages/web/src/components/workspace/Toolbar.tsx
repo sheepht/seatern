@@ -466,33 +466,30 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
   return (
     <>
       <div
-        className="h-14 border-b bg-white px-5 flex items-stretch justify-between"
-        style={{ borderColor: 'var(--border)' }}
+        className="h-14 border-b border-[var(--border)] bg-white px-5 flex items-stretch justify-between"
       >
         {/* Left: Brand + Event name + stats */}
         <div className="flex items-center gap-3">
           <span
-            className="text-lg font-extrabold tracking-tight"
-            style={{ fontFamily: 'var(--font-display)', color: 'var(--accent)' }}
+            className="text-lg font-extrabold tracking-tight font-[family-name:var(--font-display)] text-[var(--accent)]"
           >
             Seatern
           </span>
-          <span style={{ color: 'var(--border-strong)' }}>|</span>
-          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+          <span className="text-[var(--border-strong)]">|</span>
+          <span className="text-sm font-medium text-[var(--text-primary)]">
             {eventName || '未命名活動'}
           </span>
           <button
             onClick={() => { setRenameEventValue(eventName); setShowRenameEvent(true) }}
-            className="flex items-center justify-center w-5 h-5 rounded cursor-pointer hover:bg-[var(--accent-light)]"
-            style={{ color: 'var(--text-muted)', flexShrink: 0 }}
+            className="flex items-center justify-center w-5 h-5 rounded cursor-pointer hover:bg-[var(--accent-light)] text-[var(--text-muted)] shrink-0"
             title="修改活動名稱"
           >
             <Pencil size={12} />
           </button>
-          <span style={{ color: 'var(--border-strong)' }}>|</span>
+          <span className="text-[var(--border-strong)]">|</span>
           {/* 安排進度 */}
           <div className="flex items-center gap-2">
-            <div className="w-32 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(128,128,128,0.15)' }}>
+            <div className="w-32 h-1.5 rounded-full overflow-hidden bg-[rgba(128,128,128,0.15)]">
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{
@@ -501,16 +498,16 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                 }}
               />
             </div>
-            <span className="text-sm font-data font-semibold" style={{ color: 'var(--text-secondary)' }}>{assigned}/{total} 席</span>
+            <span className="text-sm font-data font-semibold text-[var(--text-secondary)]">{assigned}/{total} 席</span>
             <span className="text-sm font-data font-semibold" style={{
               color: tableCountPct >= 0.8 ? '#DC2626' : tableCountPct >= 0.6 ? '#CA8A04' : '#16A34A',
             }}>{tables.length}/{tableLimit} 桌</span>
           </div>
           {t > 0 && <>
-            <span style={{ color: 'var(--border-strong)' }}>|</span>
+            <span className="text-[var(--border-strong)]">|</span>
             {/* 滿意度分佈 */}
             <div className="flex items-center gap-2">
-              <div className="w-32 h-1.5 rounded-full overflow-hidden flex" style={{ background: 'rgba(128,128,128,0.15)', gap: '1px' }}>
+              <div className="w-32 h-1.5 rounded-full overflow-hidden flex bg-[rgba(128,128,128,0.15)] gap-px">
                 {green > 0 && <div className="h-full transition-all duration-300" style={{ width: `${(green / t) * 100}%`, background: '#16A34A' }} />}
                 {yellow > 0 && <div className="h-full transition-all duration-300" style={{ width: `${(yellow / t) * 100}%`, background: '#CA8A04' }} />}
                 {orange > 0 && <div className="h-full transition-all duration-300" style={{ width: `${(orange / t) * 100}%`, background: '#EA580C' }} />}
@@ -524,9 +521,9 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                   { color: '#DC2626', label: '糟糕', count: red },
                 ].map(({ color, label, count }) => (
                   <span key={color} className="flex items-center gap-0.5">
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0, display: 'inline-block' }} />
-                    <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</span>
-                    <span className="text-sm font-data font-semibold" style={{ color: 'var(--text-secondary)' }}>{count}人</span>
+                    <span className="inline-block w-[7px] h-[7px] rounded-full shrink-0" style={{ background: color }} />
+                    <span className="text-sm font-medium text-[var(--text-secondary)]">{label}</span>
+                    <span className="text-sm font-data font-semibold text-[var(--text-secondary)]">{count}人</span>
                   </span>
                 ))}
               </div>
@@ -537,7 +534,7 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
         {/* Right: Tab nav + ☰ */}
         <div className="flex items-stretch gap-2">
           {/* 頁面 Tab — 左上右有邊框，active tab 底部開口連接內容區 */}
-          <div className="flex self-stretch items-end" style={{ marginBottom: -1 }}>
+          <div className="flex self-stretch items-end -mb-px">
             {([
               { key: 'workspace', label: '排位畫布', path: '/workspace' },
               { key: 'guests', label: '賓客名單', path: '/workspace/guests' },
@@ -548,16 +545,13 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                 <button
                   key={tab.key}
                   onClick={() => { if (!active) navigate(tab.path) }}
+                  className="px-4 py-2.5 text-sm font-[family-name:var(--font-ui)] font-medium rounded-t-md -mr-px transition-colors duration-150"
                   style={{
-                    padding: '10px 16px', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500,
                     cursor: active ? 'default' : 'pointer',
                     background: active ? 'var(--bg-primary)' : 'transparent',
                     color: active ? 'var(--text-primary)' : 'var(--text-muted)',
                     border: active ? '1px solid var(--border)' : '1px solid transparent',
                     borderBottom: active ? '1px solid var(--bg-primary)' : '1px solid transparent',
-                    borderRadius: '6px 6px 0 0',
-                    marginRight: -1,
-                    transition: 'color 150ms',
                   }}
                 >{tab.label}</button>
               )
@@ -568,8 +562,7 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
           <div className="relative self-center">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="flex items-center justify-center w-8 h-8 rounded cursor-pointer hover:bg-[var(--accent-light)] relative"
-              style={{ color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)' }}
+              className="flex items-center justify-center w-8 h-8 rounded-[var(--radius-sm)] cursor-pointer hover:bg-[var(--accent-light)] relative text-[var(--text-secondary)]"
               title="更多"
             >
               <Menu size={18} />
@@ -579,18 +572,12 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
                 <div
-                  className="absolute right-0 top-full mt-1 z-50 py-1 min-w-[200px]"
-                  style={{
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-md, 8px)',
-                    boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-                  }}
+                  className="absolute right-0 top-full mt-1 z-50 py-1 min-w-[200px] bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-md,8px)] shadow-[0_8px_30px_rgba(0,0,0,0.12)]"
                 >
                   {/* 清除所有資料 */}
                   <button
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-[#FEF2F2] disabled:hover:bg-transparent disabled:opacity-40 disabled:cursor-default"
-                    style={{ color: '#DC2626', fontFamily: 'var(--font-body)', cursor: guests.length === 0 && tables.length === 0 ? 'default' : 'pointer' }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-[#FEF2F2] disabled:hover:bg-transparent disabled:opacity-40 disabled:cursor-default text-[#DC2626] font-[family-name:var(--font-body)]"
+                    style={{ cursor: guests.length === 0 && tables.length === 0 ? 'default' : 'pointer' }}
                     disabled={guests.length === 0 && tables.length === 0}
                     onClick={() => { setShowMenu(false); setShowClearAllConfirm(true) }}
                   >
@@ -599,28 +586,25 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                   </button>
 
                   {/* 分隔線 */}
-                  <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+                  <div className="border-t border-[var(--border)] my-1" />
 
                   {/* 登入 / 用戶資訊 */}
                   {authUser ? (
                     <>
                       <div
-                        className="px-3 py-2 text-sm truncate"
-                        style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
+                        className="px-3 py-2 text-sm truncate text-[var(--text-secondary)] font-[family-name:var(--font-body)]"
                       >
                         {authUser.user_metadata?.name || authUser.email}
                       </div>
                       <button
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
-                        style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)] text-[var(--text-secondary)] font-[family-name:var(--font-body)]"
                         onClick={() => { setShowMenu(false); navigate('/workspace/settings') }}
                       >
                         <Settings size={16} className="shrink-0" />
                         <span>設定</span>
                       </button>
                       <button
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
-                        style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)] text-[var(--text-secondary)] font-[family-name:var(--font-body)]"
                         onClick={async () => { setShowMenu(false); await signOut(); navigate('/') }}
                       >
                         <LogOut size={16} className="shrink-0" />
@@ -629,8 +613,7 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                     </>
                   ) : (
                     <button
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)]"
-                      style={{ color: 'var(--accent)', fontFamily: 'var(--font-body)' }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)] text-[var(--accent)] font-[family-name:var(--font-body)]"
                       onClick={() => { setShowMenu(false); navigate('/login') }}
                     >
                       <Lock size={16} className="shrink-0" />
@@ -647,17 +630,17 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
       {showAvoidModal && <AvoidPairModal onClose={() => setShowAvoidModal(false)} />}
 
       {showResetConfirm && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowResetConfirm(false)} />
-          <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '24px', width: '320px', border: '1px solid var(--border)' }}>
-            <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>確定重排？</p>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px' }}>所有已安排的賓客將移回待排區。可按「還原」回復。</p>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowResetConfirm(false)} style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '14px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>取消</button>
+        <div className="fixed inset-0 z-[999] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/25" onClick={() => setShowResetConfirm(false)} />
+          <div className="relative bg-[var(--bg-surface)] rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] p-6 w-80 border border-[var(--border)]">
+            <p className="text-base font-semibold text-[var(--text-primary)] mb-2">確定重排？</p>
+            <p className="text-sm text-[var(--text-secondary)] mb-4">所有已安排的賓客將移回待排區。可按「還原」回復。</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowResetConfirm(false)} className="px-4 py-2 rounded-md text-sm border border-[var(--border)] bg-transparent text-[var(--text-secondary)] cursor-pointer">取消</button>
               <button onClick={() => {
                 setShowResetConfirm(false)
                 animateResetToSidebar()
-              }} style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '14px', border: 'none', background: '#DC2626', color: 'white', cursor: 'pointer', fontWeight: 600 }}>重排</button>
+              }} className="px-4 py-2 rounded-md text-sm border-none bg-[#DC2626] text-white cursor-pointer font-semibold">重排</button>
             </div>
           </div>
         </div>,
@@ -665,20 +648,20 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
       )}
 
       {showRenameEvent && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowRenameEvent(false)} />
-          <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '24px', width: '320px', border: '1px solid var(--border)' }}>
-            <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>修改活動名稱</p>
+        <div className="fixed inset-0 z-[999] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/25" onClick={() => setShowRenameEvent(false)} />
+          <div className="relative bg-[var(--bg-surface)] rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] p-6 w-80 border border-[var(--border)]">
+            <p className="text-[13px] font-semibold text-[var(--text-primary)] mb-3">修改活動名稱</p>
             <input
               autoFocus
               value={renameEventValue}
               onChange={(e) => setRenameEventValue(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleRenameEvent(); if (e.key === 'Escape') setShowRenameEvent(false) }}
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--accent)', borderRadius: '6px', fontSize: '13px', outline: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', boxSizing: 'border-box', fontFamily: 'inherit' }}
+              className="w-full px-2.5 py-2 border border-[var(--accent)] rounded-md text-[13px] outline-none bg-[var(--bg-surface)] text-[var(--text-primary)] box-border font-[inherit]"
             />
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
-              <button onClick={() => setShowRenameEvent(false)} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>取消</button>
-              <button onClick={handleRenameEvent} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', border: 'none', background: 'var(--accent)', color: 'white', cursor: 'pointer', fontWeight: 600 }}>確認</button>
+            <div className="flex gap-2 justify-end mt-4">
+              <button onClick={() => setShowRenameEvent(false)} className="px-3.5 py-1.5 rounded-md text-xs border border-[var(--border)] bg-transparent text-[var(--text-secondary)] cursor-pointer">取消</button>
+              <button onClick={handleRenameEvent} className="px-3.5 py-1.5 rounded-md text-xs border-none bg-[var(--accent)] text-white cursor-pointer font-semibold">確認</button>
             </div>
           </div>
         </div>,
@@ -705,29 +688,29 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
           const segments = satItems.filter(({ key }) => stats[key] > 0)
           return (
             <div className="flex-1 min-w-0">
-              <div className="mb-3" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em', fontFamily: 'var(--font-display)' }}>
+              <div className="mb-3 text-xs font-semibold text-[var(--text-muted)] tracking-wide font-[family-name:var(--font-display)]">
                 {label}
               </div>
               {/* 已安排進度 */}
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-data font-semibold" style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
+                <span className="font-data font-semibold text-[13px] text-[var(--text-primary)]">
                   {stats.assigned}/{stats.total} 人
                 </span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>已安排</span>
+                <span className="text-[11px] text-[var(--text-muted)]">已安排</span>
               </div>
-              <div className="flex mb-3" style={{ height: '6px', borderRadius: '3px', overflow: 'hidden', background: 'var(--border)' }}>
+              <div className="flex mb-3 h-1.5 rounded-sm overflow-hidden bg-[var(--border)]">
                 {assignPct > 0 && (
-                  <div style={{ width: `${assignPct}%`, background: assignBarColor, transition: 'width 0.3s' }} />
+                  <div className="transition-[width] duration-300" style={{ width: `${assignPct}%`, background: assignBarColor }} />
                 )}
               </div>
               {/* 滿意度分佈條（色塊之間 1px 間距） */}
-              <div className="flex mb-2" style={{ height: '6px', borderRadius: '3px', overflow: 'hidden', background: 'var(--border)', gap: segments.length > 1 ? '1px' : 0 }}>
+              <div className="flex mb-2 h-1.5 rounded-sm overflow-hidden bg-[var(--border)]" style={{ gap: segments.length > 1 ? '1px' : 0 }}>
                 {seatedTotal > 0 && segments.map(({ key, color }) => (
                   <div key={key} style={{ width: `${(stats[key] / seatedTotal) * 100}%`, background: color }} />
                 ))}
               </div>
               {/* 分佈標籤 */}
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5" style={{ fontSize: '11px' }}>
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
                 {satItems.map(({ key, color, label: satLabel }) =>
                   stats[key] > 0 ? (
                     <span key={key} className="font-data" style={{ color }}>
@@ -737,10 +720,10 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                 )}
               </div>
               {/* 桌數 + 溢出 */}
-              <div className="flex gap-3 mt-2" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              <div className="flex gap-3 mt-2 text-xs text-[var(--text-muted)]">
                 <span>{stats.tableCount} 桌</span>
                 {stats.overflowCount > 0 && (
-                  <span style={{ color: 'var(--warning)' }}>溢出 {stats.overflowCount}人</span>
+                  <span className="text-[var(--warning)]">溢出 {stats.overflowCount}人</span>
                 )}
               </div>
             </div>
@@ -753,21 +736,20 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
               role="dialog"
               aria-modal="true"
               aria-labelledby="restore-modal-title"
-              className="bg-white w-full max-w-md p-6 mx-4"
-              style={{ borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)' }}
+              className="bg-white w-full max-w-md p-6 mx-4 rounded-[var(--radius-lg)] shadow-[var(--shadow-md)]"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 id="restore-modal-title" className="text-lg font-bold mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+              <h2 id="restore-modal-title" className="text-lg font-bold mb-1 font-[family-name:var(--font-display)] text-[var(--text-primary)]">
                 讀取快照
               </h2>
-              <p className="mb-4" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                還原到：<span className="font-medium" style={{ color: 'var(--text-primary)' }}>{snap.name}</span>
+              <p className="mb-4 text-[13px] text-[var(--text-secondary)]">
+                還原到：<span className="font-medium text-[var(--text-primary)]">{snap.name}</span>
               </p>
               {/* 對比區域 */}
-              <div className="flex gap-3 pb-4 mb-4 flex-col min-[480px]:flex-row min-[480px]:items-stretch" style={{ borderBottom: '1px solid var(--border)' }}>
+              <div className="flex gap-3 pb-4 mb-4 flex-col min-[480px]:flex-row min-[480px]:items-stretch border-b border-[var(--border)]">
                 <StatColumn label="目前" stats={currStats} />
                 {/* 箭頭分隔 */}
-                <div className="hidden min-[480px]:flex items-center justify-center" style={{ width: '24px', flexShrink: 0 }}>
+                <div className="hidden min-[480px]:flex items-center justify-center w-6 shrink-0">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path d="M3 8h10M9 4l4 4-4 4" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -779,21 +761,19 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                 </div>
                 <StatColumn label="快照" stats={snapStats} />
               </div>
-              <p className="text-sm mb-4" style={{ color: 'var(--warning)' }}>
+              <p className="text-sm mb-4 text-[var(--warning)]">
                 目前的排位將被覆蓋，還原記錄會清空。
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowRestoreConfirm(false)}
-                  className="flex-1 py-2 text-sm font-medium rounded border cursor-pointer hover:bg-[var(--bg-primary)]"
-                  style={{ borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)' }}
+                  className="flex-1 py-2 text-sm font-medium rounded-[var(--radius-sm)] border border-[var(--border-strong)] cursor-pointer hover:bg-[var(--bg-primary)] text-[var(--text-secondary)]"
                 >
                   取消
                 </button>
                 <button
                   onClick={confirmRestore}
-                  className="flex-1 py-2 text-sm font-semibold text-white rounded cursor-pointer hover:brightness-90"
-                  style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-display)' }}
+                  className="flex-1 py-2 text-sm font-semibold text-white rounded-[var(--radius-sm)] cursor-pointer hover:brightness-90 bg-[var(--accent)] font-[family-name:var(--font-display)]"
                 >
                   還原
                 </button>
@@ -803,20 +783,20 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
         )
       })()}
       {showClearAllConfirm && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowClearAllConfirm(false)} />
-          <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '24px', width: '360px', border: '1px solid var(--border)' }}>
-            <p style={{ fontSize: '16px', fontWeight: 600, color: '#DC2626', marginBottom: '8px' }}>清除所有資料</p>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+        <div className="fixed inset-0 z-[999] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/25" onClick={() => setShowClearAllConfirm(false)} />
+          <div className="relative bg-[var(--bg-surface)] rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] p-6 w-[360px] border border-[var(--border)]">
+            <p className="text-base font-semibold text-[#DC2626] mb-2">清除所有資料</p>
+            <p className="text-sm text-[var(--text-secondary)] mb-2">
               將刪除此活動的所有賓客（{guests.length} 位）和所有桌次（{tables.length} 桌）。
             </p>
-            <p style={{ fontSize: '13px', color: '#DC2626', marginBottom: '16px', fontWeight: 500 }}>
+            <p className="text-[13px] text-[#DC2626] mb-4 font-medium">
               此操作無法復原。
             </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowClearAllConfirm(false)}
-                style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-surface)', cursor: 'pointer', fontSize: '14px', color: 'var(--text-secondary)' }}
+                className="px-4 py-2 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] cursor-pointer text-sm text-[var(--text-secondary)]"
               >
                 取消
               </button>
@@ -833,7 +813,8 @@ export function Toolbar({ onFitAll, onPanToTable, page = 'workspace' }: ToolbarP
                     setShowClearAllConfirm(false)
                   }
                 }}
-                style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#DC2626', color: '#fff', cursor: clearingAll ? 'wait' : 'pointer', fontSize: '14px', fontWeight: 500, opacity: clearingAll ? 0.6 : 1 }}
+                className="px-4 py-2 rounded-md border-none bg-[#DC2626] text-white text-sm font-medium"
+                style={{ cursor: clearingAll ? 'wait' : 'pointer', opacity: clearingAll ? 0.6 : 1 }}
               >
                 {clearingAll ? '清除中...' : '確定清除'}
               </button>

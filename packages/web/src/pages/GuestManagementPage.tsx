@@ -46,12 +46,8 @@ function CategoryColorPicker({ current, onPick, onPreview, rect, onEnter, onClos
     <div
       onMouseEnter={onEnter}
       onMouseLeave={onClose}
-      style={{
-        position: 'fixed', left: rect.left, top: rect.bottom + 4,
-        background: 'var(--bg-surface)', border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-md, 8px)', padding: 8,
-        boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 9999,
-      }}
+      className="fixed bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-md,8px)] p-2 shadow-[0_8px_24px_rgba(0,0,0,0.12)] z-[9999]"
+      style={{ left: rect.left, top: rect.bottom + 4 }}
     >
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 20px)`, gap: 3 }}>
         {Array.from({ length: rows }, (_, si) =>
@@ -61,8 +57,8 @@ function CategoryColorPicker({ current, onPick, onPreview, rect, onEnter, onClos
               onClick={() => onPick(hueRow[si])}
               onMouseEnter={() => onPreview(hueRow[si])}
               onMouseLeave={() => onPreview(null)}
+              className="w-5 h-5 rounded-[3px] cursor-pointer"
               style={{
-                width: 20, height: 20, borderRadius: 3, cursor: 'pointer',
                 background: hueRow[si].background,
                 outline: hueRow[si].color === current.color ? `2px solid ${hueRow[si].color}` : 'none',
                 outlineOffset: -1,
@@ -86,17 +82,11 @@ function Toast({ message, onUndo, onClose }: { message: string; onUndo?: () => v
 
   return (
     <div
-      style={{
-        position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-        background: 'var(--text-primary)', color: 'var(--bg-surface)', padding: '10px 20px',
-        borderRadius: 'var(--radius-md, 8px)', fontSize: 14, fontFamily: 'var(--font-body)',
-        display: 'flex', alignItems: 'center', gap: 12, zIndex: 9999,
-        boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
-      }}
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[var(--text-primary)] text-[var(--bg-surface)] px-5 py-2.5 rounded-[var(--radius-md,8px)] text-sm font-[family-name:var(--font-body)] flex items-center gap-3 z-[9999] shadow-[0_8px_30px_rgba(0,0,0,0.2)]"
     >
       <span>{message}</span>
       {onUndo && (
-        <button onClick={onUndo} style={{ color: 'var(--accent-light)', fontWeight: 600, cursor: 'pointer', background: 'none', border: 'none', fontSize: 14 }}>
+        <button onClick={onUndo} className="text-[var(--accent-light)] font-semibold cursor-pointer bg-transparent border-none text-sm">
           復原
         </button>
       )}
@@ -125,40 +115,35 @@ function NumberStepper({ value, min, max, onSave, maxTooltip }: { value: number;
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+    <div className="flex items-center gap-1">
       <button
         onClick={() => value > min && onSave(value - 1)}
         disabled={value <= min}
+        className="w-6 h-6 rounded-[var(--radius-sm,4px)] border border-[var(--border)] flex items-center justify-center text-sm"
         style={{
-          width: 24, height: 24, borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
-          background: value <= min ? 'transparent' : 'var(--bg-surface)', cursor: value <= min ? 'default' : 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+          background: value <= min ? 'transparent' : 'var(--bg-surface)',
+          cursor: value <= min ? 'default' : 'pointer',
           color: value <= min ? 'var(--text-muted)' : 'var(--text-secondary)',
         }}
       >−</button>
-      <span style={{ fontFamily: 'var(--font-data)', fontVariantNumeric: 'tabular-nums', minWidth: 18, textAlign: 'center' }}>{value}</span>
-      <span ref={btnRef} onMouseEnter={handleMaxHover} onMouseLeave={handleMaxLeave} style={{ display: 'inline-flex' }}>
+      <span className="font-[family-name:var(--font-data)] tabular-nums min-w-[18px] text-center">{value}</span>
+      <span ref={btnRef} onMouseEnter={handleMaxHover} onMouseLeave={handleMaxLeave} className="inline-flex">
         <button
           onClick={() => !atMax && onSave(value + 1)}
           disabled={atMax}
+          className="w-6 h-6 rounded-[var(--radius-sm,4px)] border border-[var(--border)] flex items-center justify-center text-sm"
           style={{
-            width: 24, height: 24, borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
-            background: atMax ? 'transparent' : 'var(--bg-surface)', cursor: atMax ? 'default' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+            background: atMax ? 'transparent' : 'var(--bg-surface)',
+            cursor: atMax ? 'default' : 'pointer',
             color: atMax ? 'var(--text-muted)' : 'var(--text-secondary)',
           }}
         >+</button>
       </span>
       {popoverPos && maxTooltip && createPortal(
-        <div style={{
-          position: 'fixed', left: popoverPos.x, top: popoverPos.y,
-          transform: 'translate(-100%, -100%)',
-          background: 'var(--text-primary)', color: 'var(--bg-surface)',
-          padding: '4px 10px', borderRadius: 'var(--radius-sm, 4px)',
-          fontSize: 12, fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', pointerEvents: 'none',
-          zIndex: 9999,
-        }}>
+        <div
+          className="fixed -translate-x-full -translate-y-full bg-[var(--text-primary)] text-[var(--bg-surface)] px-2.5 py-1 rounded-[var(--radius-sm,4px)] text-xs font-[family-name:var(--font-ui)] whitespace-nowrap shadow-[0_4px_12px_rgba(0,0,0,0.15)] pointer-events-none z-[9999]"
+          style={{ left: popoverPos.x, top: popoverPos.y }}
+        >
           {maxTooltip}
         </div>,
         document.body
@@ -173,20 +158,20 @@ function DeleteConfirmModal({ guestName, tableName, onConfirm, onCancel }: {
   guestName: string; tableName: string; onConfirm: () => void; onCancel: () => void
 }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-      <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg, 12px)', padding: 24, maxWidth: 400, width: '90%', boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }}>
-        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>確定要刪除？</h3>
-        <p style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text-secondary)', margin: '0 0 20px' }}>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
+      <div className="bg-[var(--bg-surface)] rounded-[var(--radius-lg,12px)] p-6 max-w-[400px] w-[90%] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+        <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--text-primary)] mb-2">確定要刪除？</h3>
+        <p className="font-[family-name:var(--font-body)] text-sm text-[var(--text-secondary)] mb-5">
           {guestName} 目前在{tableName}，刪除後該座位會空出。
         </p>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div className="flex justify-end gap-2">
           <button
             onClick={onCancel}
-            style={{ padding: '6px 16px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', background: 'var(--bg-surface)', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)' }}
+            className="px-4 py-1.5 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--bg-surface)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--text-secondary)]"
           >取消</button>
           <button
             onClick={onConfirm}
-            style={{ padding: '6px 16px', borderRadius: 'var(--radius-sm, 4px)', border: 'none', background: 'var(--error)', color: '#fff', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500 }}
+            className="px-4 py-1.5 rounded-[var(--radius-sm,4px)] border-none bg-[var(--error)] text-white cursor-pointer text-sm font-[family-name:var(--font-ui)] font-medium"
           >刪除</button>
         </div>
       </div>
@@ -205,28 +190,26 @@ function StatsBar({
   const assigned = guests.filter((g) => g.assignedTableId && g.rsvpStatus === 'confirmed')
   const avgSat = assigned.length > 0 ? assigned.reduce((s, g) => s + g.satisfactionScore, 0) / assigned.length : 0
 
-  const statStyle = () => ({
-    display: 'flex' as const, alignItems: 'baseline' as const, gap: 4, cursor: 'pointer',
-    padding: '4px 8px', borderRadius: 'var(--radius-sm, 4px)',
-  })
+  const statClass = "flex items-baseline gap-1 cursor-pointer px-2 py-1 rounded-[var(--radius-sm,4px)]"
+  const numClass = "font-[family-name:var(--font-data)] font-bold text-xl tabular-nums"
 
   return (
     <>
-      <div style={statStyle()} onClick={() => onFilterClick('confirmed')}>
-        <span style={{ fontFamily: 'var(--font-data)', fontWeight: 700, fontSize: 20, color: 'var(--success)', fontVariantNumeric: 'tabular-nums' }}>{confirmed}</span>
+      <div className={statClass} onClick={() => onFilterClick('confirmed')}>
+        <span className={`${numClass} text-[var(--success)]`}>{confirmed}</span>
         <span>確認</span>
       </div>
-      <div style={statStyle()} onClick={() => onFilterClick('declined')}>
-        <span style={{ fontFamily: 'var(--font-data)', fontWeight: 700, fontSize: 20, color: 'var(--error)', fontVariantNumeric: 'tabular-nums' }}>{declined}</span>
+      <div className={statClass} onClick={() => onFilterClick('declined')}>
+        <span className={`${numClass} text-[var(--error)]`}>{declined}</span>
         <span>婉拒</span>
       </div>
-      <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span style={{ fontFamily: 'var(--font-data)', fontWeight: 700, fontSize: 20, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{totalSeats}</span>
+      <div className="w-px h-5 bg-[var(--border)]" />
+      <div className="flex items-baseline gap-1">
+        <span className={`${numClass} text-[var(--text-primary)]`}>{totalSeats}</span>
         <span>席位</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span style={{ fontFamily: 'var(--font-data)', fontWeight: 700, fontSize: 20, color: avgSat > 0 ? getSatisfactionColor(avgSat) : 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+      <div className="flex items-baseline gap-1">
+        <span className={numClass} style={{ color: avgSat > 0 ? getSatisfactionColor(avgSat) : 'var(--text-muted)' }}>
           {avgSat > 0 ? avgSat.toFixed(1) : '—'}
         </span>
         <span>平均滿意度</span>
@@ -465,36 +448,28 @@ export default function GuestManagementPage() {
 
   // ─── Main table view ────────────────────────────────
   return (
-    <div style={{ flex: 1, background: 'var(--bg-primary)', overflow: 'auto' }}>
-      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '24px 24px', width: '100%' }}>
+    <div className="flex-1 bg-[var(--bg-primary)] overflow-auto">
+      <div className="max-w-[1440px] mx-auto p-6 w-full">
 
         {/* Toolbar: Search + Filter (left) | Stats (right) */}
-        <div style={{
-          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '12px 0',
-          fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text-secondary)',
-          borderBottom: '1px solid var(--border)',
-        }}>
+        <div className="flex flex-wrap items-center gap-3 py-3 font-[family-name:var(--font-body)] text-sm text-[var(--text-secondary)] border-b border-[var(--border)]">
           {/* Left: Search + Category + RSVP badge */}
-          <div style={{ position: 'relative', flex: '0 1 240px' }}>
-            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <div className="relative flex-[0_1_240px]">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="搜尋姓名/暱稱..."
-              style={{
-                width: '100%', padding: '6px 10px 6px 30px', borderRadius: 'var(--radius-sm, 4px)',
-                border: '1px solid var(--border)', background: 'var(--bg-surface)', fontSize: 14,
-                fontFamily: 'var(--font-body)', color: 'var(--text-primary)', outline: 'none',
-              }}
+              className="w-full py-1.5 pl-[30px] pr-2.5 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--bg-surface)] text-sm font-[family-name:var(--font-body)] text-[var(--text-primary)] outline-none"
             />
             {search && (
-              <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}>
+              <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[var(--text-muted)] p-0">
                 <X size={14} />
               </button>
             )}
           </div>
 
-          <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm, 4px)', overflow: 'hidden' }}>
+          <div className="flex border border-[var(--border)] rounded-[var(--radius-sm,4px)] overflow-hidden">
             {(() => {
               const visible = !showDeclined ? guests.filter((g) => g.rsvpStatus !== 'declined') : guests
               return ['全部', ...categories].map((cat) => {
@@ -515,10 +490,8 @@ export default function GuestManagementPage() {
                     setHoldingCat(null)
                     schedulePickerClose()
                   }}
+                  className="relative overflow-hidden px-3 py-[5px] border-none text-[13px] font-[family-name:var(--font-ui)] font-medium cursor-pointer"
                   style={{
-                    position: 'relative', overflow: 'hidden',
-                    padding: '5px 12px', border: 'none', fontSize: 13, fontFamily: 'var(--font-ui)', fontWeight: 500,
-                    cursor: 'pointer',
                     ...(() => {
                       if (cat === '全部') {
                         return categoryFilter === cat
@@ -534,12 +507,13 @@ export default function GuestManagementPage() {
                 >
                   {cat} {count}
                   {holdingCat === cat && (
-                    <div style={{
-                      position: 'absolute', left: 0, bottom: 0, height: 2, width: '100%',
-                      background: getCategoryColor(cat, effectiveColors).color,
-                      animation: `pickerProgress ${PICKER_DELAY}ms linear forwards`,
-                      opacity: 0.6,
-                    }} />
+                    <div
+                      className="absolute left-0 bottom-0 h-0.5 w-full opacity-60"
+                      style={{
+                        background: getCategoryColor(cat, effectiveColors).color,
+                        animation: `pickerProgress ${PICKER_DELAY}ms linear forwards`,
+                      }}
+                    />
                   )}
                 </button>
               )
@@ -562,40 +536,22 @@ export default function GuestManagementPage() {
           {rsvpFilter && (
             <button
               onClick={() => setRsvpFilter(null)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
-                borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
-                background: 'var(--accent-light)', fontSize: 13, fontFamily: 'var(--font-ui)',
-                cursor: 'pointer', color: 'var(--text-primary)',
-              }}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--accent-light)] text-[13px] font-[family-name:var(--font-ui)] cursor-pointer text-[var(--text-primary)]"
             >
               {RSVP_LABELS[rsvpFilter] || rsvpFilter} <X size={12} />
             </button>
           )}
 
-          <label
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 13, fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)',
-              cursor: 'pointer', userSelect: 'none',
-            }}
-          >
+          <label className="flex items-center gap-1.5 text-[13px] font-[family-name:var(--font-ui)] text-[var(--text-secondary)] cursor-pointer select-none">
             <div
               onClick={() => setShowDeclined((v) => !v)}
-              style={{
-                width: 32, height: 18, borderRadius: 9, position: 'relative',
-                background: showDeclined ? 'var(--accent)' : 'var(--border)',
-                transition: 'background 0.2s',
-                cursor: 'pointer', flexShrink: 0,
-              }}
+              className="w-8 h-[18px] rounded-[9px] relative cursor-pointer shrink-0 transition-colors duration-200"
+              style={{ background: showDeclined ? 'var(--accent)' : 'var(--border)' }}
             >
-              <div style={{
-                width: 14, height: 14, borderRadius: '50%', background: '#fff',
-                position: 'absolute', top: 2,
-                left: showDeclined ? 16 : 2,
-                transition: 'left 0.2s',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-              }} />
+              <div
+                className="w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-[left] duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.2)]"
+                style={{ left: showDeclined ? 16 : 2 }}
+              />
             </div>
             顯示婉拒
           </label>
@@ -603,41 +559,39 @@ export default function GuestManagementPage() {
           {/* Avoid pairs overview */}
           <button
             onClick={() => setShowAvoidModal(true)}
+            className="flex items-center gap-1 px-3 py-[5px] rounded-[var(--radius-sm,4px)] border border-[var(--border)] text-[13px] font-[family-name:var(--font-ui)] cursor-pointer"
             style={{
-              display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px',
-              borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
               background: avoidPairs.length > 0 ? '#FEF2F2' : 'var(--bg-surface)',
-              fontSize: 13, fontFamily: 'var(--font-ui)', cursor: 'pointer',
               color: avoidPairs.length > 0 ? '#DC2626' : 'var(--text-secondary)',
             }}
           >
-            避桌 {avoidPairs.length > 0 && <span style={{ fontWeight: 600 }}>{avoidPairs.length}</span>}
+            避桌 {avoidPairs.length > 0 && <span className="font-semibold">{avoidPairs.length}</span>}
           </button>
 
 
           {/* Right: Stats */}
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="ml-auto flex items-center gap-3">
             <StatsBar guests={guests} onFilterClick={handleRsvpFilterClick} />
           </div>
         </div>
 
         {/* Table */}
-        <div style={{ overflowX: 'auto', marginTop: 8 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-body)', fontSize: 15 }}>
+        <div className="overflow-x-auto mt-2">
+          <table className="w-full border-collapse font-[family-name:var(--font-body)] text-[15px]">
             <thead>
-              <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                <th onClick={() => handleSort('name')} style={thStyle}>姓名{sortArrow('name')}</th>
-                <th onClick={() => handleSort('category')} style={thStyle}>分類{sortArrow('category')}</th>
-                <th style={thStyle}>子分類</th>
-                <th onClick={() => handleSort('assignedTableId')} style={thStyle}>桌次{sortArrow('assignedTableId')}</th>
-                <th onClick={() => handleSort('satisfactionScore')} style={{ ...thStyle, textAlign: 'right' }}>滿意度{sortArrow('satisfactionScore')}</th>
-                <th onClick={() => handleSort('rsvpStatus')} style={{ ...thStyle, textAlign: 'center' }}>出席{sortArrow('rsvpStatus')}</th>
-                <th onClick={() => handleSort('companionCount')} style={{ ...thStyle, textAlign: 'center' }}>攜眷{sortArrow('companionCount')}</th>
-                <th onClick={() => handleSort('prefCount')} style={thStyle}>想同桌{sortArrow('prefCount')}</th>
-                <th onClick={() => handleSort('avoidCount')} style={thStyle}>要避桌{sortArrow('avoidCount')}</th>
-                <th onClick={() => handleSort('dietaryNote')} style={thStyle}>飲食{sortArrow('dietaryNote')}</th>
-                <th onClick={() => handleSort('specialNote')} style={thStyle}>特殊需求{sortArrow('specialNote')}</th>
-                <th style={{ width: 60 }} />
+              <tr className="border-b-2 border-[var(--border)]">
+                <th onClick={() => handleSort('name')} className={thClass}>姓名{sortArrow('name')}</th>
+                <th onClick={() => handleSort('category')} className={thClass}>分類{sortArrow('category')}</th>
+                <th className={thClass}>子分類</th>
+                <th onClick={() => handleSort('assignedTableId')} className={thClass}>桌次{sortArrow('assignedTableId')}</th>
+                <th onClick={() => handleSort('satisfactionScore')} className={`${thClass} text-right`}>滿意度{sortArrow('satisfactionScore')}</th>
+                <th onClick={() => handleSort('rsvpStatus')} className={`${thClass} text-center`}>出席{sortArrow('rsvpStatus')}</th>
+                <th onClick={() => handleSort('companionCount')} className={`${thClass} text-center`}>攜眷{sortArrow('companionCount')}</th>
+                <th onClick={() => handleSort('prefCount')} className={thClass}>想同桌{sortArrow('prefCount')}</th>
+                <th onClick={() => handleSort('avoidCount')} className={thClass}>要避桌{sortArrow('avoidCount')}</th>
+                <th onClick={() => handleSort('dietaryNote')} className={thClass}>飲食{sortArrow('dietaryNote')}</th>
+                <th onClick={() => handleSort('specialNote')} className={thClass}>特殊需求{sortArrow('specialNote')}</th>
+                <th className="w-[60px]" />
               </tr>
             </thead>
             <tbody>
@@ -701,24 +655,24 @@ export default function GuestManagementPage() {
 
               {/* Empty search result */}
               {filtered.length === 0 && guests.length > 0 && (
-                <tr><td colSpan={12} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
+                <tr><td colSpan={12} className="text-center p-10 text-[var(--text-muted)] font-[family-name:var(--font-body)]">
                   沒有符合的賓客
                 </td></tr>
               )}
 
               {/* No guests at all */}
               {guests.length === 0 && (
-                <tr><td colSpan={12} style={{ textAlign: 'center', padding: '60px 24px' }}>
-                  <p style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>尚無賓客</p>
-                  <p style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>點擊下方新增或匯入名單</p>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+                <tr><td colSpan={12} className="text-center px-6 py-[60px]">
+                  <p className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--text-primary)] mb-2">尚無賓客</p>
+                  <p className="font-[family-name:var(--font-body)] text-sm text-[var(--text-secondary)] mb-5">點擊下方新增或匯入名單</p>
+                  <div className="flex justify-center gap-3">
                     <button
                       onClick={() => setShowAddModal(true)}
-                      style={{ padding: '8px 20px', borderRadius: 'var(--radius-sm, 4px)', border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500 }}
+                      className="px-5 py-2 rounded-[var(--radius-sm,4px)] border-none bg-[var(--accent)] text-white cursor-pointer text-sm font-[family-name:var(--font-ui)] font-medium"
                     >
-                      <Plus size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> 新增賓客
+                      <Plus size={14} className="mr-1 align-[-2px] inline" /> 新增賓客
                     </button>
-                    <button onClick={() => navigate('/workspace/import')} style={{ padding: '8px 20px', borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)', background: 'var(--bg-surface)', cursor: 'pointer', fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)' }}>
+                    <button onClick={() => navigate('/workspace/import')} className="px-5 py-2 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--bg-surface)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--text-secondary)]">
                       匯入名單
                     </button>
                   </div>
@@ -732,14 +686,7 @@ export default function GuestManagementPage() {
         {/* Floating add button */}
         <button
           onClick={() => setShowAddModal(true)}
-          style={{
-            position: 'fixed', right: 32, bottom: 32, zIndex: 50,
-            display: 'flex', alignItems: 'center', gap: 6, padding: '12px 20px',
-            background: 'var(--accent)', color: '#fff', border: 'none',
-            borderRadius: 'var(--radius-md, 8px)', cursor: 'pointer',
-            fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 600,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-          }}
+          className="fixed right-8 bottom-8 z-50 flex items-center gap-1.5 px-5 py-3 bg-[var(--accent)] text-white border-none rounded-[var(--radius-md,8px)] cursor-pointer text-sm font-[family-name:var(--font-ui)] font-semibold shadow-[0_4px_16px_rgba(0,0,0,0.15)]"
         >
           <Plus size={16} /> 新增賓客
         </button>
@@ -891,14 +838,14 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxCompanion, maxCom
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={onEdit}
-      style={{ borderBottom: '1px solid var(--border)', background: hovered ? 'var(--accent-light)' : 'transparent', transition: 'background 50ms', cursor: 'pointer' }}
+      className={`border-b border-[var(--border)] transition-colors duration-[50ms] cursor-pointer ${hovered ? 'bg-[var(--accent-light)]' : 'bg-transparent'}`}
     >
       {/* Name + aliases */}
-      <td style={tdStyle}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <span style={{ fontSize: 15, fontFamily: 'var(--font-body)', color: 'var(--text-primary)' }}>{guest.name}</span>
+      <td className={tdClass}>
+        <div className="flex items-baseline gap-1">
+          <span className="text-[15px] font-[family-name:var(--font-body)] text-[var(--text-primary)]">{guest.name}</span>
           {guest.aliases.length > 0 && (
-            <span style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>
+            <span className="text-[13px] text-[var(--text-muted)] font-[family-name:var(--font-ui)]">
               ({guest.aliases.join('、')})
             </span>
           )}
@@ -906,134 +853,122 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxCompanion, maxCom
       </td>
 
       {/* Category (read-only badge) */}
-      <td style={tdStyle}>
+      <td className={tdClass}>
         {guest.category && (
-          <span style={{ background: catColor.background, border: `1px solid ${catColor.border}`, color: catColor.color, padding: '1px 8px', borderRadius: 'var(--radius-sm, 4px)', fontSize: 14, fontFamily: 'var(--font-ui)', fontWeight: 500 }}>
+          <span className="px-2 py-px rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)] font-medium" style={{ background: catColor.background, border: `1px solid ${catColor.border}`, color: catColor.color }}>
             {guest.category}
           </span>
         )}
       </td>
 
       {/* Subcategory (read-only) */}
-      <td style={tdStyle}>
+      <td className={tdClass}>
         {subcatName ? (
-          <span style={{
-            padding: '1px 6px', borderRadius: 'var(--radius-sm, 4px)',
-            border: '1px solid var(--border)', fontSize: 14, color: 'var(--text-secondary)',
-            fontFamily: 'var(--font-ui)',
-          }}>{subcatName}</span>
+          <span className="px-1.5 py-px rounded-[var(--radius-sm,4px)] border border-[var(--border)] text-sm text-[var(--text-secondary)] font-[family-name:var(--font-ui)]">{subcatName}</span>
         ) : (
-          <span style={{ color: 'var(--text-muted)' }}>—</span>
+          <span className="text-[var(--text-muted)]">—</span>
         )}
       </td>
 
       {/* Table (read-only) */}
-      <td style={tdStyle}>
-        <span style={{ color: guest.assignedTableId ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 15 }}>
+      <td className={tdClass}>
+        <span className="text-[15px]" style={{ color: guest.assignedTableId ? 'var(--text-primary)' : 'var(--text-muted)' }}>
           {tableName}
         </span>
       </td>
 
       {/* Satisfaction */}
-      <td style={{ ...tdStyle, textAlign: 'right' }}>
+      <td className={`${tdClass} text-right`}>
         {guest.assignedTableId ? (
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: 36, height: 36 }}>
-            <svg width={36} height={36} style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
+          <div className="inline-flex items-center justify-center relative w-9 h-9">
+            <svg width={36} height={36} className="absolute inset-0 -rotate-90">
               <circle cx={18} cy={18} r={15} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
               <circle cx={18} cy={18} r={15} fill="none" stroke={satColor} strokeWidth={2.5}
                 strokeLinecap="round"
                 strokeDasharray={`${2 * Math.PI * 15 * Math.min(guest.satisfactionScore / 100, 1)} ${2 * Math.PI * 15}`}
-                style={{ transition: 'stroke-dasharray 400ms ease-out, stroke 400ms ease-out' }}
+                className="transition-[stroke-dasharray,stroke] duration-[400ms] ease-out"
               />
             </svg>
-            <span style={{ position: 'relative', color: satColor, fontFamily: 'var(--font-data)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>
+            <span className="relative font-[family-name:var(--font-data)] font-semibold tabular-nums text-xs" style={{ color: satColor }}>
               {guest.satisfactionScore.toFixed(0)}
             </span>
           </div>
         ) : (
-          <span style={{ color: 'var(--text-muted)' }}>—</span>
+          <span className="text-[var(--text-muted)]">—</span>
         )}
       </td>
 
       {/* RSVP toggle (quick edit) */}
-      <td style={{ ...tdStyle, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+      <td className={`${tdClass} text-center`} onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onRsvpToggle}
           title={RSVP_LABELS[guest.rsvpStatus]}
-          style={{
-            width: 28, height: 28, borderRadius: 'var(--radius-sm, 4px)',
-            border: '1px solid var(--border)', background: 'var(--bg-surface)',
-            cursor: 'pointer', fontSize: 14, fontWeight: 600,
-            color: rsvpColor(guest.rsvpStatus), display: 'inline-flex',
-            alignItems: 'center', justifyContent: 'center',
-          }}
+          className="w-7 h-7 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--bg-surface)] cursor-pointer text-sm font-semibold inline-flex items-center justify-center"
+          style={{ color: rsvpColor(guest.rsvpStatus) }}
         >{rsvpIcon(guest.rsvpStatus)}</button>
       </td>
 
       {/* Attendee count stepper (quick edit) */}
-      <td style={{ ...tdStyle, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+      <td className={`${tdClass} text-center`} onClick={(e) => e.stopPropagation()}>
         <NumberStepper value={guest.companionCount} min={0} max={maxCompanion} onSave={(v) => onSave({ companionCount: v })} maxTooltip={maxCompanionTooltip} />
       </td>
 
       {/* Seat preferences (read-only) */}
-      <td style={tdStyle}>
+      <td className={tdClass}>
         {prefGuests.length > 0 ? (
-          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          <div className="flex gap-[3px] flex-wrap">
             {prefGuests.map((g) => {
               const cc = getCategoryColor(g.category, categoryColors)
               return (
-                <span key={g.id} style={{
-                  padding: '1px 6px', borderRadius: 'var(--radius-sm, 4px)',
-                  background: cc.background, border: `1px solid ${cc.border}`,
-                  fontSize: 14, color: cc.color, fontFamily: 'var(--font-ui)',
+                <span key={g.id} className="px-1.5 py-px rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)]" style={{
+                  background: cc.background, border: `1px solid ${cc.border}`, color: cc.color,
                 }}>{g.aliases.length > 0 ? g.aliases[0] : g.name}</span>
               )
             })}
           </div>
         ) : (
-          <span style={{ color: 'var(--text-muted)' }}>—</span>
+          <span className="text-[var(--text-muted)]">—</span>
         )}
       </td>
 
       {/* Avoid pairs (read-only) */}
-      <td style={tdStyle}>
+      <td className={tdClass}>
         {avoidGuests.length > 0 ? (
-          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          <div className="flex gap-[3px] flex-wrap">
             {avoidGuests.map((g) => {
               const cc = getCategoryColor(g.category, categoryColors)
               return (
-                <span key={g.id} style={{
-                  padding: '1px 6px', borderRadius: 'var(--radius-sm, 4px)',
-                  background: cc.background, border: `1px solid ${cc.border}`,
-                  fontSize: 14, color: cc.color, fontFamily: 'var(--font-ui)',
+                <span key={g.id} className="px-1.5 py-px rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)]" style={{
+                  background: cc.background, border: `1px solid ${cc.border}`, color: cc.color,
                 }}>{g.aliases.length > 0 ? g.aliases[0] : g.name}</span>
               )
             })}
           </div>
         ) : (
-          <span style={{ color: 'var(--text-muted)' }}>—</span>
+          <span className="text-[var(--text-muted)]">—</span>
         )}
       </td>
 
       {/* Dietary note (read-only) */}
-      <td style={tdStyle}>
-        <span style={{ fontSize: 15, color: guest.dietaryNote ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+      <td className={tdClass}>
+        <span className={`text-[15px] ${guest.dietaryNote ? 'text-[var(--text-secondary)]' : 'text-[var(--text-muted)]'}`}>
           {guest.dietaryNote || '—'}
         </span>
       </td>
 
       {/* Special note (read-only) */}
-      <td style={tdStyle}>
-        <span style={{ fontSize: 15, color: guest.specialNote ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+      <td className={tdClass}>
+        <span className={`text-[15px] ${guest.specialNote ? 'text-[var(--text-secondary)]' : 'text-[var(--text-muted)]'}`}>
           {guest.specialNote || '—'}
         </span>
       </td>
 
       {/* Delete button */}
-      <td style={{ width: 36, padding: '0 4px' }}>
+      <td className="w-9 px-1">
         <button
           onClick={(e) => { e.stopPropagation(); onDelete() }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: hovered ? 'var(--error)' : 'transparent', padding: 4, borderRadius: 'var(--radius-sm, 4px)', transition: 'color 100ms' }}
+          className="bg-transparent border-none cursor-pointer p-1 rounded-[var(--radius-sm,4px)] transition-colors duration-100"
+          style={{ color: hovered ? 'var(--error)' : 'transparent' }}
           title="刪除"
         >
           <Trash2 size={14} />
@@ -1045,13 +980,6 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxCompanion, maxCom
 
 // ─── Styles ─────────────────────────────────────────
 
-const thStyle: React.CSSProperties = {
-  padding: '8px 12px', textAlign: 'left', fontFamily: 'var(--font-ui)',
-  fontSize: 14, fontWeight: 600, color: 'var(--text-muted)',
-  textTransform: 'uppercase' as const, cursor: 'pointer', userSelect: 'none',
-  whiteSpace: 'nowrap',
-}
+const thClass = "px-3 py-2 text-left font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--text-muted)] uppercase cursor-pointer select-none whitespace-nowrap"
 
-const tdStyle: React.CSSProperties = {
-  padding: '8px 12px', verticalAlign: 'middle',
-}
+const tdClass = "px-3 py-2 align-middle"

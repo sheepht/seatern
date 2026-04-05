@@ -156,7 +156,7 @@ export default function SettingsPage() {
   const pct = Math.min(100, (tables.length / tableLimit) * 100)
 
   return (
-    <div className="flex-1 overflow-auto" style={{ background: 'var(--bg-primary)' }}>
+    <div className="flex-1 overflow-auto bg-[var(--bg-primary)]">
       <div className="max-w-[1440px] mx-auto w-full p-6">
         <div className="flex gap-6 items-start flex-wrap">
 
@@ -171,14 +171,14 @@ export default function SettingsPage() {
                     {avatarUrl ? (
                       <img src={avatarUrl} alt="avatar" className="w-16 h-16 rounded-full object-cover shrink-0" />
                     ) : (
-                      <div className="w-16 h-16 rounded-full shrink-0 flex items-center justify-center text-2xl font-bold text-white" style={{ background: 'var(--accent)', fontFamily: 'var(--font-display)' }}>
+                      <div className="w-16 h-16 rounded-full shrink-0 flex items-center justify-center text-2xl font-bold text-white bg-[var(--accent)] font-[family-name:var(--font-display)]">
                         {initial}
                       </div>
                     )}
                     <div className="flex-1">
                       <label className="settings-label">名字</label>
                       <input value={name} onChange={(e) => setName(e.target.value)} className="settings-input" />
-                      <div className="mt-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>{user?.email}</div>
+                      <div className="mt-2 text-[13px] text-[var(--text-muted)]">{user?.email}</div>
                       <div className="mt-1">
                         <span className="inline-block text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: providerBadge.bg, color: providerBadge.color }}>
                           {providerBadge.label}
@@ -209,7 +209,7 @@ export default function SettingsPage() {
                         <label className="settings-label">確認密碼</label>
                         <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="settings-input" />
                       </div>
-                      {pwError && <div className="text-[13px]" style={{ color: 'var(--error)' }}>{pwError}</div>}
+                      {pwError && <div className="text-[13px] text-[var(--error)]">{pwError}</div>}
                       <div className="flex gap-2 items-center">
                         <button onClick={handleChangePw} disabled={savingPw} className="btn-primary">{savingPw ? '更新中...' : '更新密碼'}</button>
                         {pwMsg && <span className="text-[13px]" style={{ color: pwMsg.type === 'success' ? 'var(--success)' : 'var(--error)' }}>{pwMsg.text}</span>}
@@ -231,7 +231,7 @@ export default function SettingsPage() {
                     onLink={handleLinkLine} onUnlink={handleUnlinkLine} />
                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs border border-[var(--border)]">
                     <EmailIcon /><span>Email</span>
-                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{linkedEmail ? '已綁定' : '未綁定'}</span>
+                    <span className="text-[11px] text-[var(--text-muted)]">{linkedEmail ? '已綁定' : '未綁定'}</span>
                   </div>
                 </div>
               </div>
@@ -246,19 +246,19 @@ export default function SettingsPage() {
               <div className="settings-split-plan flex gap-6 flex-wrap">
                 <div className="flex-1 min-w-[180px]">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg font-bold" style={{ color: 'var(--accent)', fontFamily: 'var(--font-display)' }}>免費版</span>
-                    <span className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}>目前方案</span>
+                    <span className="text-lg font-bold text-[var(--accent)] font-[family-name:var(--font-display)]">免費版</span>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold bg-[var(--accent-light)] text-[var(--accent)]">目前方案</span>
                   </div>
                   <div className="mb-2">
-                    <div className="flex justify-between text-[13px] mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    <div className="flex justify-between text-[13px] mb-1 text-[var(--text-secondary)]">
                       <span>桌數用量</span>
-                      <span style={{ fontFamily: 'var(--font-data)', fontWeight: 500 }}>{tables.length} / {tableLimit}</span>
+                      <span className="font-medium font-[family-name:var(--font-data)]">{tables.length} / {tableLimit}</span>
                     </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                    <div className="h-1.5 rounded-full overflow-hidden bg-[var(--border)]">
                       <div className="h-full rounded-full transition-[width] duration-300" style={{ background: pct >= 80 ? 'var(--warning)' : 'var(--accent)', width: `${pct}%` }} />
                     </div>
                   </div>
-                  <ul className="text-[13px] pl-4 flex flex-col gap-1 m-0" style={{ color: 'var(--text-secondary)' }}>
+                  <ul className="text-[13px] pl-4 flex flex-col gap-1 m-0 text-[var(--text-secondary)]">
                     <li>最多 {tableLimit} 桌</li>
                     <li>單一活動</li>
                     <li>基本排位功能</li>
@@ -266,16 +266,16 @@ export default function SettingsPage() {
                 </div>
                 <div className="settings-divider-col flex-1 min-w-[180px]">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>專業版</span>
-                    <span className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: 'var(--bg-primary)', color: 'var(--text-muted)' }}>即將推出</span>
+                    <span className="text-lg font-bold text-[var(--text-primary)] font-[family-name:var(--font-display)]">專業版</span>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold bg-[var(--bg-primary)] text-[var(--text-muted)]">即將推出</span>
                   </div>
-                  <ul className="text-[13px] pl-4 flex flex-col gap-1 m-0 mb-3" style={{ color: 'var(--text-muted)' }}>
+                  <ul className="text-[13px] pl-4 flex flex-col gap-1 m-0 mb-3 text-[var(--text-muted)]">
                     <li>最多 50+ 桌</li>
                     <li>多活動管理</li>
                     <li>匯出 PDF 座位表</li>
                     <li>優先客服支援</li>
                   </ul>
-                  <button disabled className="btn-primary !cursor-not-allowed" style={{ background: 'var(--border)', color: 'var(--text-muted)' }}>敬請期待</button>
+                  <button disabled className="btn-primary !cursor-not-allowed bg-[var(--border)] text-[var(--text-muted)]">敬請期待</button>
                 </div>
               </div>
 
@@ -283,14 +283,14 @@ export default function SettingsPage() {
 
               {/* 資料管理 */}
               <h2 className="card-title">資料管理</h2>
-              <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>匯出你的賓客名單、桌次安排等所有資料。</p>
+              <p className="text-sm mb-3 text-[var(--text-secondary)]">匯出你的賓客名單、桌次安排等所有資料。</p>
               <button onClick={handleExport} disabled={exporting} className="btn-primary">{exporting ? '匯出中...' : '⬇ 匯出 JSON'}</button>
 
               <div className="border-t border-[var(--border)] my-5" />
 
               {/* 刪除帳號 */}
-              <h2 className="card-title" style={{ color: 'var(--error)' }}>刪除帳號</h2>
-              <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>刪除後你的所有資料將無法存取。此操作無法復原。</p>
+              <h2 className="card-title text-[var(--error)]">刪除帳號</h2>
+              <p className="text-sm mb-3 text-[var(--text-secondary)]">刪除後你的所有資料將無法存取。此操作無法復原。</p>
               <button onClick={() => setShowDeleteDialog(true)} className="btn-danger">刪除我的帳號</button>
             </div>
           </div>
@@ -300,9 +300,9 @@ export default function SettingsPage() {
         {showDeleteDialog && (
           <div className="fixed inset-0 z-[999] flex items-center justify-center">
             <div className="absolute inset-0 bg-black/50" onClick={() => { setShowDeleteDialog(false); setDeleteInput('') }} />
-            <div className="relative p-6 w-[400px] max-w-[calc(100vw-32px)] border border-[var(--border)]" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg, 12px)', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
-              <h3 className="text-base font-semibold mb-2" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>刪除帳號</h3>
-              <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>此操作將永久移除你的帳號存取權限。你的所有賓客資料、桌次安排都將無法存取。</p>
+            <div className="relative p-6 w-[400px] max-w-[calc(100vw-32px)] border border-[var(--border)] bg-[var(--bg-surface)] rounded-[var(--radius-lg,12px)] shadow-[0_20px_60px_rgba(0,0,0,0.15)]">
+              <h3 className="text-base font-semibold mb-2 text-[var(--text-primary)] font-[family-name:var(--font-display)]">刪除帳號</h3>
+              <p className="text-sm mb-4 text-[var(--text-secondary)]">此操作將永久移除你的帳號存取權限。你的所有賓客資料、桌次安排都將無法存取。</p>
               <label className="settings-label mb-1">請輸入「刪除」來確認</label>
               <input value={deleteInput} onChange={(e) => setDeleteInput(e.target.value)} placeholder="刪除" className="settings-input" autoFocus />
               <div className="flex gap-2 justify-end mt-4">
@@ -331,12 +331,12 @@ function LinkPill({ icon, label, linked, loading, canUnlink, onLink, onUnlink }:
       {icon}<span>{label}</span>
       {linked ? (
         <button onClick={onUnlink} disabled={!canUnlink || loading}
-          className={`bg-transparent border-none text-xs font-medium cursor-pointer p-0 ${!canUnlink ? 'opacity-50 !cursor-not-allowed' : ''}`}
-          style={{ color: canUnlink ? 'var(--error)' : 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
+          className={`bg-transparent border-none text-xs font-medium cursor-pointer p-0 font-[family-name:var(--font-display)] ${!canUnlink ? 'opacity-50 !cursor-not-allowed' : ''}`}
+          style={{ color: canUnlink ? 'var(--error)' : 'var(--text-muted)' }}>
           {loading ? '...' : '解除'}
         </button>
       ) : (
-        <button onClick={onLink} className="bg-transparent border-none text-xs font-medium cursor-pointer p-0" style={{ color: 'var(--accent)', fontFamily: 'var(--font-display)' }}>綁定</button>
+        <button onClick={onLink} className="bg-transparent border-none text-xs font-medium cursor-pointer p-0 text-[var(--accent)] font-[family-name:var(--font-display)]">綁定</button>
       )}
     </div>
   )

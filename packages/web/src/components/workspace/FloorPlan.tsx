@@ -742,15 +742,15 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     : undefined
 
   return (
-    <div ref={containerRef} className="relative w-full h-full" style={{ cursor: cursorStyle, clipPath: 'inset(0 0 0 -200px)' }} onMouseMove={handleGlobalMouseMove}>
+    <div ref={containerRef} className="relative w-full h-full [clip-path:inset(0_0_0_-200px)]" style={{ cursor: cursorStyle }} onMouseMove={handleGlobalMouseMove}>
       {/* SVG 平面圖 — tabIndex={0} 讓畫布可以接收 focus 和鍵盤事件 */}
       <svg
         id="floorplan-svg"
         ref={svgRef}
         tabIndex={0}
         viewBox={viewBoxStr}
-        className="w-full h-full bg-[#FAFAFA] outline-none"
-        style={{ userSelect: 'none', overflow: 'visible', cursor: cursorStyle }}
+        className="w-full h-full bg-[#FAFAFA] outline-none select-none overflow-visible"
+        style={{ cursor: cursorStyle }}
         onMouseDown={handleSvgMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -863,7 +863,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           }
 
           const recLines = recData.length > 0 ? (
-            <g style={{ pointerEvents: 'none' }}>
+            <g className="pointer-events-none">
               {recData.map((r) => {
                 const isSwapTarget = longPressActive && r.tableId === bestSwapTableId
                 const strokeW = isSwapTarget ? 5 : 2.5
@@ -884,7 +884,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           ) : null
 
           const recBadges = recData.length > 0 ? (
-            <g style={{ pointerEvents: 'none' }}>
+            <g className="pointer-events-none">
               {recData.map((r) => (
                 <g key={`rec-badge-${r.animIdx}`} opacity={r.opacity} transform={`translate(${r.midpoint.x}, ${r.midpoint.y})`}>
                   <rect x={-20} y={-12} width={40} height={24} rx={12} fill={r.badgeColor} />
@@ -949,7 +949,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
         return createPortal(
           <svg
-            style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 9998 }}
+            className="fixed inset-0 w-screen h-screen pointer-events-none z-[9998]"
           >
             <style>{`
               @keyframes rec-overlay-flow {
@@ -1106,24 +1106,14 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         return indicators.map((ind, i) => (
           <div
             key={`offscreen-${i}`}
+            className="absolute text-white px-2.5 py-[3px] rounded-xl text-xs font-bold font-[family-name:'Plus_Jakarta_Sans',sans-serif] whitespace-nowrap pointer-events-none z-30 shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
             style={{
-              position: 'absolute',
-              left: ind.edge === 'right' ? undefined : ind.edge === 'left' ? ind.x : ind.x,
+              left: ind.edge === 'right' ? undefined : ind.x,
               right: ind.edge === 'right' ? margin : undefined,
               top: ind.edge === 'bottom' ? undefined : ind.y,
               bottom: ind.edge === 'bottom' ? margin : undefined,
-              transform: ind.edge === 'left' ? 'translateY(-50%)' : ind.edge === 'right' ? 'translateY(-50%)' : 'translateX(-50%)',
+              transform: ind.edge === 'left' || ind.edge === 'right' ? 'translateY(-50%)' : 'translateX(-50%)',
               background: ind.color,
-              color: 'white',
-              padding: '3px 10px',
-              borderRadius: 12,
-              fontSize: 12,
-              fontWeight: 700,
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              whiteSpace: 'nowrap',
-              pointerEvents: 'none',
-              zIndex: 30,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             }}
           >
             {ind.name} +{ind.delta}
@@ -1132,7 +1122,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       })()}
 
       {/* HTML overlay 層（拖桌子或重排動畫時禁用） */}
-      <div style={{ pointerEvents: (draggingTableId || isResetting || flyingGuestIds.size > 0) ? 'none' : undefined }}>
+      <div className={(draggingTableId || isResetting || flyingGuestIds.size > 0) ? 'pointer-events-none' : ''}>
         {/* 每個座位的 drop zone（含空位） */}
         {screenSeats.map((ss) => {
           // 計算桌子中心螢幕座標（從同桌所有座位的幾何中心推算）
@@ -1224,52 +1214,33 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       {/* 空位點擊 → 選擇賓客 popover */}
       {/* 自動分配進度 overlay — 全畫布遮罩 + 中央進度卡 */}
       {autoAssignProgress && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'rgba(250,250,250,0.6)',
-          zIndex: 50,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          <div style={{
-            background: 'var(--bg-surface, #fff)',
-            border: '1px solid var(--border, #E7E5E4)',
-            borderRadius: 'var(--radius-lg, 12px)',
-            boxShadow: '0 8px 30px rgba(28,25,23,0.12)',
-            padding: '28px 36px',
-            fontFamily: 'var(--font-body)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 14,
-            minWidth: 280,
-          }}>
-            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary, #1C1917)' }}>
+        <div className="absolute inset-0 bg-[rgba(250,250,250,0.6)] z-50 flex items-center justify-center">
+          <div className="bg-[var(--bg-surface,#fff)] border border-[var(--border,#E7E5E4)] rounded-[var(--radius-lg,12px)] shadow-[0_8px_30px_rgba(28,25,23,0.12)] px-9 py-7 font-[family-name:var(--font-body)] flex flex-col items-center gap-3.5 min-w-[280px]">
+            <div className="text-base font-semibold text-[var(--text-primary,#1C1917)]">
               {autoAssignProgress.label}
             </div>
             {/* 進度條 — 顏色依進度百分比 */}
-            <div style={{ width: '100%', height: 8, background: '#E7E5E4', borderRadius: 4, overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                background: getSatisfactionColor(autoAssignProgress.progress * 100),
-                borderRadius: 4,
-                width: `${Math.max(3, autoAssignProgress.progress * 100)}%`,
-                transition: 'width 200ms ease-out, background 400ms ease-out',
-              }} />
+            <div className="w-full h-2 bg-[#E7E5E4] rounded overflow-hidden">
+              <div
+                className="h-full rounded"
+                style={{
+                  background: getSatisfactionColor(autoAssignProgress.progress * 100),
+                  width: `${Math.max(3, autoAssignProgress.progress * 100)}%`,
+                  transition: 'width 200ms ease-out, background 400ms ease-out',
+                }}
+              />
             </div>
             {autoAssignProgress.detail && (() => {
               const parts = autoAssignProgress.detail.split(' · ')
               return (
-                <div style={{ textAlign: 'center' }}>
+                <div className="text-center">
                   {parts.map((p, i) => (
-                    <div key={i} style={{ fontSize: 14, color: 'var(--text-secondary, #78716C)', lineHeight: 1.6 }}>{p}</div>
+                    <div key={i} className="text-sm text-[var(--text-secondary,#78716C)] leading-[1.6]">{p}</div>
                   ))}
                 </div>
               )
             })()}
-            <div style={{ fontSize: 14, color: 'var(--text-muted, #A8A29E)' }}>
+            <div className="text-sm text-[var(--text-muted,#A8A29E)]">
               {autoAssignProgress.remainingSeconds !== null && autoAssignProgress.remainingSeconds > 0 ? (
                 autoAssignProgress.remainingSeconds < 60
                   ? `預計剩餘 ${autoAssignProgress.remainingSeconds} 秒`
@@ -1278,16 +1249,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
             </div>
             <button
               onClick={() => useSeatingStore.getState().cancelAutoAssign()}
-              className="cursor-pointer hover:bg-black/5"
-              style={{
-                padding: '6px 20px',
-                borderRadius: 6,
-                fontSize: 13,
-                border: '1px solid var(--border)',
-                background: 'transparent',
-                color: 'var(--text-secondary)',
-                fontFamily: 'var(--font-body)',
-              }}
+              className="cursor-pointer hover:bg-black/5 px-5 py-1.5 rounded-md text-[13px] border border-[var(--border)] bg-transparent text-[var(--text-secondary)] font-[family-name:var(--font-body)]"
             >
               取消
             </button>

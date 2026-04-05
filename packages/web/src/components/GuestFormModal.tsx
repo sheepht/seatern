@@ -156,69 +156,55 @@ export function AddPickerButton({ guests, excludeIds, onSelect, categoryColors, 
       <button
         ref={btnRef}
         onClick={() => setOpen(!open)}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 2,
-          padding: '2px 8px', borderRadius: 'var(--radius-sm, 4px)',
-          border: '1px dashed var(--border)', background: 'none',
-          fontSize: 13, fontFamily: 'var(--font-ui)', color: 'var(--accent)',
-          cursor: 'pointer', whiteSpace: 'nowrap',
-        }}
+        className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-[var(--radius-sm,4px)] border border-dashed border-[var(--border)] bg-none text-[13px] font-[family-name:var(--font-ui)] text-[var(--accent)] cursor-pointer whitespace-nowrap"
       >
         + 新增
       </button>
       {open && createPortal(
         <div
           ref={panelRef}
-          style={{
-            position: 'fixed', left: pos.left, top: pos.top, width: 320, zIndex: 10000,
-            border: '1px solid var(--border)', borderRadius: 'var(--radius-md, 8px)',
-            padding: 8, background: 'var(--bg-surface)',
-            boxShadow: '0 12px 32px rgba(0,0,0,0.15)',
-          }}
+          className="fixed w-[320px] z-[10000] border border-[var(--border)] rounded-[var(--radius-md,8px)] p-2 bg-[var(--bg-surface)] shadow-[0_12px_32px_rgba(0,0,0,0.15)]"
+          style={{ left: pos.left, top: pos.top }}
         >
           <input
             ref={searchRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={placeholder || '搜尋賓客...'}
-            style={{
-              width: '100%', padding: '4px 8px', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm, 4px)', fontSize: 14, fontFamily: 'var(--font-ui)',
-              outline: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)',
-              boxSizing: 'border-box', marginBottom: 6,
-            }}
+            className="w-full px-2 py-1 border border-[var(--border)] rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)] outline-none bg-[var(--bg-surface)] text-[var(--text-primary)] box-border mb-1.5"
             onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)' }}
             onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
           />
-          <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+          <div className="max-h-60 overflow-y-auto">
             {grouped.length === 0 ? (
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: 4 }}>
+              <div className="text-[13px] text-[var(--text-muted)] p-1">
                 {search.trim() ? `找不到「${search}」` : '沒有可選的賓客'}
               </div>
             ) : (
               grouped.map(({ category, subGroups }) => {
                 const catColor = getCategoryColor(category, categoryColors)
                 return (
-                  <div key={category} style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                      <span style={{
-                        fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 3,
-                        background: catColor.background, color: catColor.color, border: `1px solid ${catColor.border}`,
-                      }}>{category}</span>
+                  <div key={category} className="mb-2">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span
+                        className="text-xs font-semibold px-1.5 py-px rounded-[3px]"
+                        style={{
+                          background: catColor.background, color: catColor.color, border: `1px solid ${catColor.border}`,
+                        }}
+                      >{category}</span>
                     </div>
                     {subGroups.map(({ tagName, guests: sgGuests }) => (
-                      <div key={tagName ?? '__no_tag__'} style={{ paddingLeft: 8, borderLeft: `2px solid ${catColor.border}`, marginBottom: 4 }}>
-                        {tagName && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{tagName}</div>}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                      <div key={tagName ?? '__no_tag__'} className="pl-2 mb-1" style={{ borderLeft: `2px solid ${catColor.border}` }}>
+                        {tagName && <div className="text-[11px] text-[var(--text-muted)] mb-0.5">{tagName}</div>}
+                        <div className="flex flex-wrap gap-[3px]">
                           {sgGuests.map((g) => (
                             <button
                               key={g.id}
                               onClick={() => { onSelect(g.id) }}
+                              className="px-2 py-0.5 text-[13px] font-[family-name:var(--font-body)] rounded-[var(--radius-sm,4px)] cursor-pointer whitespace-nowrap"
                               style={{
-                                padding: '2px 8px', fontSize: 13, fontFamily: 'var(--font-body)',
-                                borderRadius: 'var(--radius-sm, 4px)', cursor: 'pointer',
                                 border: `1px solid ${catColor.border}`, background: catColor.background,
-                                color: catColor.color, whiteSpace: 'nowrap',
+                                color: catColor.color,
                               }}
                               onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-light)'; e.currentTarget.style.borderColor = 'var(--accent)' }}
                               onMouseLeave={(e) => { e.currentTarget.style.background = catColor.background; e.currentTarget.style.borderColor = catColor.border }}
@@ -268,11 +254,8 @@ export function FixedDropdown({ anchorRef, children, onClose, style: extraStyle 
   }, [onClose, anchorRef])
 
   return createPortal(
-    <div ref={popRef} style={{
-      position: 'fixed', left: pos.left, top: pos.top, zIndex: 10000,
-      background: 'var(--bg-surface)', border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-md, 8px)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-      padding: 4, minWidth: 120, ...extraStyle,
+    <div ref={popRef} className="fixed z-[10000] bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-md,8px)] shadow-[0_8px_24px_rgba(0,0,0,0.12)] p-1 min-w-[120px]" style={{
+      left: pos.left, top: pos.top, ...extraStyle,
     }}>
       {children}
     </div>,
@@ -386,50 +369,43 @@ export default function GuestFormModal({
   return createPortal(
     <div
       onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
-      }}
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg, 12px)',
-          padding: 24, maxWidth: 820, width: '90%', maxHeight: '90vh', overflow: 'auto',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-        }}
+        className="bg-[var(--bg-surface)] rounded-[var(--radius-lg,12px)] p-6 max-w-[820px] w-[90%] max-h-[90vh] overflow-auto shadow-[0_8px_30px_rgba(0,0,0,0.12)]"
       >
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--text-primary)] m-0">
             {mode === 'add' ? '新增賓客' : `${guest!.name}的詳細資訊`}
           </h3>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-muted)' }}
+            className="bg-none border-none cursor-pointer p-1 text-[var(--text-muted)]"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Form — two columns */}
-        <div style={{ display: 'flex', gap: 24 }}>
+        <div className="flex gap-6">
 
           {/* Left column: basic info */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="flex-1 flex flex-col">
 
             <div style={sectionTitleStyle}>基本資料</div>
 
             {/* 1. 姓名 + 暱稱 */}
             <div style={rowStyle}>
               <span style={labelStyle}>
-                姓名{mode === 'add' && <span style={{ color: 'var(--error)' }}> *</span>}
+                姓名{mode === 'add' && <span className="text-[var(--error)]"> *</span>}
               </span>
-              <div style={{ flex: 1 }}>
+              <div className="flex-1">
                 <FieldInput value={name} onChange={setName} maxLength={50} />
               </div>
               <span style={{ ...labelStyle, width: 'auto', paddingLeft: 8 }}>暱稱</span>
-              <div style={{ flex: 1 }}>
+              <div className="flex-1">
                 <FieldInput
                   value={alias}
                   onChange={setAlias}
@@ -442,7 +418,7 @@ export default function GuestFormModal({
             {/* 2. 分類 */}
             <div style={rowStyle}>
               <span style={labelStyle}>分類</span>
-              <div style={{ flex: 1, display: 'flex', gap: 6, paddingTop: 2 }}>
+              <div className="flex-1 flex gap-1.5 pt-0.5">
                 {categories.map((cat) => {
                   const cc = getCategoryColor(cat, categoryColors)
                   const selected = category === cat
@@ -450,9 +426,8 @@ export default function GuestFormModal({
                     <button
                       key={cat}
                       onClick={() => setCategory(cat)}
+                      className="px-3 py-[3px] rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)] font-medium cursor-pointer"
                       style={{
-                        padding: '3px 12px', borderRadius: 'var(--radius-sm, 4px)', fontSize: 14,
-                        fontFamily: 'var(--font-ui)', fontWeight: 500, cursor: 'pointer',
                         border: selected ? `2px solid ${cc.color}` : `1px solid ${cc.border}`,
                         background: selected ? cc.background : 'var(--bg-surface)',
                         color: selected ? cc.color : 'var(--text-secondary)',
@@ -466,25 +441,24 @@ export default function GuestFormModal({
             {/* 3. 子分類 */}
             <div style={rowStyle}>
               <span style={labelStyle}>子分類</span>
-              <div style={{ flex: 1, paddingTop: 4, position: 'relative' }}>
+              <div className="flex-1 pt-1 relative">
                 <span
                   ref={subcatAnchorRef}
                   onClick={() => setSubcatOpen(!subcatOpen)}
+                  className="text-[15px] cursor-pointer inline-flex items-center gap-0.5"
                   style={{
                     color: subcatName && subcatName !== '__new__' ? 'var(--text-primary)' : 'var(--text-muted)',
-                    fontSize: 15, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 2,
                   }}
                 >
                   {subcatName && subcatName !== '__new__' ? subcatName : '未指定'}
-                  <ChevronDown size={10} style={{ color: 'var(--text-muted)' }} />
+                  <ChevronDown size={10} className="text-[var(--text-muted)]" />
                 </span>
                 {subcatOpen && (
                   <FixedDropdown anchorRef={subcatAnchorRef} onClose={() => setSubcatOpen(false)} style={{ minWidth: 180, maxHeight: 240, overflow: 'auto' }}>
                     <div
                       onClick={() => { setSubcatName(''); setNewSubcat(''); setSubcatOpen(false) }}
+                      className="px-2 py-1 rounded-[var(--radius-sm,4px)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--text-muted)]"
                       style={{
-                        padding: '4px 8px', borderRadius: 'var(--radius-sm, 4px)', cursor: 'pointer',
-                        fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--text-muted)',
                         background: !subcatName ? 'var(--accent-light)' : 'transparent',
                       }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)' }}
@@ -496,9 +470,8 @@ export default function GuestFormModal({
                       <div
                         key={sc.id}
                         onClick={() => { setSubcatName(sc.name); setNewSubcat(''); setSubcatOpen(false) }}
+                        className="px-2 py-1 rounded-[var(--radius-sm,4px)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--text-primary)]"
                         style={{
-                          padding: '4px 8px', borderRadius: 'var(--radius-sm, 4px)', cursor: 'pointer',
-                          fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--text-primary)',
                           background: subcatName === sc.name ? 'var(--accent-light)' : 'transparent',
                         }}
                         onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)' }}
@@ -509,11 +482,7 @@ export default function GuestFormModal({
                     ))}
                     <div
                       onClick={() => { setSubcatName('__new__'); setSubcatOpen(false) }}
-                      style={{
-                        padding: '4px 8px', borderRadius: 'var(--radius-sm, 4px)', cursor: 'pointer',
-                        fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--accent)',
-                        borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 6,
-                      }}
+                      className="px-2 py-1 rounded-[var(--radius-sm,4px)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--accent)] border-t border-[var(--border)] mt-1 pt-1.5"
                       onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)' }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
                     >
@@ -522,7 +491,7 @@ export default function GuestFormModal({
                   </FixedDropdown>
                 )}
                 {subcatName === '__new__' && (
-                  <div style={{ marginTop: 6 }}>
+                  <div className="mt-1.5">
                     <input
                       ref={newSubcatInputRef}
                       value={newSubcat}
@@ -560,27 +529,25 @@ export default function GuestFormModal({
             {/* 4. 出席 */}
             <div style={rowStyle}>
               <span style={labelStyle}>出席</span>
-              <div style={{ flex: 1, display: 'flex', gap: 8, paddingTop: 4 }}>
+              <div className="flex-1 flex gap-2 pt-1">
                 <button
                   onClick={() => setRsvp('confirmed')}
+                  className="px-3.5 py-1 rounded-[var(--radius-sm,4px)] cursor-pointer text-[15px] font-[family-name:var(--font-ui)] font-semibold"
                   style={{
-                    padding: '4px 14px', borderRadius: 'var(--radius-sm, 4px)',
                     border: rsvp === 'confirmed' ? '2px solid var(--success)' : '1px solid var(--border)',
                     background: rsvp === 'confirmed' ? 'rgba(34,197,94,0.08)' : 'var(--bg-surface)',
                     color: rsvp === 'confirmed' ? 'var(--success)' : 'var(--text-muted)',
-                    cursor: 'pointer', fontSize: 15, fontFamily: 'var(--font-ui)', fontWeight: 600,
                   }}
                 >
                   ✓ 確認
                 </button>
                 <button
                   onClick={() => setRsvp('declined')}
+                  className="px-3.5 py-1 rounded-[var(--radius-sm,4px)] cursor-pointer text-[15px] font-[family-name:var(--font-ui)] font-semibold"
                   style={{
-                    padding: '4px 14px', borderRadius: 'var(--radius-sm, 4px)',
                     border: rsvp === 'declined' ? '2px solid var(--error)' : '1px solid var(--border)',
                     background: rsvp === 'declined' ? 'rgba(239,68,68,0.08)' : 'var(--bg-surface)',
                     color: rsvp === 'declined' ? 'var(--error)' : 'var(--text-muted)',
-                    cursor: 'pointer', fontSize: 15, fontFamily: 'var(--font-ui)', fontWeight: 600,
                   }}
                 >
                   ✗ 婉拒
@@ -591,32 +558,31 @@ export default function GuestFormModal({
           </div>
 
           {/* Right column: seating & notes */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="flex-1 flex flex-col">
 
             <div style={sectionTitleStyle}>排位</div>
 
             {/* 1. 桌次 + 攜眷 */}
             <div style={rowStyle}>
               <span style={labelStyle}>桌次</span>
-              <div style={{ flex: 1, paddingTop: 4, position: 'relative' }}>
+              <div className="flex-1 pt-1 relative">
                 <span
                   ref={tableAnchorRef}
                   onClick={() => setTableOpen(!tableOpen)}
+                  className="text-[15px] cursor-pointer inline-flex items-center gap-0.5"
                   style={{
                     color: tableId ? 'var(--text-primary)' : 'var(--text-muted)',
-                    fontSize: 15, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 2,
                   }}
                 >
                   {currentTable ? currentTable.name : '未排座'}
-                  <ChevronDown size={10} style={{ color: 'var(--text-muted)' }} />
+                  <ChevronDown size={10} className="text-[var(--text-muted)]" />
                 </span>
                 {tableOpen && (
                   <FixedDropdown anchorRef={tableAnchorRef} onClose={() => setTableOpen(false)} style={{ minWidth: 180, maxHeight: 240, overflow: 'auto' }}>
                     <div
                       onClick={() => { setTableId(null); setTableOpen(false) }}
+                      className="px-2 py-1 rounded-[var(--radius-sm,4px)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--text-muted)]"
                       style={{
-                        padding: '4px 8px', borderRadius: 'var(--radius-sm, 4px)', cursor: 'pointer',
-                        fontSize: 14, fontFamily: 'var(--font-ui)', color: 'var(--text-muted)',
                         background: !tableId ? 'var(--accent-light)' : 'transparent',
                       }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)' }}
@@ -631,20 +597,18 @@ export default function GuestFormModal({
                         <div
                           key={t.id}
                           onClick={() => { if (!full || isCurrent) { setTableId(t.id); setTableOpen(false) } }}
+                          className="px-2 py-1 rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)] flex justify-between gap-2"
                           style={{
-                            padding: '4px 8px', borderRadius: 'var(--radius-sm, 4px)',
                             cursor: full && !isCurrent ? 'default' : 'pointer',
-                            fontSize: 14, fontFamily: 'var(--font-ui)',
                             color: full && !isCurrent ? 'var(--text-muted)' : 'var(--text-primary)',
                             opacity: full && !isCurrent ? 0.5 : 1,
                             background: isCurrent ? 'var(--accent-light)' : 'transparent',
-                            display: 'flex', justifyContent: 'space-between', gap: 8,
                           }}
                           onMouseEnter={(e) => { if (!full || isCurrent) (e.currentTarget as HTMLDivElement).style.background = 'var(--accent-light)' }}
                           onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = isCurrent ? 'var(--accent-light)' : 'transparent' }}
                         >
                           <span>{t.name}</span>
-                          <span style={{ color: 'var(--text-muted)' }}>({t.used}/{t.capacity})</span>
+                          <span className="text-[var(--text-muted)]">({t.used}/{t.capacity})</span>
                         </div>
                       )
                     })}
@@ -652,25 +616,25 @@ export default function GuestFormModal({
                 )}
               </div>
               <span style={{ ...labelStyle, width: 'auto', paddingLeft: 8 }}>攜眷</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingTop: 4 }}>
+              <div className="flex items-center gap-1 pt-1">
                 <button
                   onClick={() => companion > 0 && setCompanion(companion - 1)}
                   disabled={companion <= 0}
+                  className="w-7 h-7 rounded-[var(--radius-sm,4px)] border border-[var(--border)] flex items-center justify-center text-base"
                   style={{
-                    width: 28, height: 28, borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
-                    background: companion <= 0 ? 'transparent' : 'var(--bg-surface)', cursor: companion <= 0 ? 'default' : 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                    background: companion <= 0 ? 'transparent' : 'var(--bg-surface)',
+                    cursor: companion <= 0 ? 'default' : 'pointer',
                     color: companion <= 0 ? 'var(--text-muted)' : 'var(--text-secondary)',
                   }}
                 >−</button>
-                <span style={{ fontFamily: 'var(--font-data)', fontVariantNumeric: 'tabular-nums', minWidth: 24, textAlign: 'center', fontSize: 15 }}>{companion}</span>
+                <span className="font-[family-name:var(--font-data)] tabular-nums min-w-6 text-center text-[15px]">{companion}</span>
                 <button
                   onClick={() => companion < 4 && setCompanion(companion + 1)}
                   disabled={companion >= 4}
+                  className="w-7 h-7 rounded-[var(--radius-sm,4px)] border border-[var(--border)] flex items-center justify-center text-base"
                   style={{
-                    width: 28, height: 28, borderRadius: 'var(--radius-sm, 4px)', border: '1px solid var(--border)',
-                    background: companion >= 4 ? 'transparent' : 'var(--bg-surface)', cursor: companion >= 4 ? 'default' : 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                    background: companion >= 4 ? 'transparent' : 'var(--bg-surface)',
+                    cursor: companion >= 4 ? 'default' : 'pointer',
                     color: companion >= 4 ? 'var(--text-muted)' : 'var(--text-secondary)',
                   }}
                 >+</button>
@@ -680,24 +644,23 @@ export default function GuestFormModal({
             {/* 2. 想同桌 */}
             <div style={rowStyle}>
               <span style={labelStyle}>想同桌</span>
-              <div style={{ flex: 1, paddingTop: 4 }}>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="flex-1 pt-1">
+                <div className="flex gap-1 flex-wrap items-center">
                   {prefIds.map((pid) => {
                     const g = guests.find((x) => x.id === pid)
                     const display = g ? (g.aliases.length > 0 ? g.aliases[0] : g.name) : '?'
                     const cc = g ? getCategoryColor(g.category, categoryColors) : null
                     return (
-                      <span key={pid} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 2,
-                        padding: '2px 8px', borderRadius: 'var(--radius-sm, 4px)',
+                      <span key={pid} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)]" style={{
                         background: cc?.background || 'var(--accent-light)',
                         border: `1px solid ${cc?.border || 'var(--border)'}`,
-                        fontSize: 14, fontFamily: 'var(--font-ui)', color: cc?.color || 'var(--text-primary)',
+                        color: cc?.color || 'var(--text-primary)',
                       }}>
                         {display}
                         <button
                           onClick={() => setPrefIds(prefIds.filter((id) => id !== pid))}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: cc?.color || 'var(--text-muted)', fontSize: 10, lineHeight: 1, opacity: 0.6 }}
+                          className="bg-none border-none cursor-pointer p-0 text-[10px] leading-none opacity-60"
+                          style={{ color: cc?.color || 'var(--text-muted)' }}
                         >
                           <X size={14} />
                         </button>
@@ -720,24 +683,23 @@ export default function GuestFormModal({
             {/* 3. 要避桌 */}
             <div style={rowStyle}>
               <span style={labelStyle}>要避桌</span>
-              <div style={{ flex: 1, paddingTop: 4 }}>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="flex-1 pt-1">
+                <div className="flex gap-1 flex-wrap items-center">
                   {avoidIds.map((aid) => {
                     const g = guests.find((x) => x.id === aid)
                     const display = g ? (g.aliases.length > 0 ? g.aliases[0] : g.name) : '?'
                     const cc = g ? getCategoryColor(g.category, categoryColors) : null
                     return (
-                      <span key={aid} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 2,
-                        padding: '2px 8px', borderRadius: 'var(--radius-sm, 4px)',
+                      <span key={aid} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)]" style={{
                         background: cc?.background || 'rgba(239,68,68,0.08)',
                         border: `1px solid ${cc?.border || 'var(--error)'}`,
-                        fontSize: 14, fontFamily: 'var(--font-ui)', color: cc?.color || 'var(--error)',
+                        color: cc?.color || 'var(--error)',
                       }}>
                         {display}
                         <button
                           onClick={() => setAvoidIds(avoidIds.filter((id) => id !== aid))}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: cc?.color || 'var(--error)', fontSize: 10, lineHeight: 1, opacity: 0.6 }}
+                          className="bg-none border-none cursor-pointer p-0 text-[10px] leading-none opacity-60"
+                          style={{ color: cc?.color || 'var(--error)' }}
                         >
                           <X size={14} />
                         </button>
@@ -760,7 +722,7 @@ export default function GuestFormModal({
             {/* 4. 飲食 */}
             <div style={rowStyle}>
               <span style={labelStyle}>飲食</span>
-              <div style={{ flex: 1 }}>
+              <div className="flex-1">
                 <FieldInput value={dietary} onChange={setDietary} placeholder="素食、過敏等..." />
               </div>
             </div>
@@ -768,7 +730,7 @@ export default function GuestFormModal({
             {/* 5. 特殊需求 */}
             <div style={rowStyle}>
               <span style={labelStyle}>特殊需求</span>
-              <div style={{ flex: 1 }}>
+              <div className="flex-1">
                 <FieldInput value={special} onChange={setSpecial} placeholder="輪椅、兒童椅等..." />
               </div>
             </div>
@@ -777,42 +739,31 @@ export default function GuestFormModal({
         </div>
 
         {/* Footer */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+        <div className="flex justify-between mt-5 pt-4 border-t border-[var(--border)]">
           <div>
             {mode === 'edit' && onDelete && guest && (
               <button
                 onClick={() => onDelete(guest.id)}
-                style={{
-                  padding: '6px 16px', borderRadius: 'var(--radius-sm, 4px)',
-                  border: '1px solid var(--error)', background: 'none',
-                  color: 'var(--error)', cursor: 'pointer', fontSize: 15,
-                  fontFamily: 'var(--font-ui)', fontWeight: 500,
-                }}
+                className="px-4 py-1.5 rounded-[var(--radius-sm,4px)] border border-[var(--error)] bg-none text-[var(--error)] cursor-pointer text-[15px] font-[family-name:var(--font-ui)] font-medium"
               >
                 刪除賓客
               </button>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="flex gap-2">
             <button
               onClick={onClose}
-              style={{
-                padding: '6px 20px', borderRadius: 'var(--radius-sm, 4px)',
-                border: '1px solid var(--border)', background: 'var(--bg-surface)',
-                color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 15,
-                fontFamily: 'var(--font-ui)', fontWeight: 500,
-              }}
+              className="px-5 py-1.5 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] cursor-pointer text-[15px] font-[family-name:var(--font-ui)] font-medium"
             >
               取消
             </button>
             <button
               onClick={handleSubmit}
               disabled={!name.trim() || submitting}
+              className="px-5 py-1.5 rounded-[var(--radius-sm,4px)] border-none text-white text-[15px] font-[family-name:var(--font-ui)] font-medium"
               style={{
-                padding: '6px 20px', borderRadius: 'var(--radius-sm, 4px)',
-                border: 'none', background: !name.trim() || submitting ? 'var(--text-muted)' : 'var(--accent)',
-                color: '#fff', cursor: !name.trim() || submitting ? 'default' : 'pointer', fontSize: 15,
-                fontFamily: 'var(--font-ui)', fontWeight: 500,
+                background: !name.trim() || submitting ? 'var(--text-muted)' : 'var(--accent)',
+                cursor: !name.trim() || submitting ? 'default' : 'pointer',
                 opacity: !name.trim() || submitting ? 0.5 : 1,
               }}
             >

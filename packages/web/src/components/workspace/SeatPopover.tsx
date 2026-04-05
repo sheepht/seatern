@@ -125,41 +125,23 @@ export function SeatPopover({ tableId, seatIndex, seatX, seatY, tableCenterX, ta
   return createPortal(
     <div
       ref={popoverRef}
+      className="fixed flex flex-col z-[9999] bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-[0_8px_30px_rgba(28,25,23,0.12)] font-[family-name:var(--font-body)] overflow-hidden"
       style={{
-        position: 'fixed',
         left: Math.max(8, left),
         top: Math.max(8, top),
         width: popW,
         maxHeight: popH,
-        background: 'var(--bg-surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-lg)',
-        boxShadow: '0 8px 30px rgba(28,25,23,0.12)',
-        zIndex: 9999,
-        display: 'flex',
-        flexDirection: 'column',
-        fontFamily: 'var(--font-body)',
-        overflow: 'hidden',
       }}
     >
       {/* 搜尋框 */}
-      <div style={{ padding: '10px 12px 6px', borderBottom: '1px solid var(--border)' }}>
+      <div className="px-3 pt-2.5 pb-1.5 border-b border-[var(--border)]">
         <input
           ref={inputRef}
           type="text"
           placeholder="搜尋姓名、分類、群組..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '6px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '13px',
-            fontFamily: 'var(--font-body)',
-            outline: 'none',
-            background: '#FAFAF9',
-          }}
+          className="w-full px-2 py-1.5 border border-[var(--border)] rounded-[var(--radius-sm)] text-[13px] font-[family-name:var(--font-body)] outline-none bg-[#FAFAF9]"
           onFocus={(e) => { e.target.style.borderColor = '#B08D57' }}
           onBlur={(e) => { e.target.style.borderColor = 'var(--border)' }}
         />
@@ -167,8 +149,8 @@ export function SeatPopover({ tableId, seatIndex, seatX, seatY, tableCenterX, ta
 
       {/* 推薦區（僅在無搜尋時顯示） */}
       {!search.trim() && top3.length > 0 && (
-        <div style={{ padding: '8px 12px 4px' }}>
-          <div style={{ fontSize: '11px', color: '#A8A29E', fontWeight: 600, marginBottom: 4 }}>
+        <div className="px-3 pt-2 pb-1">
+          <div className="text-[11px] text-[#A8A29E] font-semibold mb-1">
             推薦入座
           </div>
           {top3.map((p) => (
@@ -179,13 +161,13 @@ export function SeatPopover({ tableId, seatIndex, seatX, seatY, tableCenterX, ta
 
       {/* 分隔線 */}
       {!search.trim() && top3.length > 0 && filtered.length > top3.length && (
-        <div style={{ height: 1, background: 'var(--border)', margin: '0 12px' }} />
+        <div className="h-px bg-[var(--border)] mx-3" />
       )}
 
       {/* 全部列表 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px 8px' }}>
+      <div className="flex-1 overflow-y-auto px-3 pt-1 pb-2">
         {!search.trim() && top3.length > 0 && (
-          <div style={{ fontSize: '11px', color: '#A8A29E', fontWeight: 600, marginBottom: 4, marginTop: 4 }}>
+          <div className="text-[11px] text-[#A8A29E] font-semibold mb-1 mt-1">
             所有待排
           </div>
         )}
@@ -193,7 +175,7 @@ export function SeatPopover({ tableId, seatIndex, seatX, seatY, tableCenterX, ta
           <GuestRow key={p.guest.id} prediction={p} onClick={() => handleSelect(p.guest.id)} tableId={tableId} seatIndex={seatIndex} categoryColors={categoryColors} />
         ))}
         {filtered.length === 0 && (
-          <div style={{ padding: '16px 0', textAlign: 'center', color: '#A8A29E', fontSize: '13px' }}>
+          <div className="py-4 text-center text-[#A8A29E] text-[13px]">
             {search.trim() ? '找不到符合的賓客' : '沒有待排賓客'}
           </div>
         )}
@@ -222,15 +204,9 @@ function GuestRow({ prediction, onClick, highlight, tableId, seatIndex, category
   return (
     <div
       onClick={onClick}
+      className="flex items-center gap-1.5 px-1.5 py-[5px] rounded-[var(--radius-sm)] cursor-pointer transition-[background] duration-100"
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '5px 6px',
-        borderRadius: 'var(--radius-sm)',
-        cursor: 'pointer',
         background: highlight ? '#FFFBEB' : 'transparent',
-        transition: 'background 100ms',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = highlight ? '#FEF3C7' : '#F5F5F4'
@@ -245,34 +221,28 @@ function GuestRow({ prediction, onClick, highlight, tableId, seatIndex, category
       }}
     >
       {/* 標籤 badge（顏色跟分類走） */}
-      <span style={{
-        fontSize: '10px',
-        fontWeight: 600,
-        padding: '1px 5px',
-        borderRadius: '3px',
-        background: catStyle.bg,
-        color: catStyle.text,
-        border: `1px solid ${catStyle.border}`,
-        flexShrink: 0,
-        maxWidth: 72,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-      }}>
+      <span
+        className="text-[10px] font-semibold px-[5px] py-px rounded-[3px] shrink-0 max-w-[72px] overflow-hidden text-ellipsis whitespace-nowrap"
+        style={{
+          background: catStyle.bg,
+          color: catStyle.text,
+          border: `1px solid ${catStyle.border}`,
+        }}
+      >
         {tagLabel}
       </span>
 
       {/* 姓名 */}
-      <span style={{ fontSize: '13px', fontWeight: 500, color: '#1C1917', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <span className="text-[13px] font-medium text-[#1C1917] flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
         {guest.aliases?.length > 0 ? guest.aliases[0] : guest.name}
       </span>
 
       {/* 預測分數 + 桌均 delta */}
-      <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-        <span style={{ fontSize: '12px', fontWeight: 700, color: scoreColor }}>
+      <span className="flex items-center gap-1 shrink-0">
+        <span className="text-xs font-bold" style={{ color: scoreColor }}>
           {predictedScore}
         </span>
-        <span style={{ fontSize: '10px', fontWeight: 600, color: deltaColor }}>
+        <span className="text-[10px] font-semibold" style={{ color: deltaColor }}>
           {tableDelta > 0 ? `+${tableDelta}` : tableDelta === 0 ? '±0' : `${tableDelta}`}
         </span>
       </span>

@@ -27,38 +27,25 @@ function ExpandButton({ collapsed, onClick }: { collapsed: boolean; onClick: () 
   return (
     <div
       ref={btnRef}
-      className="shrink-0 flex items-center justify-center cursor-pointer bg-[var(--bg-primary)] hover:bg-[var(--accent-light)] overflow-hidden"
+      className="shrink-0 flex items-center justify-center cursor-pointer bg-[var(--bg-primary)] hover:bg-[var(--accent-light)] overflow-hidden relative z-20 transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
       style={{
         width: collapsed ? 28 : 0,
         borderRight: collapsed ? '1px solid var(--border)' : 'none',
-        transition: 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-        position: 'relative',
-        zIndex: 20,
       }}
       onClick={onClick}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
     >
-      <ChevronRight size={14} className="shrink-0" style={{ color: 'var(--text-muted)' }} />
+      <ChevronRight size={14} className="shrink-0 text-[var(--text-muted)]" />
       {show && collapsed && rect && createPortal(
-        <div style={{
-          position: 'fixed',
-          left: rect.right + 8,
-          top: rect.top + rect.height / 2,
-          transform: 'translateY(-50%)',
-          background: 'var(--bg-surface, #fff)',
-          color: 'var(--text-secondary, #78716C)',
-          border: '1px solid var(--border, #E7E5E4)',
-          padding: '4px 10px',
-          borderRadius: 6,
-          fontSize: 12,
-          whiteSpace: 'nowrap',
-          pointerEvents: 'none',
-          zIndex: 9999,
-          fontFamily: 'var(--font-body)',
-          boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
-        }}>
-          展開待排區 <kbd style={{ background: '#F5F5F4', border: '1px solid var(--border, #E7E5E4)', borderRadius: 3, padding: '1px 4px', fontSize: 10, marginLeft: 4, color: 'var(--text-primary, #1C1917)' }}>Q</kbd>
+        <div
+          className="fixed bg-[var(--bg-surface,#fff)] text-[var(--text-secondary,#78716C)] border border-[var(--border,#E7E5E4)] px-2.5 py-1 rounded-md text-xs whitespace-nowrap pointer-events-none z-[9999] font-[family-name:var(--font-body)] shadow-[0_4px_12px_rgba(28,25,23,0.08)]"
+          style={{
+            left: rect.right + 8,
+            top: rect.top + rect.height / 2,
+            transform: 'translateY(-50%)',
+          }}>
+          展開待排區 <kbd className="bg-[#F5F5F4] border border-[var(--border,#E7E5E4)] rounded-[3px] px-1 py-px text-[10px] ml-1 text-[var(--text-primary,#1C1917)]">Q</kbd>
         </div>,
         document.body,
       )}
@@ -271,22 +258,19 @@ export default function WorkspacePage() {
           <ExpandButton collapsed={sidebarCollapsed} onClick={() => setSidebarCollapsed(false)} />
           {/* 側邊欄 — z-index 高於 SVG 溢出的推薦線 */}
           <div
-            className="shrink-0 overflow-hidden relative z-10"
+            className="shrink-0 overflow-hidden relative z-10 bg-[var(--bg-primary)] transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
             style={{
               width: sidebarCollapsed ? 0 : 320,
               borderRight: sidebarCollapsed ? 'none' : '1px solid var(--border)',
-              background: 'var(--bg-primary)',
-              transition: 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
-            <div style={{
-              width: 320,
-              height: '100%',
-              transform: sidebarCollapsed ? 'translateX(-320px)' : 'none',
-              transition: 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms',
-              opacity: autoAssignProgress ? 0.4 : 1,
-              pointerEvents: autoAssignProgress ? 'none' : undefined,
-            }}>
+            <div
+              className="w-[320px] h-full transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+              style={{
+                transform: sidebarCollapsed ? 'translateX(-320px)' : 'none',
+                opacity: autoAssignProgress ? 0.4 : 1,
+                pointerEvents: autoAssignProgress ? 'none' : undefined,
+              }}>
               <SidePanel onCollapse={() => setSidebarCollapsed(true)} onPanToTable={(x, y) => floorPlanRef.current?.panToPoint(x, y)} />
             </div>
           </div>

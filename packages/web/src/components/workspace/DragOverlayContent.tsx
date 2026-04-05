@@ -63,12 +63,7 @@ export function DragOverlayContent({ guest }: Props) {
       <svg
         width={size + 12}
         height={size + 12}
-        style={{
-          position: 'absolute',
-          left: -6,
-          top: -6,
-          pointerEvents: 'none',
-        }}
+        className="absolute -left-1.5 -top-1.5 pointer-events-none"
       >
         <circle
           cx={size / 2 + 6}
@@ -99,20 +94,14 @@ export function DragOverlayContent({ guest }: Props) {
 
       {/* 賓客圓形 */}
       <div
-        className="flex items-center justify-center"
+        className="flex items-center justify-center rounded-full font-[family-name:var(--font-body)] font-medium whitespace-nowrap overflow-hidden shadow-[0_4px_16px_rgba(28,25,23,0.2)]"
         style={{
           width: size,
           height: size,
-          borderRadius: '50%',
-          fontFamily: 'var(--font-body)',
           fontSize: displayName.length > 3 ? '13px' : '16px',
-          fontWeight: 500,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
           border: `2px solid ${catStyle.borderColor}`,
           backgroundColor: catStyle.background,
           color: catStyle.color,
-          boxShadow: '0 4px 16px rgba(28,25,23,0.2)',
         }}
       >
         {displayName}
@@ -121,22 +110,10 @@ export function DragOverlayContent({ guest }: Props) {
       {/* 滿意度變化 badge（不受父層 scale 影響） */}
       {delta !== 0 && (
         <div
-          className="absolute flex items-center justify-center"
+          className="absolute flex items-center justify-center -bottom-2 left-1/2 min-w-7 h-5 rounded-[10px] px-1.5 text-white text-[11px] font-bold font-[family-name:var(--font-data)] border-2 border-white whitespace-nowrap"
           style={{
-            bottom: -8,
-            left: '50%',
             transform: `translateX(-50%) scale(${1 / scale})`,
-            minWidth: 28,
-            height: 20,
-            borderRadius: 10,
-            padding: '0 6px',
             background: delta > 0 ? '#16A34A' : '#DC2626',
-            color: 'white',
-            fontSize: '11px',
-            fontWeight: 700,
-            fontFamily: 'var(--font-data)',
-            border: '2px solid white',
-            whiteSpace: 'nowrap',
           }}
         >
           {delta > 0 ? '+' : ''}{Math.round(delta)}
@@ -148,12 +125,9 @@ export function DragOverlayContent({ guest }: Props) {
         <svg
           width={30}
           height={34}
+          className="absolute -top-3.5 -right-3.5 pointer-events-none"
           style={{
-            position: 'absolute',
-            top: -14,
-            right: -14,
             transform: `scale(${1 / scale})`,
-            pointerEvents: 'none',
           }}
         >
           <g transform="translate(12, 12)">
@@ -180,20 +154,7 @@ export function DragOverlayContent({ guest }: Props) {
       {/* 眷屬 badge */}
       {guest.companionCount > 0 && (
         <div
-          className="absolute flex items-center justify-center"
-          style={{
-            top: -6,
-            right: -6,
-            width: 22,
-            height: 22,
-            borderRadius: '50%',
-            background: '#B08D57',
-            color: 'white',
-            fontSize: '11px',
-            fontWeight: 700,
-            fontFamily: 'var(--font-data)',
-            border: '2px solid white',
-          }}
+          className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-[22px] h-[22px] rounded-full bg-[#B08D57] text-white text-[11px] font-bold font-[family-name:var(--font-data)] border-2 border-white"
         >
           +{guest.companionCount}
         </div>

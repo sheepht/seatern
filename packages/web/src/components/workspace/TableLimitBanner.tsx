@@ -13,12 +13,11 @@ export default function TableLimitBanner() {
   if (user || dismissed || tables.length < 8) return null
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2 mx-2 mb-2 rounded-lg text-xs" style={{ backgroundColor: '#F5F0E6', color: '#8C6D3F' }}>
+    <div className="flex items-center gap-2 px-4 py-2 mx-2 mb-2 rounded-lg text-xs bg-[#F5F0E6] text-[#8C6D3F]">
       <span className="flex-1">登入即可排到 20 桌</span>
       <button
         onClick={() => navigate('/login')}
-        className="font-medium hover:underline whitespace-nowrap"
-        style={{ color: '#B08D57' }}
+        className="font-medium hover:underline whitespace-nowrap text-[#B08D57]"
       >
         登入
       </button>

@@ -45,16 +45,13 @@ export function GuestChip({ guest, animIndex }: Props) {
       {...Object.fromEntries(Object.entries(listeners || {}).filter(([k]) => k !== 'onPointerDown'))}
       {...attributes}
       data-guest-id={guest.id}
-      className={`guest-chip px-2 py-0.5 text-sm cursor-grab select-none whitespace-nowrap ${
+      className={`guest-chip px-2 py-0.5 text-sm cursor-grab select-none whitespace-nowrap font-[family-name:var(--font-body)] rounded-[var(--radius-sm)] ${
         isDragging ? 'opacity-30' : ''
       } ${animClass}`}
       style={{
-        fontFamily: 'var(--font-body)',
-        borderRadius: 'var(--radius-sm)',
         border: `1px solid ${categoryStyle.borderColor}`,
         backgroundColor: categoryStyle.background,
         color: categoryStyle.color,
-        animationDelay: animDelay,
       }}
       onPointerDown={(e) => {
         // 長按 1.5 秒自動分配到最佳推薦桌
@@ -101,37 +98,21 @@ export function GuestChip({ guest, animIndex }: Props) {
     >
       {guest.aliases.length > 0 ? guest.aliases[0] : guest.name}
       {guest.companionCount > 0 && (
-        <span style={{ color: 'var(--text-muted)' }} className="ml-0.5">+{guest.companionCount}</span>
+        <span className="ml-0.5 text-[var(--text-muted)]">+{guest.companionCount}</span>
       )}
     </div>
     {tooltip && bestSwapTableId && createPortal(
-      <div style={{
-        position: 'fixed',
-        left: tooltip.x,
-        top: tooltip.y,
-        transform: 'translateY(-50%)',
-        background: '#B08D57',
-        color: 'white',
-        padding: '4px 10px',
-        borderRadius: 6,
-        fontSize: 12,
-        whiteSpace: 'nowrap',
-        pointerEvents: 'none',
-        zIndex: 9999,
-        fontFamily: 'var(--font-body)',
-        boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
-        overflow: 'hidden',
-      }}>
+      <div
+        className="fixed -translate-y-1/2 bg-[#B08D57] text-white px-2.5 py-1 rounded-md text-xs whitespace-nowrap pointer-events-none z-[9999] font-[family-name:var(--font-body)] shadow-[0_4px_12px_rgba(28,25,23,0.08)] overflow-hidden"
+        style={{
+          left: tooltip.x,
+          top: tooltip.y,
+        }}
+      >
         {longPressProgress && (
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'rgba(255,255,255,0.3)',
-            transformOrigin: 'left',
-            animation: 'longpress-fill 1.5s linear forwards',
-          }} />
+          <div className="absolute inset-0 bg-white/30 origin-left animate-[longpress-fill_1.5s_linear_forwards]" />
         )}
-        <span style={{ position: 'relative' }}>長按入座</span>
+        <span className="relative">長按入座</span>
         <style>{`@keyframes longpress-fill { from { transform: scaleX(0) } to { transform: scaleX(1) } }`}</style>
       </div>,
       document.body,

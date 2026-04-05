@@ -78,34 +78,33 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
   const canConfirm = missingRequired.length === 0 && importCount > 0
 
   return (
-    <div className="flex flex-col" style={{ height: '100%' }}>
+    <div className="flex flex-col h-full">
       {/* 頂部：統計摘要 + 操作按鈕 */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
         <div className="flex items-center gap-3 flex-wrap">
-          <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>確認匯入資料</h2>
-          <div className="px-3 py-1 text-sm font-medium" style={{ background: '#F0FDF4', color: 'var(--success)', borderRadius: 'var(--radius-sm)' }}>
+          <h2 className="text-lg font-bold font-[family-name:var(--font-display)] text-[var(--text-primary)]">確認匯入資料</h2>
+          <div className="px-3 py-1 text-sm font-medium bg-[#F0FDF4] text-[var(--success)] rounded-[var(--radius-sm)]">
             偵測到 <span className="font-data">{allGuests.length}</span> 位賓客
           </div>
           {isReimport && (
-            <div className="px-3 py-1 text-sm font-medium" style={{ background: 'var(--accent-light)', color: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}>
+            <div className="px-3 py-1 text-sm font-medium bg-[var(--accent-light)] text-[var(--accent)] rounded-[var(--radius-sm)]">
               新增 <span className="font-data">{diff.newGuests.length}</span> 人 / 已存在 <span className="font-data">{diff.skippedGuests.length}</span> 人（跳過）
             </div>
           )}
           {!isReimport && (
-            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <span className="text-sm text-[var(--text-secondary)]">
               確認 <span className="font-data">{confirmedCount}</span> 人 / 婉拒 <span className="font-data">{declinedCount}</span> 人 / 共 <span className="font-data">{totalSeats}</span> 席
             </span>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="px-4 py-2 text-sm hover:opacity-80" style={{ color: 'var(--text-secondary)' }}>
+          <button onClick={onBack} className="px-4 py-2 text-sm hover:opacity-80 text-[var(--text-secondary)]">
             返回
           </button>
           <button
             onClick={() => onConfirm(allGuests)}
             disabled={!canConfirm}
-            className="px-6 py-2 text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-            style={{ background: 'var(--accent)', borderRadius: 'var(--radius-sm)' }}
+            className="px-6 py-2 text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 bg-[var(--accent)] rounded-[var(--radius-sm)]"
           >
             {isReimport ? `匯入 ${importCount} 位新賓客` : `確認匯入 ${allGuests.length} 位賓客`}
           </button>
@@ -114,7 +113,7 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
 
       {/* 錯誤提示 */}
       {missingRequired.length > 0 && (
-        <div className="p-3 text-sm mb-4" style={{ background: '#FEF2F2', color: 'var(--error)', borderRadius: 'var(--radius-sm)' }}>
+        <div className="p-3 text-sm mb-4 bg-[#FEF2F2] text-[var(--error)] rounded-[var(--radius-sm)]">
           以下必填欄位未對應：{missingRequired.join('、')}
         </div>
       )}
@@ -123,35 +122,33 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
       <div className="flex gap-6 flex-1 min-h-0">
 
         {/* 左側：欄位對應 */}
-        <div className="flex-shrink-0" style={{ width: 340 }}>
-          <div className="p-4" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', height: '100%' }}>
-            <h3 className="text-sm font-medium mb-4" style={{ color: 'var(--text-primary)' }}>欄位對應</h3>
+        <div className="flex-shrink-0 w-[340px]">
+          <div className="p-4 h-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-md)]">
+            <h3 className="text-sm font-medium mb-4 text-[var(--text-primary)]">欄位對應</h3>
             <div className="space-y-2">
               {SYSTEM_FIELDS.map((sf) => {
                 const isMulti = mapping[sf.field] === '__multi__'
                 const isMissing = !mapping[sf.field]
                 return (
                   <div key={sf.field} className="flex items-center gap-2">
-                    <label className="text-sm flex-shrink-0 flex items-center gap-1" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                    <label className="text-sm flex-shrink-0 flex items-center gap-1 text-[var(--text-secondary)] whitespace-nowrap">
                       {sf.label}
-                      {sf.required && <span style={{ color: 'var(--error)' }}>*</span>}
+                      {sf.required && <span className="text-[var(--error)]">*</span>}
                       <span className="relative group">
-                        <Info size={11} style={{ color: 'var(--text-muted)', cursor: 'help' }} />
-                        <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover:block px-2 py-1 text-xs whitespace-nowrap"
-                          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', boxShadow: 'var(--shadow-sm)' }}>
+                        <Info size={11} className="text-[var(--text-muted)] cursor-help" />
+                        <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover:block px-2 py-1 text-xs whitespace-nowrap bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
                           {FIELD_TOOLTIPS[sf.field]}
                         </span>
                       </span>
                     </label>
                     {isMulti ? (
-                      <span className="text-xs" style={{ color: 'var(--accent)' }}>
+                      <span className="text-xs text-[var(--accent)]">
                         多欄位（{multiMapping[sf.field].join(', ')}）
                       </span>
                     ) : (
                       <select
-                        className="flex-1 text-sm px-2 py-1"
+                        className="flex-1 text-sm px-2 py-1 rounded-[var(--radius-sm)]"
                         style={{
-                          borderRadius: 'var(--radius-sm)',
                           border: sf.required && isMissing
                             ? '1px solid #DC2626'
                             : !sf.required && isMissing
@@ -180,20 +177,20 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
         </div>
 
         {/* 右側：資料預覽表格 */}
-        <div className="flex-1 min-w-0 overflow-auto" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)' }}>
-          <table className="min-w-full text-sm" style={{ whiteSpace: 'nowrap' }}>
-            <thead className="sticky top-0 z-10" style={{ background: 'var(--bg-surface)' }}>
+        <div className="flex-1 min-w-0 overflow-auto border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)]">
+          <table className="min-w-full text-sm whitespace-nowrap">
+            <thead className="sticky top-0 z-10 bg-[var(--bg-surface)]">
               <tr>
-                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>#</th>
-                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>姓名</th>
-                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>外號</th>
-                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>分類</th>
-                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>子分類</th>
-                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>出席</th>
-                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>攜眷</th>
-                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>葷素</th>
-                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>想同桌</th>
-                <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>避免同桌</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">#</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">姓名</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">外號</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">分類</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">子分類</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">出席</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">攜眷</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">葷素</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">想同桌</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">避免同桌</th>
               </tr>
             </thead>
             <tbody>
@@ -201,32 +198,30 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
                 const isNew = !isReimport || newGuestNames.has(g.name.trim().toLowerCase())
                 const isSkipped = isReimport && !isNew
                 return (
-                <tr key={i} style={{ borderTop: '1px solid var(--border)', opacity: isSkipped ? 0.4 : g.rsvpStatus === 'declined' ? 0.5 : 1 }}>
-                  <td className="px-3 py-2 text-xs font-data" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
-                  <td className="px-3 py-2 font-medium" style={{ color: 'var(--text-primary)' }}>
+                <tr key={i} className="border-t border-[var(--border)]" style={{ opacity: isSkipped ? 0.4 : g.rsvpStatus === 'declined' ? 0.5 : 1 }}>
+                  <td className="px-3 py-2 text-xs font-data text-[var(--text-muted)]">{i + 1}</td>
+                  <td className="px-3 py-2 font-medium text-[var(--text-primary)]">
                     {g.name}
                     {isReimport && (
-                      <span className="ml-2 px-1.5 py-0.5" style={{
-                        borderRadius: 'var(--radius-sm)',
+                      <span className="ml-2 px-1.5 py-0.5 rounded-[var(--radius-sm)] text-[11px]" style={{
                         background: isNew ? '#F0FDF4' : 'var(--bg-primary)',
                         color: isNew ? 'var(--success)' : 'var(--text-muted)',
-                        fontSize: '11px',
                       }}>
                         {isNew ? '新' : '已存在'}
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{g.aliases.join(', ') || '—'}</td>
-                  <td className="px-3 py-2" style={{ color: 'var(--text-primary)' }}>{g.category || '—'}</td>
-                  <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{g.rawSubcategory || '—'}</td>
+                  <td className="px-3 py-2 text-[var(--text-secondary)]">{g.aliases.join(', ') || '—'}</td>
+                  <td className="px-3 py-2 text-[var(--text-primary)]">{g.category || '—'}</td>
+                  <td className="px-3 py-2 text-[var(--text-secondary)]">{g.rawSubcategory || '—'}</td>
                   <td className="px-3 py-2">
                     <span style={{ color: g.rsvpStatus === 'confirmed' ? 'var(--success)' : g.rsvpStatus === 'declined' ? 'var(--error)' : 'var(--text-muted)' }}>
                       {g.rsvpStatus === 'confirmed' ? '出席' : g.rsvpStatus === 'declined' ? '婉拒' : '待定'}
                     </span>
                   </td>
                   <td className="px-3 py-2 font-data">{g.companionCount > 0 ? `+${g.companionCount}` : '—'}</td>
-                  <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{g.dietaryNote || '—'}</td>
-                  <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{g.rawPreferences.join(', ') || '—'}</td>
+                  <td className="px-3 py-2 text-[var(--text-secondary)]">{g.dietaryNote || '—'}</td>
+                  <td className="px-3 py-2 text-[var(--text-secondary)]">{g.rawPreferences.join(', ') || '—'}</td>
                   <td className="px-3 py-2" style={{ color: g.rawAvoids.length > 0 ? 'var(--error)' : 'var(--text-secondary)' }}>{g.rawAvoids.join(', ') || '—'}</td>
                 </tr>
                 )

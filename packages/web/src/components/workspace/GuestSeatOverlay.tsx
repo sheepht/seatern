@@ -51,17 +51,13 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
       ref={(el) => { setNodeRef(el); elRef.current = el }}
       {...Object.fromEntries(Object.entries(listeners || {}).filter(([k]) => k !== 'onPointerDown'))}
       {...attributes}
-      className="absolute rounded-full cursor-grab"
+      className="absolute rounded-full cursor-grab z-10 box-border border-[1.5px] border-dashed border-transparent transition-[border-color] duration-150 ease-out"
       style={{
         left: x - radius - 6,
         top: y - radius - 6,
         width: size + 12,
         height: size + 12,
         opacity: isDragging ? 0.3 : undefined,
-        zIndex: 10,
-        border: '1.5px dashed transparent',
-        boxSizing: 'border-box',
-        transition: 'border-color 150ms ease-out',
       }}
       onPointerDown={(e) => {
         // 長按 2 秒換位（與 dnd-kit 共存：不動 = 長按，移動 = 拖曳）
@@ -147,81 +143,46 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
     {tooltip && createPortal(
       <>
         {/* 上方：賓客基本資訊 */}
-        <div style={{
-          position: 'fixed',
-          left: tooltip.x,
-          top: Math.max(8, tooltip.y - tooltip.r - 8),
-          transform: 'translate(-50%, -100%)',
-          background: 'var(--bg-surface, #fff)',
-          border: '1px solid var(--border, #E7E5E4)',
-          padding: '5px 10px',
-          borderRadius: 6,
-          pointerEvents: 'none',
-          zIndex: 9999,
-          fontFamily: 'var(--font-body)',
-          boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
-          textAlign: 'center',
-          maxWidth: 200,
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: '#1C1917', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div
+          className="fixed -translate-x-1/2 -translate-y-full bg-[var(--bg-surface,#fff)] border border-[var(--border,#E7E5E4)] px-2.5 py-[5px] rounded-md pointer-events-none z-[9999] font-[family-name:var(--font-body)] shadow-[0_4px_12px_rgba(28,25,23,0.08)] text-center max-w-[200px]"
+          style={{
+            left: tooltip.x,
+            top: Math.max(8, tooltip.y - tooltip.r - 8),
+          }}
+        >
+          <div className="text-[13px] font-medium text-[#1C1917] whitespace-nowrap overflow-hidden text-ellipsis">
             {guest.name}{guest.subcategory ? ` (${guest.subcategory.name})` : ''}
           </div>
           {(guest.dietaryNote || guest.specialNote) && (
-            <div style={{ fontSize: 11, color: '#A8A29E', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div className="text-[11px] text-[#A8A29E] mt-px whitespace-nowrap overflow-hidden text-ellipsis">
               {[guest.dietaryNote, guest.specialNote].filter(Boolean).join(' · ')}
             </div>
           )}
         </div>
         {/* 右側：雙擊移除 */}
-        <div style={{
-          position: 'fixed',
-          left: tooltip.x + tooltip.r + 6,
-          top: tooltip.y,
-          transform: 'translateY(-50%)',
-          background: 'var(--bg-surface, #fff)',
-          color: 'var(--text-secondary, #78716C)',
-          border: '1px solid var(--border, #E7E5E4)',
-          padding: '4px 10px',
-          borderRadius: 6,
-          fontSize: 12,
-          whiteSpace: 'nowrap',
-          pointerEvents: 'none',
-          zIndex: 9999,
-          fontFamily: 'var(--font-body)',
-          boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
-        }}>
+        <div
+          className="fixed -translate-y-1/2 bg-[var(--bg-surface,#fff)] text-[var(--text-secondary,#78716C)] border border-[var(--border,#E7E5E4)] py-1 px-2.5 rounded-md text-xs whitespace-nowrap pointer-events-none z-[9999] font-[family-name:var(--font-body)] shadow-[0_4px_12px_rgba(28,25,23,0.08)]"
+          style={{
+            left: tooltip.x + tooltip.r + 6,
+            top: tooltip.y,
+          }}
+        >
           雙擊移除
         </div>
         {/* 左側：長按換位（僅有換位推薦時顯示） */}
         {hasSwapRec && (
-          <div style={{
-            position: 'fixed',
-            left: tooltip.x - tooltip.r - 6,
-            top: tooltip.y,
-            transform: 'translate(-100%, -50%)',
-            background: '#B08D57',
-            color: 'white',
-            padding: '4px 10px',
-            borderRadius: 6,
-            fontSize: 12,
-            whiteSpace: 'nowrap',
-            pointerEvents: 'none',
-            zIndex: 9999,
-            fontFamily: 'var(--font-body)',
-            boxShadow: '0 4px 12px rgba(28,25,23,0.08)',
-            overflow: 'hidden',
-          }}>
+          <div
+            className="fixed -translate-x-full -translate-y-1/2 bg-[#B08D57] text-white py-1 px-2.5 rounded-md text-xs whitespace-nowrap pointer-events-none z-[9999] font-[family-name:var(--font-body)] shadow-[0_4px_12px_rgba(28,25,23,0.08)] overflow-hidden"
+            style={{
+              left: tooltip.x - tooltip.r - 6,
+              top: tooltip.y,
+            }}
+          >
             {/* 長按進度條 */}
             {longPressProgress && (
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'rgba(255,255,255,0.3)',
-                transformOrigin: 'left',
-                animation: 'longpress-fill 1.5s linear forwards',
-              }} />
+              <div className="absolute inset-0 bg-white/30 origin-left animate-[longpress-fill_1.5s_linear_forwards]" />
             )}
-            <span style={{ position: 'relative' }}>長按換位</span>
+            <span className="relative">長按換位</span>
             <style>{`@keyframes longpress-fill { from { transform: scaleX(0) } to { transform: scaleX(1) } }`}</style>
           </div>
         )}

@@ -28,20 +28,16 @@ export function SeatDropZone({ tableId, seatIndex, x, y, radius, isEmpty, isActi
   return (
     <div
       ref={setNodeRef}
-      className="absolute rounded-full"
+      className="absolute rounded-full z-5 box-border transition-[background-color,border] duration-150"
       style={{
         left: x - radius,
         top: y - radius,
         width: size,
         height: size,
-        zIndex: 5,
         cursor: isEmpty && onEmptyClick ? 'pointer' : undefined,
         // 空位顯示 hover 效果，有人的位子不顯示（由 shift 預覽處理）
         backgroundColor: isActive ? 'rgba(176, 141, 87, 0.3)' : isOver && isEmpty ? 'rgba(176, 141, 87, 0.2)' : undefined,
         border: isActive ? '2px solid #B08D57' : isOver && isEmpty ? '2px dashed #B08D57' : undefined,
-        boxSizing: 'border-box',
-        borderRadius: '50%',
-        transition: 'background-color 150ms, border 150ms',
       }}
       onClick={isEmpty && onEmptyClick ? (e) => {
         e.stopPropagation()

@@ -55,9 +55,8 @@ export function CsvUpload({ onParsed }: Props) {
   return (
     <div>
       <div
-        className="border-2 border-dashed p-8 text-center cursor-pointer transition-colors"
+        className="border-2 border-dashed p-8 text-center cursor-pointer transition-colors rounded-[var(--radius-lg)]"
         style={{
-          borderRadius: 'var(--radius-lg)',
           borderColor: isDragging ? 'var(--accent)' : 'var(--border)',
           background: isDragging ? 'var(--accent-light)' : 'transparent',
         }}
@@ -77,16 +76,16 @@ export function CsvUpload({ onParsed }: Props) {
           }}
         />
         {loading ? (
-          <p style={{ color: 'var(--text-secondary)' }}>解析中...</p>
+          <p className="text-[var(--text-secondary)]">解析中...</p>
         ) : (
           <>
-            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>上傳 CSV 或 Excel 檔案</p>
-            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>支援 .csv、.xlsx — 拖曳或點擊選擇</p>
+            <p className="font-medium text-[var(--text-primary)]">上傳 CSV 或 Excel 檔案</p>
+            <p className="text-sm mt-1 text-[var(--text-secondary)]">支援 .csv、.xlsx — 拖曳或點擊選擇</p>
           </>
         )}
       </div>
       {error && (
-        <p className="mt-2 text-sm" style={{ color: 'var(--error)' }}>{error}</p>
+        <p className="mt-2 text-sm text-[var(--error)]">{error}</p>
       )}
     </div>
   )

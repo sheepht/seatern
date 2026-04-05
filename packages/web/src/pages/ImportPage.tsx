@@ -268,18 +268,18 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="flex-1 overflow-hidden flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+    <div className="flex-1 overflow-hidden flex flex-col bg-[var(--bg-primary)]">
       {/* input 步驟：居中卡片 */}
       {step === 'input' && (
       <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
-      <div className="w-full max-w-3xl p-8" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
+      <div className="w-full max-w-3xl p-8 bg-[var(--bg-surface)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)]">
         {(
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+              <h1 className="text-2xl font-bold font-[family-name:var(--font-display)] text-[var(--text-primary)]">
                 {existingGuests.length > 0 ? '追加賓客' : '匯入賓客名單'}
               </h1>
-              <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>
+              <p className="mt-1 text-[var(--text-secondary)]">
                 {existingGuests.length > 0
                   ? `已有 ${existingGuests.length} 位賓客，系統會自動跳過已存在的人`
                   : '選擇匯入方式'
@@ -288,15 +288,15 @@ export default function ImportPage() {
             </div>
 
             {existingLoading ? (
-              <div className="text-center py-8" style={{ color: 'var(--text-muted)' }}>載入中...</div>
+              <div className="text-center py-8 text-[var(--text-muted)]">載入中...</div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 {/* 左卡：Google Sheet 網址匯入 */}
-                <div className="p-5 flex flex-col" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)' }}>
-                  <div className="text-base font-medium mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+                <div className="p-5 flex flex-col border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)]">
+                  <div className="text-base font-medium mb-1 font-[family-name:var(--font-display)] text-[var(--text-primary)]">
                     Google Sheet
                   </div>
-                  <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+                  <p className="text-sm mb-4 text-[var(--text-secondary)]">
                     貼上公開的 Google Sheet 網址
                   </p>
 
@@ -305,39 +305,24 @@ export default function ImportPage() {
                     onChange={(e) => setSheetUrl(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleSheetImport() }}
                     placeholder="https://docs.google.com/spreadsheets/d/..."
-                    className="text-sm mb-3"
-                    style={{
-                      width: '100%', padding: '8px 10px',
-                      border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-                      background: 'var(--bg-surface)', color: 'var(--text-primary)',
-                      fontFamily: 'var(--font-body)', outline: 'none', boxSizing: 'border-box',
-                    }}
-                    onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)' }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                    className="settings-input text-sm mb-3"
                   />
 
                   <button
                     onClick={handleSheetImport}
                     disabled={!sheetUrl.trim() || sheetLoading}
-                    className="text-sm font-medium mb-4 hover:opacity-80 disabled:opacity-40"
-                    style={{
-                      padding: '8px 0', width: '100%',
-                      background: 'var(--accent)', color: '#fff',
-                      border: 'none', borderRadius: 'var(--radius-sm)',
-                      cursor: !sheetUrl.trim() || sheetLoading ? 'default' : 'pointer',
-                    }}
+                    className="btn-primary text-sm font-medium mb-4 w-full py-2 hover:opacity-80 disabled:opacity-40 disabled:cursor-default"
                   >
                     {sheetLoading ? '匯入中...' : '匯入'}
                   </button>
 
-                  <div className="mt-auto text-sm" style={{ color: 'var(--text-muted)' }}>
+                  <div className="mt-auto text-sm text-[var(--text-muted)]">
                     還沒有 Sheet？{' '}
                     <a
                       href="https://docs.google.com/spreadsheets/d/1GkBJ7pmVsIDWQjJvelQRISrWEhMv8CERN8Vy9ZfpctQ/copy"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:underline"
-                      style={{ color: 'var(--accent)' }}
+                      className="hover:underline text-[var(--accent)]"
                     >
                       複製我們的範本 →
                     </a>
@@ -345,11 +330,11 @@ export default function ImportPage() {
                 </div>
 
                 {/* 右卡：本機上傳 */}
-                <div className="p-5 flex flex-col" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)' }}>
-                  <div className="text-base font-medium mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+                <div className="p-5 flex flex-col border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)]">
+                  <div className="text-base font-medium mb-1 font-[family-name:var(--font-display)] text-[var(--text-primary)]">
                     本機上傳
                   </div>
-                  <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+                  <p className="text-sm mb-4 text-[var(--text-secondary)]">
                     上傳 CSV 或 Excel 檔案
                   </p>
 
@@ -357,13 +342,12 @@ export default function ImportPage() {
                     <CsvUpload onParsed={handleParsed} />
                   </div>
 
-                  <div className="mt-auto text-sm" style={{ color: 'var(--text-muted)' }}>
+                  <div className="mt-auto text-sm text-[var(--text-muted)]">
                     還沒有檔案？{' '}
                     <a
                       href="/seatern-template.csv"
                       download="seatern-template.csv"
-                      className="hover:underline"
-                      style={{ color: 'var(--accent)' }}
+                      className="hover:underline text-[var(--accent)]"
                     >
                       下載 CSV 範本 →
                     </a>
@@ -374,7 +358,7 @@ export default function ImportPage() {
           </div>
         )}
         {error && (
-          <div className="mt-4 p-3 text-sm" style={{ background: '#FEF2F2', color: 'var(--error)', borderRadius: 'var(--radius-sm)' }}>{error}</div>
+          <div className="mt-4 p-3 text-sm bg-[#FEF2F2] text-[var(--error)] rounded-[var(--radius-sm)]">{error}</div>
         )}
       </div>
       </div>
@@ -382,7 +366,7 @@ export default function ImportPage() {
 
       {/* preview 步驟：全版面 */}
       {step === 'preview' && parseResult && (
-        <div className="p-6 flex-1 flex flex-col min-h-0" style={{ maxWidth: 1440, margin: '0 auto', width: '100%' }}>
+        <div className="p-6 flex-1 flex flex-col min-h-0 max-w-[1440px] mx-auto w-full">
           <ImportPreview
             data={parseResult}
             onConfirm={handlePreviewConfirm}
@@ -390,7 +374,7 @@ export default function ImportPage() {
             existingGuests={existingGuests.length > 0 ? existingGuests : undefined}
           />
           {error && (
-            <div className="mt-4 p-3 text-sm" style={{ background: '#FEF2F2', color: 'var(--error)', borderRadius: 'var(--radius-sm)' }}>{error}</div>
+            <div className="mt-4 p-3 text-sm bg-[#FEF2F2] text-[var(--error)] rounded-[var(--radius-sm)]">{error}</div>
           )}
         </div>
       )}
@@ -398,9 +382,9 @@ export default function ImportPage() {
       {/* preferences 步驟：居中卡片 */}
       {step === 'preferences' && (
         <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
-        <div className="w-full max-w-3xl p-8" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
-          <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>確認「想同桌」配對</h1>
-          <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
+        <div className="w-full max-w-3xl p-8 bg-[var(--bg-surface)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)]">
+          <h1 className="text-2xl font-bold mb-2 font-[family-name:var(--font-display)] text-[var(--text-primary)]">確認「想同桌」配對</h1>
+          <p className="text-sm mb-6 text-[var(--text-secondary)]">
             系統已自動比對賓客填寫的「想同桌人選」，以下需要你確認
           </p>
           <PreferenceMatch
@@ -414,7 +398,7 @@ export default function ImportPage() {
       )}
 
       {importing && (
-        <div className="text-center py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>匯入中...</div>
+        <div className="text-center py-8 text-sm text-[var(--text-secondary)]">匯入中...</div>
       )}
     </div>
   )

@@ -337,19 +337,17 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
       onMouseDown={onMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}
+      className={`${isDragging ? 'cursor-grabbing' : 'cursor-grab'} transition-opacity duration-200 ease-out`}
       opacity={isDimmed ? 0.2 : isOverlapping ? 0.4 : 1}
-      style={{ transition: 'opacity 200ms ease-out' }}
     >
       {/* 操作圖示 — 畫在桌子圓形之前，讓桌面蓋住圖示（從背後彈出效果） */}
       {showIcons && (
         <>
           <g
-            className="table-btn-edit"
+            className="table-btn-edit cursor-pointer"
             transform={`translate(${editX}, ${editY}) scale(${counterScale})`}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); setRenameValue(table.name); setShowRenameModal(true) }}
-            style={{ cursor: 'pointer' }}
           >
             <g className="table-icon-pop" style={{ '--icon-from-x': `${editFromX * zoom}px`, '--icon-from-y': `${editFromY * zoom}px` } as React.CSSProperties}>
               <circle r={iconR} fill="white" stroke="#D6D3D1" strokeWidth="1.5" />
@@ -361,11 +359,10 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
             </g>
           </g>
           <g
-            className="table-btn-delete"
+            className="table-btn-delete cursor-pointer"
             transform={`translate(${deleteX}, ${deleteY}) scale(${counterScale})`}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); setShowActionConfirm(true) }}
-            style={{ cursor: 'pointer' }}
           >
             <g className="table-icon-pop" style={{ '--icon-from-x': `${deleteFromX * zoom}px`, '--icon-from-y': `${deleteFromY * zoom}px` } as React.CSSProperties}>
               <circle r={iconR} fill="white" stroke="#FECACA" strokeWidth="1.5" />
@@ -774,20 +771,20 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
 
     {/* 改名 modal */}
     {showRenameModal && createPortal(
-      <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowRenameModal(false)} />
-        <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '24px', width: '300px', border: '1px solid var(--border)' }}>
-          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>修改桌名</p>
+      <div className="fixed inset-0 z-[999] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/25" onClick={() => setShowRenameModal(false)} />
+        <div className="relative bg-[var(--bg-surface)] rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] p-6 w-[300px] border border-[var(--border)]">
+          <p className="text-[13px] font-semibold text-[var(--text-primary)] mb-3">修改桌名</p>
           <input
             autoFocus
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setShowRenameModal(false) }}
-            style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--accent)', borderRadius: '6px', fontSize: '13px', outline: 'none', background: 'var(--bg-surface)', color: 'var(--text-primary)', boxSizing: 'border-box', fontFamily: 'inherit' }}
+            className="w-full px-2.5 py-2 border border-[var(--accent)] rounded-md text-[13px] outline-none bg-[var(--bg-surface)] text-[var(--text-primary)] box-border font-inherit"
           />
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
-            <button onClick={() => setShowRenameModal(false)} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>取消</button>
-            <button onClick={handleRename} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', border: 'none', background: 'var(--accent)', color: 'white', cursor: 'pointer', fontWeight: 600 }}>確認</button>
+          <div className="flex gap-2 justify-end mt-4">
+            <button onClick={() => setShowRenameModal(false)} className="px-3.5 py-1.5 rounded-md text-xs border border-[var(--border)] bg-transparent text-[var(--text-secondary)] cursor-pointer">取消</button>
+            <button onClick={handleRename} className="px-3.5 py-1.5 rounded-md text-xs border-none bg-[var(--accent)] text-white cursor-pointer font-semibold">確認</button>
           </div>
         </div>
       </div>,
@@ -796,20 +793,20 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
 
     {/* 清空/刪除 modal */}
     {showActionConfirm && createPortal(
-      <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} onClick={() => setShowActionConfirm(false)} />
-        <div style={{ position: 'relative', background: 'var(--bg-surface)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: '24px', width: '300px', border: '1px solid var(--border)' }}>
-          <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+      <div className="fixed inset-0 z-[999] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/25" onClick={() => setShowActionConfirm(false)} />
+        <div className="relative bg-[var(--bg-surface)] rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] p-6 w-[300px] border border-[var(--border)]">
+          <p className="text-base font-semibold text-[var(--text-primary)] mb-1.5">
             {guests.length > 0 ? `清空「${table.name}」？` : `刪除「${table.name}」？`}
           </p>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+          <p className="text-sm text-[var(--text-secondary)] mb-4">
             {guests.length > 0
               ? `此桌的 ${guests.length} 位賓客將移回未安排。`
               : '此桌為空桌，將直接刪除。'}
           </p>
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button onClick={() => setShowActionConfirm(false)} style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '14px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>取消</button>
-            <button onClick={handleActionConfirm} style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '14px', border: 'none', background: '#DC2626', color: 'white', cursor: 'pointer', fontWeight: 600 }}>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setShowActionConfirm(false)} className="px-4 py-2 rounded-md text-sm border border-[var(--border)] bg-transparent text-[var(--text-secondary)] cursor-pointer">取消</button>
+            <button onClick={handleActionConfirm} className="px-4 py-2 rounded-md text-sm border-none bg-[#DC2626] text-white cursor-pointer font-semibold">
               {guests.length > 0 ? '清空' : '刪除'}
             </button>
           </div>

@@ -35,7 +35,7 @@ export default function TableLimitModal() {
             </div>
           </div>
 
-          <h2 className="text-center text-xl font-bold text-stone-900" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+          <h2 className="text-center text-xl font-bold text-stone-900 font-[family-name:var(--font-display)]">
             已達到 {limit} 桌上限
           </h2>
 
@@ -58,8 +58,7 @@ export default function TableLimitModal() {
           <div className="mt-6">
             <button
               onClick={dismiss}
-              className="w-full h-11 rounded-lg text-sm font-medium text-white flex items-center justify-center"
-              style={{ backgroundColor: '#B08D57' }}
+              className="w-full h-11 rounded-lg text-sm font-medium text-white flex items-center justify-center bg-[#B08D57]"
             >
               了解付費方案（即將推出）
             </button>
@@ -91,7 +90,7 @@ export default function TableLimitModal() {
           </div>
         </div>
 
-        <h2 className="text-center text-xl font-bold text-stone-900" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+        <h2 className="text-center text-xl font-bold text-stone-900 font-[family-name:var(--font-display)]">
           解鎖更多桌數
         </h2>
 
@@ -113,8 +112,7 @@ export default function TableLimitModal() {
         <div className="mt-6 space-y-2.5">
           <button
             onClick={() => navigate('/login')}
-            className="w-full h-11 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2"
-            style={{ backgroundColor: '#06C755' }}
+            className="w-full h-11 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2 bg-[#06C755]"
           >
             LINE 登入
           </button>
@@ -126,8 +124,7 @@ export default function TableLimitModal() {
           </button>
           <button
             onClick={() => navigate('/login')}
-            className="w-full h-11 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2"
-            style={{ backgroundColor: '#B08D57' }}
+            className="w-full h-11 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2 bg-[#B08D57]"
           >
             Email 登入
           </button>
