@@ -364,7 +364,6 @@ function AddGuestSheet({ tableId, onClose, recommendedGuestIds }: { tableId: str
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="搜尋賓客..."
-              autoFocus
               className="w-full py-2 pl-8 pr-2.5 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--bg-primary)] text-sm font-[family-name:var(--font-body)] text-[var(--text-primary)] outline-none"
             />
             {search && (
@@ -390,16 +389,20 @@ function AddGuestSheet({ tableId, onClose, recommendedGuestIds }: { tableId: str
                 onClick={() => handleAdd(g.id)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 border-b border-[var(--border)] bg-transparent cursor-pointer text-left active:bg-[var(--accent-light)]"
               >
-                <span className="flex-1 text-sm font-[family-name:var(--font-body)] text-[var(--text-primary)]">
+                <span className="flex-1 text-sm font-[family-name:var(--font-body)] text-[var(--text-primary)] truncate">
                   {g.aliases.length > 0 ? <>{g.aliases[0]} <span className="text-[var(--text-muted)]">({g.name})</span></> : g.name}
+                  {g.companionCount > 0 && <span className="text-[var(--text-muted)]"> +{g.companionCount}</span>}
                 </span>
                 {recommendedGuestIds.has(g.id) && (
-                  <span className="px-1.5 py-px rounded-full text-[10px] font-[family-name:var(--font-ui)] font-medium bg-[var(--accent-light)] text-[var(--accent)]">推薦</span>
+                  <span className="shrink-0 px-1.5 py-px rounded-full text-[10px] font-[family-name:var(--font-ui)] font-medium bg-[var(--accent-light)] text-[var(--accent)]">推薦</span>
                 )}
                 {g.category && (
-                  <span className="px-1.5 py-px rounded-[var(--radius-sm,4px)] text-xs font-[family-name:var(--font-ui)]" style={{ background: cc.background, border: `1px solid ${cc.border}`, color: cc.color }}>
+                  <span className="shrink-0 px-1.5 py-px rounded-[var(--radius-sm,4px)] text-xs font-[family-name:var(--font-ui)]" style={{ background: cc.background, border: `1px solid ${cc.border}`, color: cc.color }}>
                     {g.category}
                   </span>
+                )}
+                {g.subcategory?.name && (
+                  <span className="shrink-0 text-xs text-[var(--text-muted)] font-[family-name:var(--font-ui)]">{g.subcategory.name}</span>
                 )}
               </button>
             );
