@@ -523,8 +523,39 @@ export default function GuestManagementPage() {
         )}
 
         {/* Search */}
-        <div className={`font-[family-name:var(--font-body)] text-sm text-[var(--text-secondary)] shrink-0 ${isMobile ? 'py-2' : 'flex flex-wrap items-center gap-3 py-3 border-b border-[var(--border)]'}`}>
-          <div className={`relative ${isMobile ? 'w-full mb-2' : 'flex-[0_1_240px]'}`}>
+        <div className={`font-[family-name:var(--font-body)] text-sm text-[var(--text-secondary)] shrink-0 ${isMobile ? 'py-2 space-y-2' : 'flex flex-wrap items-center gap-3 py-3 border-b border-[var(--border)]'}`}>
+          {isMobile && (
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 min-w-0">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="搜尋姓名/暱稱..."
+                  className="w-full py-1.5 pl-[30px] pr-2.5 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--bg-surface)] text-sm font-[family-name:var(--font-body)] text-[var(--text-primary)] outline-none"
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[var(--text-muted)] p-0">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              <label className="flex items-center gap-1.5 text-[13px] font-[family-name:var(--font-ui)] text-[var(--text-secondary)] cursor-pointer select-none shrink-0 whitespace-nowrap">
+                <div
+                  onClick={() => setShowDeclined((v) => !v)}
+                  className="w-8 h-[18px] rounded-[9px] relative cursor-pointer shrink-0 transition-colors duration-200"
+                  style={{ background: showDeclined ? 'var(--error)' : 'var(--border)' }}
+                >
+                  <div
+                    className="w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-[left] duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.2)]"
+                    style={{ left: showDeclined ? 16 : 2 }}
+                  />
+                </div>
+                顯示婉拒
+              </label>
+            </div>
+          )}
+          {!isMobile && <div className="flex-[0_1_240px] relative">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               value={search}
@@ -537,7 +568,7 @@ export default function GuestManagementPage() {
                 <X size={14} />
               </button>
             )}
-          </div>
+          </div>}
 
           <div className={`flex border border-[var(--border)] rounded-[var(--radius-sm,4px)] ${isMobile ? 'overflow-x-auto shrink-0' : 'overflow-hidden'}`}>
             {isMobile && (
