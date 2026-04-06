@@ -1,10 +1,12 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Map as MapIcon, List, Search, X, Zap, Save, Pencil } from 'lucide-react';
+import { Map as MapIcon, List, Search, X, Zap, Save, Pencil, Undo2, Redo2, Plus, Trash2, Shuffle, History, LayoutGrid, Dices } from 'lucide-react';
 import { useSeatingStore } from '@/stores/seating';
-import { getSatisfactionColor } from '@/lib/satisfaction';
+import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction';
 import { getTableRecommendations, getGuestRecommendations, type TableRecommendation } from '@/lib/recommend';
 import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors';
+import { findFreePosition, calculateGridLayout } from '@/lib/viewport';
+import { authFetch } from '@/lib/api';
 import { FloorPlan, type FloorPlanHandle } from '@/components/workspace/FloorPlan';
 import type { Guest } from '@/stores/seating';
 
@@ -28,25 +30,33 @@ function MobileDashboard() {
 
   return (
     <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-surface)] shrink-0">
-      {/* Top row: score + unassigned */}
+      {/* Top row: score (left) + legend (right) */}
       <div className="flex items-center justify-between mb-1.5">
-        <span className="flex items-center gap-1.5 text-sm">
-          <span className="text-xs text-[var(--text-muted)] font-[family-name:var(--font-body)]">滿意度</span>
-          <span className="font-[family-name:var(--font-data)] font-bold tabular-nums" style={{ color: avgSat > 0 ? getSatisfactionColor(avgSat) : 'var(--text-muted)' }}>
+        <span className="flex items-center gap-1.5">
+          <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)]">滿意度</span>
+          <span className="text-lg font-[family-name:var(--font-data)] font-bold tabular-nums" style={{ color: avgSat > 0 ? getSatisfactionColor(avgSat) : 'var(--text-muted)' }}>
             {avgSat > 0 ? avgSat.toFixed(1) : '—'}
           </span>
+          {unassigned.length > 0 && (
+            <span className="text-sm text-[var(--warning)] font-[family-name:var(--font-body)] ml-1">待排{unassigned.length}</span>
+          )}
         </span>
-        {unassigned.length > 0 && (
-          <span className="text-xs text-[var(--warning)] font-[family-name:var(--font-body)]">待排 {unassigned.length} 人</span>
+        {assigned.length > 0 && (
+          <span className="flex items-center gap-2 text-sm font-[family-name:var(--font-body)] text-[var(--text-muted)]">
+            {green > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--satisfaction-green)' }} />好{green}人</span>}
+            {yellow > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--satisfaction-yellow)' }} />可{yellow}人</span>}
+            {orange > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--satisfaction-orange)' }} />普{orange}人</span>}
+            {red > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--satisfaction-red)' }} />差{red}人</span>}
+          </span>
         )}
       </div>
       {/* Bar chart */}
       {assigned.length > 0 && (
         <div className="flex h-2 rounded-full overflow-hidden gap-px">
-          {green > 0 && <div style={{ flex: green / total, background: 'var(--satisfaction-green)' }} title={`好 ${green}`} />}
-          {yellow > 0 && <div style={{ flex: yellow / total, background: 'var(--satisfaction-yellow)' }} title={`可 ${yellow}`} />}
-          {orange > 0 && <div style={{ flex: orange / total, background: 'var(--satisfaction-orange)' }} title={`普 ${orange}`} />}
-          {red > 0 && <div style={{ flex: red / total, background: 'var(--satisfaction-red)' }} title={`差 ${red}`} />}
+          {green > 0 && <div style={{ flex: green / total, background: 'var(--satisfaction-green)' }} />}
+          {yellow > 0 && <div style={{ flex: yellow / total, background: 'var(--satisfaction-yellow)' }} />}
+          {orange > 0 && <div style={{ flex: orange / total, background: 'var(--satisfaction-orange)' }} />}
+          {red > 0 && <div style={{ flex: red / total, background: 'var(--satisfaction-red)' }} />}
         </div>
       )}
     </div>
@@ -713,6 +723,17 @@ export function MobileWorkspace() {
   const saveSnapshot = useSeatingStore((s) => s.saveSnapshot);
   const autoAssignGuests = useSeatingStore((s) => s.autoAssignGuests);
   const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress);
+  const undo = useSeatingStore((s) => s.undo);
+  const undoStack = useSeatingStore((s) => s.undoStack);
+  const snapshots = useSeatingStore((s) => s.snapshots);
+  const restoreSnapshot = useSeatingStore((s) => s.restoreSnapshot);
+  const addTable = useSeatingStore((s) => s.addTable);
+  const resetAllSeats = useSeatingStore((s) => s.resetAllSeats);
+  const autoArrangeTables = useSeatingStore((s) => s.autoArrangeTables);
+  const eventId = useSeatingStore((s) => s.eventId);
+  const [adding, setAdding] = useState(false);
+  const [arranging, setArranging] = useState(false);
+  const isDev = import.meta.env.DEV;
 
   const avoidPairs = useSeatingStore((s) => s.avoidPairs);
 
@@ -767,6 +788,78 @@ export function MobileWorkspace() {
   const handleAutoAssign = useCallback(async () => {
     await autoAssignGuests('balanced');
   }, [autoAssignGuests]);
+
+  const handleAutoArrange = useCallback(async () => {
+    setArranging(true);
+    try {
+      const svg = document.getElementById('floorplan-svg') as SVGSVGElement | null;
+      const vb = svg?.viewBox.baseVal;
+      let positions: ReturnType<typeof calculateGridLayout>;
+      if (vb && vb.width > 0) {
+        const padding = 100;
+        const areaW = vb.width - padding * 2;
+        const areaH = vb.height - padding * 2;
+        const cols = Math.ceil(Math.sqrt(tables.length));
+        const rows = Math.ceil(tables.length / cols);
+        const spacingX = cols > 1 ? areaW / (cols - 1) : 0;
+        const spacingY = rows > 1 ? areaH / (rows - 1) : 0;
+        positions = tables.map((t, i) => ({
+          tableId: t.id,
+          x: vb.x + padding + (i % cols) * spacingX,
+          y: vb.y + padding + Math.floor(i / cols) * spacingY,
+        }));
+      } else {
+        positions = calculateGridLayout(tables);
+      }
+      await autoArrangeTables(positions);
+    } finally {
+      setArranging(false);
+    }
+  }, [tables, autoArrangeTables]);
+
+  const handleRandomAssign = useCallback(() => {
+    const { avoidPairs: ap, undoStack: us } = useSeatingStore.getState();
+    const allConfirmed = guests.filter((g) => g.rsvpStatus === 'confirmed');
+    const shuffled = [...allConfirmed];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    shuffled.length = Math.ceil(shuffled.length * 0.75);
+    const remaining = new Map<string, number>();
+    const nextSeat = new Map<string, number>();
+    for (const t of tables) { remaining.set(t.id, t.capacity); nextSeat.set(t.id, 0); }
+    const assignments = new Map<string, { tableId: string; seatIndex: number }>();
+    for (const g of shuffled) {
+      const avail = tables.find((t) => (remaining.get(t.id) || 0) >= g.seatCount);
+      if (avail) {
+        const seat = nextSeat.get(avail.id) || 0;
+        assignments.set(g.id, { tableId: avail.id, seatIndex: seat });
+        remaining.set(avail.id, (remaining.get(avail.id) || 0) - g.seatCount);
+        nextSeat.set(avail.id, seat + g.seatCount);
+      }
+    }
+    const updatedGuests = guests.map((g) => {
+      const a = assignments.get(g.id);
+      if (a) return { ...g, assignedTableId: a.tableId, seatIndex: a.seatIndex };
+      if (g.rsvpStatus === 'confirmed') return { ...g, assignedTableId: null, seatIndex: null };
+      return g;
+    });
+    const result = recalculateAll(updatedGuests, tables, ap);
+    const finalGuests = updatedGuests.map((g) => { const s = result.guests.find((gs) => gs.id === g.id); return s ? { ...g, satisfactionScore: s.satisfactionScore } : g; });
+    const finalTables = tables.map((t) => { const s = result.tables.find((ts) => ts.id === t.id); return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t; });
+    useSeatingStore.setState({
+      guests: finalGuests, tables: finalTables,
+      undoStack: [...us, { type: 'auto-assign' as const, assignments: allConfirmed.map((g) => ({ guestId: g.id, fromTableId: g.assignedTableId || null, fromSeatIndex: g.seatIndex })), createdTableIds: [] }],
+    });
+    if (eventId) {
+      const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed');
+      authFetch(`/api/events/${eventId}/guests/assign-batch`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignments: confirmed.map((g) => ({ guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null })) }),
+      }).catch(console.error);
+    }
+  }, [guests, tables, eventId]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -853,16 +946,95 @@ export function MobileWorkspace() {
         </>
       ) : (
         /* Map mode */
-        <div className="flex-1 min-w-0">
-          <FloorPlan ref={floorPlanRef} />
-        </div>
+        <>
+          <div className="flex-1 min-w-0">
+            <FloorPlan ref={floorPlanRef} />
+          </div>
+          {/* Map mode toolbar — single row, horizontal scroll */}
+          <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-t border-[var(--border)] bg-[var(--bg-surface)] overflow-x-auto">
+            {/* 儲存/讀取 */}
+            <div className="flex shrink-0 rounded-[var(--radius-sm,4px)] border border-[var(--border)] overflow-hidden">
+              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-50 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] border-r border-[var(--border)] text-xs whitespace-nowrap">
+                <Save size={13} /> {saving ? '儲存中...' : '儲存'}
+              </button>
+              <button onClick={() => { if (snapshots.length > 0) restoreSnapshot(snapshots[0].id); }} disabled={snapshots.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap">
+                <History size={13} /> 讀取
+              </button>
+            </div>
+            {/* 還原/重做 */}
+            <div className="flex shrink-0 rounded-[var(--radius-sm,4px)] border border-[var(--border)] overflow-hidden">
+              <button onClick={() => undo()} disabled={undoStack.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] border-r border-[var(--border)] text-xs whitespace-nowrap">
+                <Undo2 size={13} /> 還原
+              </button>
+              <button disabled className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap">
+                <Redo2 size={13} /> 重做
+              </button>
+            </div>
+            {/* 新桌/清桌 */}
+            <div className="flex shrink-0 rounded-[var(--radius-sm,4px)] border border-[var(--border)] overflow-hidden">
+              <button
+                onClick={async () => {
+                  setAdding(true);
+                  const pos = findFreePosition(tables);
+                  await addTable(`第${tables.length + 1}桌`, pos.x, pos.y);
+                  floorPlanRef.current?.panToPoint(pos.x, pos.y);
+                  setAdding(false);
+                }}
+                disabled={adding}
+                className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-50 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] border-r border-[var(--border)] text-xs whitespace-nowrap"
+              >
+                <Plus size={13} /> 新桌
+              </button>
+              <button
+                onClick={async () => {
+                  const eid = useSeatingStore.getState().eventId;
+                  if (!eid) return;
+                  const res = await authFetch(`/api/events/${eid}/tables/empty`, { method: 'DELETE' });
+                  if (res.ok) await useSeatingStore.getState().loadEvent();
+                }}
+                disabled={!tables.some((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed'))}
+                className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap"
+              >
+                <Trash2 size={13} /> 清桌
+              </button>
+            </div>
+            {/* 重排 */}
+            <button
+              onClick={() => resetAllSeats()}
+              disabled={!guests.some((g) => g.assignedTableId)}
+              className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-sm,4px)] border border-[var(--border)] cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap"
+            >
+              <Shuffle size={13} /> 重排
+            </button>
+            {/* DEV 工具 */}
+            {isDev && (
+              <>
+                <button
+                  onClick={handleAutoArrange}
+                  disabled={tables.length === 0 || arranging}
+                  className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-sm,4px)] border border-[#C4B5FD] cursor-pointer disabled:opacity-50 text-[#7C3AED] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap"
+                >
+                  <LayoutGrid size={12} /> {arranging ? '排列中...' : '排列'}
+                </button>
+                {tables.length > 0 && (
+                  <button
+                    onClick={handleRandomAssign}
+                    className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-sm,4px)] border border-[#C4B5FD] cursor-pointer text-[#7C3AED] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap"
+                  >
+                    <Dices size={12} /> 隨機
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </>
       )}
 
       {/* Mode toggle FAB */}
       <button
         onClick={() => setMode(mode === 'list' ? 'map' : 'list')}
         className="fixed right-4 z-40 w-11 h-11 flex items-center justify-center rounded-full bg-[var(--bg-surface)] border border-[var(--border)] shadow-[0_2px_8px_rgba(0,0,0,0.12)] cursor-pointer"
-        style={{ bottom: mode === 'list' ? 130 : 72 }}
+        style={{ bottom: mode === 'list' ? 130 : 110 }}
       >
         {mode === 'list' ? <MapIcon size={18} className="text-[var(--text-secondary)]" /> : <List size={18} className="text-[var(--text-secondary)]" />}
       </button>
