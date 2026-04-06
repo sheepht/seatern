@@ -540,9 +540,8 @@ export default function GuestManagementPage() {
                   </button>
                 )}
               </div>
-              <label className="flex items-center gap-1.5 text-[13px] font-[family-name:var(--font-ui)] text-[var(--text-secondary)] cursor-pointer select-none shrink-0 whitespace-nowrap">
+              <label onClick={() => setShowDeclined((v) => !v)} className="flex items-center gap-1.5 text-base font-[family-name:var(--font-ui)] text-[var(--text-secondary)] cursor-pointer select-none shrink-0 whitespace-nowrap">
                 <div
-                  onClick={() => setShowDeclined((v) => !v)}
                   className="w-8 h-[18px] rounded-[9px] relative cursor-pointer shrink-0 transition-colors duration-200"
                   style={{ background: showDeclined ? 'var(--error)' : 'var(--border)' }}
                 >
@@ -782,11 +781,66 @@ export default function GuestManagementPage() {
                 <div
                   role="button"
                   aria-label={`${guest.name} ${guest.category || ''} ${guest.rsvpStatus === 'confirmed' ? '確認' : '婉拒'}`}
-                  className="p-3 border border-[var(--border)] rounded-[var(--radius-md,8px)] bg-[var(--bg-surface)] active:bg-[var(--accent-light)]"
+                  className="relative flex border border-[var(--border)] rounded-[var(--radius-md,8px)] bg-[var(--bg-surface)] active:bg-[var(--accent-light)] overflow-hidden"
                 >
-                  {/* Row 1: name + companion + RSVP */}
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2 min-w-0">
+                  {/* Left: table info strip */}
+                  <div
+                    className="shrink-0 w-12 flex flex-col items-center justify-between pt-1.5 pb-1.5"
+                    style={{
+                      background: guest.assignedTableId ? 'var(--accent-light)' : 'var(--bg-primary)',
+                      borderRight: '1px solid var(--border)',
+                    }}
+                  >
+                    {/* Top: label + table number */}
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className="text-[11px] font-[family-name:var(--font-ui)] text-[var(--text-muted)]">桌次</span>
+                      <span className="text-[11px] font-[family-name:var(--font-ui)] font-medium text-center leading-tight" style={{ color: guest.assignedTableId ? 'var(--accent-dark)' : 'var(--text-muted)' }}>
+                        {guest.assignedTableId ? (tableNameMap.get(guest.assignedTableId) || '—').replace('第', '').replace('桌', '') : '未排'}
+                      </span>
+                    </div>
+                    {/* Bottom: satisfaction ring */}
+                    {guest.assignedTableId && (() => {
+                      const score = guest.satisfactionScore;
+                      const r = 13;
+                      const sw = 2.5;
+                      const ringR = r + sw / 2;
+                      const circum = 2 * Math.PI * ringR;
+                      const progress = Math.min(score / 100, 1);
+                      const size = (ringR + sw) * 2;
+                      return (
+                        <svg width={size} height={size} className="block">
+                          <g transform={`translate(${size / 2}, ${size / 2})`}>
+                            <circle r={ringR} fill="none" stroke="var(--border)" strokeWidth={sw} />
+                            {score > 0 && (
+                              <circle
+                                r={ringR}
+                                fill="none"
+                                stroke={satColor}
+                                strokeWidth={sw}
+                                strokeLinecap="round"
+                                strokeDasharray={`${circum * progress} ${circum * (1 - progress)}`}
+                                strokeDashoffset={circum * 0.25}
+                                transform="rotate(-90)"
+                              />
+                            )}
+                            <text y={4} textAnchor="middle" fill={satColor} fontSize={10} fontWeight="700" fontFamily="'Plus Jakarta Sans', sans-serif">
+                              {score.toFixed(0)}
+                            </text>
+                          </g>
+                        </svg>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Right: guest info */}
+                  <div className="flex-1 min-w-0 p-2.5 pr-8">
+                    {/* RSVP icon — floating top-right */}
+                    <span className="absolute top-2 right-2.5 text-lg font-semibold" style={{ color: rsvpColor(guest.rsvpStatus) }}>
+                      {rsvpIcon(guest.rsvpStatus)}
+                    </span>
+
+                    {/* Row 1: name + companion + category */}
+                    <div className="flex items-center gap-2 min-w-0 mb-0.5">
                       <span className="font-medium text-[var(--text-primary)] truncate">
                         {guest.aliases.length > 0 ? <>{guest.aliases[0]}<span className="text-[var(--text-muted)] font-normal text-sm">({guest.name})</span></> : guest.name}
                       </span>
@@ -799,31 +853,22 @@ export default function GuestManagementPage() {
                         </span>
                       )}
                     </div>
-                    <span className="shrink-0 text-sm font-semibold" style={{ color: rsvpColor(guest.rsvpStatus) }}>
-                      {rsvpIcon(guest.rsvpStatus)}
-                    </span>
-                  </div>
 
-                  {/* Row 2: table + subcategory + satisfaction */}
-                  <div className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
-                    <span style={{ color: guest.assignedTableId ? 'var(--text-primary)' : 'var(--text-muted)' }}>{tableName}</span>
-                    {subcatName && <span>{subcatName}</span>}
-                    {guest.assignedTableId && (
-                      <span className="ml-auto font-[family-name:var(--font-data)] tabular-nums font-semibold" style={{ color: satColor }}>
-                        {guest.satisfactionScore.toFixed(0)}
-                      </span>
+                    {/* Row 2: subcategory + details */}
+                    <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                      {subcatName && <span>{subcatName}</span>}
+                    </div>
+
+                    {/* Row 3: preferences, avoids, dietary (if any) */}
+                    {(prefGuests.length > 0 || avoidGuestsList.length > 0 || guest.dietaryNote || guest.specialNote) && (
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[var(--text-muted)]">
+                        {prefGuests.length > 0 && <span>想同桌：{prefGuests.map((g) => g.aliases[0] || g.name).join('、')}</span>}
+                        {avoidGuestsList.length > 0 && <span style={{ color: 'var(--error)' }}>避桌：{avoidGuestsList.map((g) => g.aliases[0] || g.name).join('、')}</span>}
+                        {guest.dietaryNote && <span>{guest.dietaryNote}</span>}
+                        {guest.specialNote && <span>{guest.specialNote}</span>}
+                      </div>
                     )}
                   </div>
-
-                  {/* Row 3: preferences, avoids, dietary (if any) */}
-                  {(prefGuests.length > 0 || avoidGuestsList.length > 0 || guest.dietaryNote || guest.specialNote) && (
-                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[var(--text-muted)]">
-                      {prefGuests.length > 0 && <span>想同桌：{prefGuests.map((g) => g.aliases[0] || g.name).join('、')}</span>}
-                      {avoidGuestsList.length > 0 && <span style={{ color: 'var(--error)' }}>避桌：{avoidGuestsList.map((g) => g.aliases[0] || g.name).join('、')}</span>}
-                      {guest.dietaryNote && <span>{guest.dietaryNote}</span>}
-                      {guest.specialNote && <span>{guest.specialNote}</span>}
-                    </div>
-                  )}
                 </div>
                 </SwipeableCard>
               );
