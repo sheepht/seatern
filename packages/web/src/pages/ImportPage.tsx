@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { authFetch } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useSeatingStore } from '@/stores/seating';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import type { ParseResult } from '@/lib/csv-parser';
 import { parseCSV } from '@/lib/csv-parser';
 import type { RawGuest } from '@/lib/column-detector';
@@ -33,6 +34,7 @@ export default function ImportPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Google Sheet URL 匯入
+  const isMobile = useIsMobile();
   const [sheetUrl, setSheetUrl] = useState('');
   const [sheetLoading, setSheetLoading] = useState(false);
 
@@ -290,9 +292,34 @@ export default function ImportPage() {
             {existingLoading ? (
               <div className="text-center py-8 text-[var(--text-muted)]">載入中...</div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {/* 左卡：Google Sheet 網址匯入 */}
-                <div className="p-5 flex flex-col border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 本機上傳（手機版排第一） */}
+                <div className={`p-5 flex flex-col border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)] ${isMobile ? 'order-1' : 'order-2'}`}>
+                  <div className="text-base font-medium mb-1 font-[family-name:var(--font-display)] text-[var(--text-primary)]">
+                    本機上傳
+                  </div>
+                  <p className="text-sm mb-4 text-[var(--text-secondary)]">
+                    上傳 CSV 或 Excel 檔案
+                  </p>
+
+                  <div className="flex-1 mb-4">
+                    <CsvUpload onParsed={handleParsed} />
+                  </div>
+
+                  <div className="mt-auto text-sm text-[var(--text-muted)]">
+                    還沒有檔案？{' '}
+                    <a
+                      href="/seatern-template.csv"
+                      download="seatern-template.csv"
+                      className="hover:underline text-[var(--accent)]"
+                    >
+                      下載 CSV 範本 →
+                    </a>
+                  </div>
+                </div>
+
+                {/* Google Sheet 網址匯入（手機版排第二） */}
+                <div className={`p-5 flex flex-col border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)] ${isMobile ? 'order-2' : 'order-1'}`}>
                   <div className="text-base font-medium mb-1 font-[family-name:var(--font-display)] text-[var(--text-primary)]">
                     Google Sheet
                   </div>
@@ -325,31 +352,6 @@ export default function ImportPage() {
                       className="hover:underline text-[var(--accent)]"
                     >
                       複製我們的範本 →
-                    </a>
-                  </div>
-                </div>
-
-                {/* 右卡：本機上傳 */}
-                <div className="p-5 flex flex-col border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)]">
-                  <div className="text-base font-medium mb-1 font-[family-name:var(--font-display)] text-[var(--text-primary)]">
-                    本機上傳
-                  </div>
-                  <p className="text-sm mb-4 text-[var(--text-secondary)]">
-                    上傳 CSV 或 Excel 檔案
-                  </p>
-
-                  <div className="flex-1 mb-4">
-                    <CsvUpload onParsed={handleParsed} />
-                  </div>
-
-                  <div className="mt-auto text-sm text-[var(--text-muted)]">
-                    還沒有檔案？{' '}
-                    <a
-                      href="/seatern-template.csv"
-                      download="seatern-template.csv"
-                      className="hover:underline text-[var(--accent)]"
-                    >
-                      下載 CSV 範本 →
                     </a>
                   </div>
                 </div>

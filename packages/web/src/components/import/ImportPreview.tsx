@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Info } from 'lucide-react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import type { ParseResult } from '@/lib/csv-parser';
 import {
   detectColumns,
@@ -34,6 +35,7 @@ interface Props {
 }
 
 export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props) {
+  const isMobile = useIsMobile();
   const detection = useMemo(() => detectColumns(data.headers), [data.headers]);
 
   // 可編輯的欄位對應
@@ -80,7 +82,7 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
   return (
     <div className="flex flex-col h-full">
       {/* 頂部：統計摘要 + 操作按鈕 */}
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+      <div className={`flex flex-wrap gap-3 mb-4 ${isMobile ? 'flex-col' : 'items-center justify-between'}`}>
         <div className="flex items-center gap-3 flex-wrap">
           <h2 className="text-lg font-bold font-[family-name:var(--font-display)] text-[var(--text-primary)]">確認匯入資料</h2>
           <div className="px-3 py-1 text-sm font-medium bg-[#F0FDF4] text-[var(--success)] rounded-[var(--radius-sm)]">
@@ -97,14 +99,14 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className={`flex items-center gap-3 ${isMobile ? 'w-full' : ''}`}>
           <button onClick={onBack} className="px-4 py-2 text-sm hover:opacity-80 text-[var(--text-secondary)]">
             返回
           </button>
           <button
             onClick={() => onConfirm(allGuests)}
             disabled={!canConfirm}
-            className="px-6 py-2 text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 bg-[var(--accent)] rounded-[var(--radius-sm)]"
+            className={`text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 bg-[var(--accent)] rounded-[var(--radius-sm)] font-medium ${isMobile ? 'flex-1 py-3' : 'px-6 py-2'}`}
           >
             {isReimport ? `匯入 ${importCount} 位新賓客` : `確認匯入 ${allGuests.length} 位賓客`}
           </button>
@@ -118,12 +120,12 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
         </div>
       )}
 
-      {/* 左右佈局：欄位對應 | 資料預覽 */}
-      <div className="flex gap-6 flex-1 min-h-0">
+      {/* 佈局：欄位對應 + 資料預覽 */}
+      <div className={isMobile ? 'flex flex-col gap-4 flex-1 min-h-0' : 'flex gap-6 flex-1 min-h-0'}>
 
-        {/* 左側：欄位對應 */}
-        <div className="flex-shrink-0 w-[340px]">
-          <div className="p-4 h-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-md)]">
+        {/* 欄位對應 */}
+        <div className={isMobile ? '' : 'flex-shrink-0 w-[340px]'}>
+          <div className={`p-4 bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-md)] ${isMobile ? '' : 'h-full'}`}>
             <h3 className="text-sm font-medium mb-4 text-[var(--text-primary)]">欄位對應</h3>
             <div className="space-y-2">
               {SYSTEM_FIELDS.map((sf) => {
@@ -134,12 +136,14 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
                     <label className="text-sm flex-shrink-0 flex items-center gap-1 text-[var(--text-secondary)] whitespace-nowrap">
                       {sf.label}
                       {sf.required && <span className="text-[var(--error)]">*</span>}
-                      <span className="relative group">
-                        <Info size={11} className="text-[var(--text-muted)] cursor-help" />
-                        <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover:block px-2 py-1 text-xs whitespace-nowrap bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
-                          {FIELD_TOOLTIPS[sf.field]}
+                      {!isMobile && (
+                        <span className="relative group">
+                          <Info size={11} className="text-[var(--text-muted)] cursor-help" />
+                          <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover:block px-2 py-1 text-xs whitespace-nowrap bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
+                            {FIELD_TOOLTIPS[sf.field]}
+                          </span>
                         </span>
-                      </span>
+                      )}
                     </label>
                     {isMulti ? (
                       <span className="text-xs text-[var(--accent)]">
@@ -176,60 +180,124 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
           </div>
         </div>
 
-        {/* 右側：資料預覽表格 */}
-        <div className="flex-1 min-w-0 overflow-auto border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)]">
-          <table className="min-w-full text-sm whitespace-nowrap">
-            <thead className="sticky top-0 z-10 bg-[var(--bg-surface)]">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">#</th>
-                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">姓名</th>
-                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">外號</th>
-                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">分類</th>
-                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">子分類</th>
-                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">出席</th>
-                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">攜眷</th>
-                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">葷素</th>
-                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">想同桌</th>
-                <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">避免同桌</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allGuests.map((g, i) => {
-                const isNew = !isReimport || newGuestNames.has(g.name.trim().toLowerCase());
-                const isSkipped = isReimport && !isNew;
-                return (
-                <tr key={i} className="border-t border-[var(--border)]" style={{ opacity: isSkipped ? 0.4 : g.rsvpStatus === 'declined' ? 0.5 : 1 }}>
-                  <td className="px-3 py-2 text-xs font-data text-[var(--text-muted)]">{i + 1}</td>
-                  <td className="px-3 py-2 font-medium text-[var(--text-primary)]">
-                    {g.name}
-                    {isReimport && (
-                      <span className="ml-2 px-1.5 py-0.5 rounded-[var(--radius-sm)] text-[11px]" style={{
-                        background: isNew ? '#F0FDF4' : 'var(--bg-primary)',
-                        color: isNew ? 'var(--success)' : 'var(--text-muted)',
-                      }}>
-                        {isNew ? '新' : '已存在'}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-[var(--text-secondary)]">{g.aliases.join(', ') || '—'}</td>
-                  <td className="px-3 py-2 text-[var(--text-primary)]">{g.category || '—'}</td>
-                  <td className="px-3 py-2 text-[var(--text-secondary)]">{g.rawSubcategory || '—'}</td>
-                  <td className="px-3 py-2">
-                    <span style={{ color: g.rsvpStatus === 'confirmed' ? 'var(--success)' : g.rsvpStatus === 'declined' ? 'var(--error)' : 'var(--text-muted)' }}>
+        {/* 資料預覽 */}
+        {isMobile ? (
+          /* 手機版：卡片列表 */
+          <div className="flex-1 overflow-auto space-y-2">
+            {allGuests.map((g, i) => {
+              const isNew = !isReimport || newGuestNames.has(g.name.trim().toLowerCase());
+              const isSkipped = isReimport && !isNew;
+              return (
+                <div
+                  key={i}
+                  className="p-3 border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)]"
+                  style={{ opacity: isSkipped ? 0.4 : g.rsvpStatus === 'declined' ? 0.5 : 1 }}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-[var(--text-primary)]">
+                      {g.name}
+                      {isReimport && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded-[var(--radius-sm)] text-[11px]" style={{
+                          background: isNew ? '#F0FDF4' : 'var(--bg-primary)',
+                          color: isNew ? 'var(--success)' : 'var(--text-muted)',
+                        }}>
+                          {isNew ? '新' : '已存在'}
+                        </span>
+                      )}
+                    </span>
+                    <span style={{ color: g.rsvpStatus === 'confirmed' ? 'var(--success)' : g.rsvpStatus === 'declined' ? 'var(--error)' : 'var(--text-muted)' }} className="text-sm">
                       {g.rsvpStatus === 'confirmed' ? '出席' : g.rsvpStatus === 'declined' ? '婉拒' : '待定'}
                     </span>
-                  </td>
-                  <td className="px-3 py-2 font-data">{g.companionCount > 0 ? `+${g.companionCount}` : '—'}</td>
-                  <td className="px-3 py-2 text-[var(--text-secondary)]">{g.dietaryNote || '—'}</td>
-                  <td className="px-3 py-2 text-[var(--text-secondary)]">{g.rawPreferences.join(', ') || '—'}</td>
-                  <td className="px-3 py-2" style={{ color: g.rawAvoids.length > 0 ? 'var(--error)' : 'var(--text-secondary)' }}>{g.rawAvoids.join(', ') || '—'}</td>
+                  </div>
+                  <div className="text-sm text-[var(--text-secondary)] flex flex-wrap gap-x-3 gap-y-0.5">
+                    {g.category && <span>{g.category}</span>}
+                    {g.rawSubcategory && <span>{g.rawSubcategory}</span>}
+                    {g.companionCount > 0 && <span>攜眷 +{g.companionCount}</span>}
+                  </div>
+                  {(g.rawPreferences.length > 0 || g.rawAvoids.length > 0 || g.dietaryNote || g.specialNote) && (
+                    <div className="text-xs text-[var(--text-muted)] mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                      {g.rawPreferences.length > 0 && <span>想同桌：{g.rawPreferences.join('、')}</span>}
+                      {g.rawAvoids.length > 0 && <span style={{ color: 'var(--error)' }}>避桌：{g.rawAvoids.join('、')}</span>}
+                      {g.dietaryNote && <span>{g.dietaryNote}</span>}
+                      {g.specialNote && <span>{g.specialNote}</span>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* 桌面版：表格 */
+          <div className="flex-1 min-w-0 overflow-auto border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)]">
+            <table className="min-w-full text-sm whitespace-nowrap">
+              <thead className="sticky top-0 z-10 bg-[var(--bg-surface)]">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">#</th>
+                  <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">姓名</th>
+                  <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">外號</th>
+                  <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">分類</th>
+                  <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">子分類</th>
+                  <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">出席</th>
+                  <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">攜眷</th>
+                  <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">葷素</th>
+                  <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">想同桌</th>
+                  <th className="px-3 py-2 text-left font-medium text-[var(--text-secondary)]">避免同桌</th>
                 </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {allGuests.map((g, i) => {
+                  const isNew = !isReimport || newGuestNames.has(g.name.trim().toLowerCase());
+                  const isSkipped = isReimport && !isNew;
+                  return (
+                  <tr key={i} className="border-t border-[var(--border)]" style={{ opacity: isSkipped ? 0.4 : g.rsvpStatus === 'declined' ? 0.5 : 1 }}>
+                    <td className="px-3 py-2 text-xs font-data text-[var(--text-muted)]">{i + 1}</td>
+                    <td className="px-3 py-2 font-medium text-[var(--text-primary)]">
+                      {g.name}
+                      {isReimport && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded-[var(--radius-sm)] text-[11px]" style={{
+                          background: isNew ? '#F0FDF4' : 'var(--bg-primary)',
+                          color: isNew ? 'var(--success)' : 'var(--text-muted)',
+                        }}>
+                          {isNew ? '新' : '已存在'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-[var(--text-secondary)]">{g.aliases.join(', ') || '—'}</td>
+                    <td className="px-3 py-2 text-[var(--text-primary)]">{g.category || '—'}</td>
+                    <td className="px-3 py-2 text-[var(--text-secondary)]">{g.rawSubcategory || '—'}</td>
+                    <td className="px-3 py-2">
+                      <span style={{ color: g.rsvpStatus === 'confirmed' ? 'var(--success)' : g.rsvpStatus === 'declined' ? 'var(--error)' : 'var(--text-muted)' }}>
+                        {g.rsvpStatus === 'confirmed' ? '出席' : g.rsvpStatus === 'declined' ? '婉拒' : '待定'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-data">{g.companionCount > 0 ? `+${g.companionCount}` : '—'}</td>
+                    <td className="px-3 py-2 text-[var(--text-secondary)]">{g.dietaryNote || '—'}</td>
+                    <td className="px-3 py-2 text-[var(--text-secondary)]">{g.rawPreferences.join(', ') || '—'}</td>
+                    <td className="px-3 py-2" style={{ color: g.rawAvoids.length > 0 ? 'var(--error)' : 'var(--text-secondary)' }}>{g.rawAvoids.join(', ') || '—'}</td>
+                  </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
+      {/* 底部操作按鈕（手機版，滑到底不用再拉回去） */}
+      {isMobile && (
+        <div className="flex items-center gap-3 pt-4 mt-2 border-t border-[var(--border)]">
+          <button onClick={onBack} className="px-4 py-2 text-sm hover:opacity-80 text-[var(--text-secondary)]">
+            返回
+          </button>
+          <button
+            onClick={() => onConfirm(allGuests)}
+            disabled={!canConfirm}
+            className="flex-1 py-3 text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 bg-[var(--accent)] rounded-[var(--radius-sm)] font-medium"
+          >
+            {isReimport ? `匯入 ${importCount} 位新賓客` : `確認匯入 ${allGuests.length} 位賓客`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
