@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Map, List, Plus, Search, X, Zap, Save, Pencil } from 'lucide-react';
+import { Map as MapIcon, List, Plus, Search, X, Zap, Save, Pencil } from 'lucide-react';
 import { useSeatingStore, type AvoidPair } from '@/stores/seating';
 import { getSatisfactionColor } from '@/lib/satisfaction';
+import { getTableRecommendations, type TableRecommendation } from '@/lib/recommend';
 import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors';
 import { FloorPlan, type FloorPlanHandle } from '@/components/workspace/FloorPlan';
 import type { Guest } from '@/stores/seating';
@@ -54,10 +55,11 @@ function MobileDashboard() {
 
 // ─── Table Card ────────────────────────────────────
 
-function MobileTableCard({ tableId, onAddGuest, onGuestLongPress }: {
+function MobileTableCard({ tableId, onAddGuest, onGuestLongPress, recommendCount }: {
   tableId: string
   onAddGuest: (tableId: string) => void
   onGuestLongPress: (guest: Guest, tableId: string) => void
+  recommendCount: number
 }) {
   const table = useSeatingStore((s) => s.tables.find((t) => t.id === tableId))!;
   const guests = useSeatingStore((s) => s.guests);
@@ -111,6 +113,11 @@ function MobileTableCard({ tableId, onAddGuest, onGuestLongPress }: {
           </button>
         </div>
         <div className="flex items-center gap-1.5">
+          {recommendCount > 0 && seatCount < table.capacity && (
+            <span className="text-[11px] font-[family-name:var(--font-ui)] font-medium px-1.5 py-px rounded-full bg-[var(--accent-light)] text-[var(--accent)]">
+              推薦{recommendCount}
+            </span>
+          )}
           {satDelta !== null && (
             <span
               className="text-xs font-[family-name:var(--font-data)] font-semibold tabular-nums animate-[fadeInOut_2s_ease-out_forwards]"
@@ -299,7 +306,7 @@ function MobileTableCard({ tableId, onAddGuest, onGuestLongPress }: {
 
 // ─── Bottom Sheet (add guest) ──────────────────────
 
-function AddGuestSheet({ tableId, onClose }: { tableId: string; onClose: () => void }) {
+function AddGuestSheet({ tableId, onClose, recommendedGuestIds }: { tableId: string; onClose: () => void; recommendedGuestIds: Set<string> }) {
   const guests = useSeatingStore((s) => s.guests);
   const tables = useSeatingStore((s) => s.tables);
   const moveGuest = useSeatingStore((s) => s.moveGuest);
@@ -311,12 +318,18 @@ function AddGuestSheet({ tableId, onClose }: { tableId: string; onClose: () => v
   const tableName = table?.name || '';
 
   const unassigned = guests.filter((g) => !g.assignedTableId && g.rsvpStatus === 'confirmed');
-  const filtered = search
+  const searched = search
     ? unassigned.filter((g) => {
         const q = search.toLowerCase();
         return g.name.toLowerCase().includes(q) || g.aliases.some((a) => a.toLowerCase().includes(q));
       })
     : unassigned;
+  // Sort: recommended first
+  const filtered = [...searched].sort((a, b) => {
+    const aRec = recommendedGuestIds.has(a.id) ? 0 : 1;
+    const bRec = recommendedGuestIds.has(b.id) ? 0 : 1;
+    return aRec - bRec;
+  });
 
   const handleAdd = (guestId: string) => {
     moveGuest(guestId, tableId);
@@ -380,6 +393,9 @@ function AddGuestSheet({ tableId, onClose }: { tableId: string; onClose: () => v
                 <span className="flex-1 text-sm font-[family-name:var(--font-body)] text-[var(--text-primary)]">
                   {g.aliases.length > 0 ? <>{g.aliases[0]} <span className="text-[var(--text-muted)]">({g.name})</span></> : g.name}
                 </span>
+                {recommendedGuestIds.has(g.id) && (
+                  <span className="px-1.5 py-px rounded-full text-[10px] font-[family-name:var(--font-ui)] font-medium bg-[var(--accent-light)] text-[var(--accent)]">推薦</span>
+                )}
                 {g.category && (
                   <span className="px-1.5 py-px rounded-[var(--radius-sm,4px)] text-xs font-[family-name:var(--font-ui)]" style={{ background: cc.background, border: `1px solid ${cc.border}`, color: cc.color }}>
                     {g.category}
@@ -513,6 +529,19 @@ export function MobileWorkspace() {
   const autoAssignGuests = useSeatingStore((s) => s.autoAssignGuests);
   const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress);
 
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs);
+
+  // 推薦計算（useMemo 懶計算，只在賓客/桌次變化時重算）
+  const recommendations = useMemo(
+    () => getTableRecommendations(tables, guests, avoidPairs),
+    [tables, guests, avoidPairs],
+  );
+  const recMap = useMemo(() => {
+    const m = new Map<string, TableRecommendation>();
+    for (const r of recommendations) m.set(r.tableId, r);
+    return m;
+  }, [recommendations]);
+
   const [mode, setMode] = useState<'list' | 'map'>('list');
   const [addingToTable, setAddingToTable] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ guest: Guest; tableId: string } | null>(null);
@@ -566,6 +595,7 @@ export function MobileWorkspace() {
                 tableId={t.id}
                 onAddGuest={(id) => setAddingToTable(id)}
                 onGuestLongPress={(guest, tableId) => setContextMenu({ guest, tableId })}
+                recommendCount={recMap.get(t.id)?.guests.length ?? 0}
               />
             ))}
 
@@ -626,12 +656,16 @@ export function MobileWorkspace() {
         className="fixed right-4 z-40 w-11 h-11 flex items-center justify-center rounded-full bg-[var(--bg-surface)] border border-[var(--border)] shadow-[0_2px_8px_rgba(0,0,0,0.12)] cursor-pointer"
         style={{ bottom: mode === 'list' ? 130 : 72 }}
       >
-        {mode === 'list' ? <Map size={18} className="text-[var(--text-secondary)]" /> : <List size={18} className="text-[var(--text-secondary)]" />}
+        {mode === 'list' ? <MapIcon size={18} className="text-[var(--text-secondary)]" /> : <List size={18} className="text-[var(--text-secondary)]" />}
       </button>
 
       {/* Bottom sheet: add guest */}
       {addingToTable && (
-        <AddGuestSheet tableId={addingToTable} onClose={() => setAddingToTable(null)} />
+        <AddGuestSheet
+          tableId={addingToTable}
+          onClose={() => setAddingToTable(null)}
+          recommendedGuestIds={new Set(recMap.get(addingToTable)?.guests.map((g) => g.guestId) ?? [])}
+        />
       )}
 
       {/* Context menu */}
