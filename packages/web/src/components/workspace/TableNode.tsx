@@ -1,5 +1,6 @@
 import { useRef, useLayoutEffect, useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useSeatingStore, type Table, type Guest } from '@/stores/seating';
 import { getSatisfactionColor, formatScoreDelta } from '@/lib/satisfaction';
 import { dampedCounterScale, labelOpacity, satisfactionBlend, blendColors } from '@/lib/viewport';
@@ -309,16 +310,17 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
     setShowActionConfirm(false);
   };
 
+  const isMobile = useIsMobile();
   const showIcons = isSelected && !isDragging;
-  const iconR = 14;
+  const iconR = isMobile ? 22 : 14;
   // 弧線參數化：t ∈ [0,1]，x(t) = -R·cos(t·π)，y(t) = -R·sin(t·π)
   // textArcR = 文字 baseline 所在弧線（與 textPath 一致）
   // iconArcR = 圖示中心所在弧線，需往外偏移約半個字高，使圖示視覺中心對齊文字中心
   const textArcR = radius + 12;
   const fontSize = 20;
-  const iconArcR = textArcR + fontSize * 0.55;  // baseline → 文字視覺中心
+  const iconArcR = textArcR + fontSize * 0.55 + (isMobile ? 25 : 0);  // 手機版再往外推 25px
   const arcLength = Math.PI * textArcR;
-  const iconPad = 20 * counterScale;  // 文字邊緣到圖示中心的間距（螢幕 px），隨 zoom 反向縮放
+  const iconPad = (isMobile ? 40 : 20) * counterScale;  // 手機版間距更大
   const tEdit = Math.max(0.04, 0.5 - (nameTextLength / 2 + iconPad) / arcLength);
   const tDelete = Math.min(0.96, 0.5 + (nameTextLength / 2 + iconPad) / arcLength);
   const editX = -iconArcR * Math.cos(tEdit * Math.PI);
@@ -344,8 +346,8 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
       className={`${isDragging ? 'cursor-grabbing' : 'cursor-grab'} transition-opacity duration-200 ease-out`}
       opacity={isDimmed ? 0.2 : isOverlapping ? 0.4 : 1}
     >
-      {/* 操作圖示 — 畫在桌子圓形之前，讓桌面蓋住圖示（從背後彈出效果） */}
-      {showIcons && (
+      {/* 操作圖示 — 桌面版：畫在桌子圓形之前（從背後彈出效果） */}
+      {showIcons && !isMobile && (
         <>
           <g
             className="table-btn-edit cursor-pointer"
@@ -356,7 +358,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
             <g className="table-icon-pop" style={{ '--icon-from-x': `${editFromX * zoom}px`, '--icon-from-y': `${editFromY * zoom}px` } as React.CSSProperties}>
               <circle r={iconR} fill="white" stroke="#D6D3D1" strokeWidth="1.5" />
               {/* Pencil icon (lucide) */}
-              <g fill="none" stroke="#78716C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="translate(-6,-6) scale(0.5)">
+              <g fill="none" stroke="#78716C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform={isMobile ? 'translate(-8,-8) scale(0.7)' : 'translate(-6,-6) scale(0.5)'}>
                 <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
                 <path d="m15 5 4 4" />
               </g>
@@ -371,7 +373,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
             <g className="table-icon-pop" style={{ '--icon-from-x': `${deleteFromX * zoom}px`, '--icon-from-y': `${deleteFromY * zoom}px` } as React.CSSProperties}>
               <circle r={iconR} fill="white" stroke="#FECACA" strokeWidth="1.5" />
               {/* X icon (lucide) */}
-              <g fill="none" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="translate(-6,-6) scale(0.5)">
+              <g fill="none" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform={isMobile ? 'translate(-8,-8) scale(0.7)' : 'translate(-6,-6) scale(0.5)'}>
                 <path d="M18 6 6 18" />
                 <path d="m6 6 12 12" />
               </g>
@@ -771,6 +773,35 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
         );
       })()}
 
+      {/* 手機版操作圖示 — 畫在最上層，不被桌面蓋住 */}
+      {showIcons && isMobile && (
+        <>
+          <g
+            className="cursor-pointer"
+            transform={`translate(${editX}, ${editY}) scale(${counterScale})`}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); setRenameValue(table.name); setCapacityValue(table.capacity); setShowRenameModal(true); }}
+          >
+            <circle r={iconR} fill="white" stroke="#D6D3D1" strokeWidth="1.5" />
+            <g fill="none" stroke="#78716C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="translate(-8,-8) scale(0.7)">
+              <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+              <path d="m15 5 4 4" />
+            </g>
+          </g>
+          <g
+            className="cursor-pointer"
+            transform={`translate(${deleteX}, ${deleteY}) scale(${counterScale})`}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); setShowActionConfirm(true); }}
+          >
+            <circle r={iconR} fill="white" stroke="#FECACA" strokeWidth="1.5" />
+            <g fill="none" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="translate(-8,-8) scale(0.7)">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </g>
+          </g>
+        </>
+      )}
     </g>
 
     {/* 改名 modal */}
