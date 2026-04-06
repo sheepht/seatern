@@ -44,6 +44,7 @@ interface Props {
   isDimmed?: boolean
   zoom: number
   onMouseDown: (e: React.MouseEvent) => void
+  onTouchStart?: (e: React.TouchEvent) => void
   onEmptySeatClick?: (tableId: string, seatIndex: number, e: React.MouseEvent) => void
 }
 
@@ -134,7 +135,7 @@ function TableScoreRing({ score, originalScore, hasGuests, hideDelta }: { score:
   );
 }
 
-export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimmed, zoom, onMouseDown, onEmptySeatClick }: Props) {
+export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimmed, zoom, onMouseDown, onTouchStart, onEmptySeatClick }: Props) {
   const counterScale = 1 / zoom; // 桌名等維持固定螢幕大小
   const rawGuestScale = dampedCounterScale(zoom); // 賓客元素：阻尼縮小
   const nameAlpha = labelOpacity(zoom);         // 名字漸進淡出
@@ -337,6 +338,7 @@ export function TableNode({ table, isSelected, isDragging, isOverlapping, isDimm
       data-table-id={table.id}
       transform={`translate(${table.positionX}, ${table.positionY})`}
       onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={`${isDragging ? 'cursor-grabbing' : 'cursor-grab'} transition-opacity duration-200 ease-out`}

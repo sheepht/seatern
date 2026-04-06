@@ -339,54 +339,8 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const getTouchDist = (t1: React.Touch, t2: React.Touch) =>
     Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      // Pinch start
-      e.preventDefault();
-      pinchStartRef.current = {
-        dist: getTouchDist(e.touches[0], e.touches[1]),
-        zoom: zoomRef.current,
-      };
-      touchStartRef.current = null;
-    } else if (e.touches.length === 1) {
-      // Pan start
-      const t = e.touches[0];
-      touchStartRef.current = { x: t.clientX, y: t.clientY, panX: panXRef.current, panY: panYRef.current };
-      pinchStartRef.current = null;
-    }
-  }, []);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2 && pinchStartRef.current) {
-      e.preventDefault();
-      const newDist = getTouchDist(e.touches[0], e.touches[1]);
-      const scale = newDist / pinchStartRef.current.dist;
-      const nextZoom = Math.max(0.25, Math.min(1, pinchStartRef.current.zoom * scale));
-
-      // Zoom toward the midpoint of the two touches
-      const svg = svgRef.current;
-      if (svg) {
-        const rect = svg.getBoundingClientRect();
-        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
-        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
-        const s = nextZoom / zoomRef.current;
-        setPanX(Math.round(cx - s * (cx - panXRef.current)));
-        setPanY(Math.round(cy - s * (cy - panYRef.current)));
-      }
-      setZoom(nextZoom);
-    } else if (e.touches.length === 1 && touchStartRef.current && !pinchStartRef.current) {
-      const t = e.touches[0];
-      const dx = t.clientX - touchStartRef.current.x;
-      const dy = t.clientY - touchStartRef.current.y;
-      setPanX(Math.round(touchStartRef.current.panX + dx));
-      setPanY(Math.round(touchStartRef.current.panY + dy));
-    }
-  }, []);
-
-  const handleTouchEnd = useCallback(() => {
-    touchStartRef.current = null;
-    pinchStartRef.current = null;
-  }, []);
+  // Touch-based table dragging
+  const touchDragTableRef = useRef<string | null>(null);
 
   // Wheel zoom — 用 native listener 確保 non-passive（trackpad pinch 需要 preventDefault）
   const wheelRafRef = useRef<number | null>(null);
@@ -510,6 +464,105 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
       y: inverse.b * clientX + inverse.d * clientY + inverse.f,
     };
   }, []);
+
+  const handleTableTouchStart = useCallback((tableId: string, e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    e.stopPropagation();
+    const t = e.touches[0];
+    const table = tables.find((tbl) => tbl.id === tableId);
+    if (!table) return;
+
+    const point = getSvgPoint(t.clientX, t.clientY);
+    touchDragTableRef.current = tableId;
+    setDraggingTableId(tableId);
+    dragOffsetRef.current = { x: point.x - table.positionX, y: point.y - table.positionY };
+    dragStartPosRef.current = { x: table.positionX, y: table.positionY };
+    didDragRef.current = false;
+    setSelectedTable(tableId);
+  }, [tables, getSvgPoint, setSelectedTable]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      touchDragTableRef.current = null;
+      pinchStartRef.current = {
+        dist: getTouchDist(e.touches[0], e.touches[1]),
+        zoom: zoomRef.current,
+      };
+      touchStartRef.current = null;
+    } else if (e.touches.length === 1) {
+      if (!touchDragTableRef.current) {
+        const t = e.touches[0];
+        touchStartRef.current = { x: t.clientX, y: t.clientY, panX: panXRef.current, panY: panYRef.current };
+      }
+      pinchStartRef.current = null;
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStartRef.current) {
+      e.preventDefault();
+      const newDist = getTouchDist(e.touches[0], e.touches[1]);
+      const scale = newDist / pinchStartRef.current.dist;
+      const nextZoom = Math.max(0.25, Math.min(1, pinchStartRef.current.zoom * scale));
+      const svg = svgRef.current;
+      if (svg) {
+        const rect = svg.getBoundingClientRect();
+        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+        const s = nextZoom / zoomRef.current;
+        setPanX(Math.round(cx - s * (cx - panXRef.current)));
+        setPanY(Math.round(cy - s * (cy - panYRef.current)));
+      }
+      setZoom(nextZoom);
+    } else if (e.touches.length === 1 && touchDragTableRef.current) {
+      const t = e.touches[0];
+      didDragRef.current = true;
+      const point = getSvgPoint(t.clientX, t.clientY);
+      const offset = dragOffsetRef.current;
+      const snappedX = Math.round((point.x - offset.x) / 50) * 50;
+      const snappedY = Math.round((point.y - offset.y) / 50) * 50;
+      updateTablePosition(touchDragTableRef.current, snappedX, snappedY);
+      // Overlap detection
+      const dragTable = tables.find((tbl) => tbl.id === touchDragTableRef.current);
+      if (dragTable) {
+        const rDrag = Math.max(58 + Math.min(dragTable.capacity, 12) * 7, 88);
+        const overlaps = tables.some((tbl) => {
+          if (tbl.id === touchDragTableRef.current) return false;
+          const rOther = Math.max(58 + Math.min(tbl.capacity, 12) * 7, 88);
+          const dx = snappedX - tbl.positionX;
+          const dy = snappedY - tbl.positionY;
+          return Math.sqrt(dx * dx + dy * dy) < rDrag + rOther - 10;
+        });
+        setDragOverlap(overlaps);
+      }
+    } else if (e.touches.length === 1 && touchStartRef.current && !pinchStartRef.current) {
+      const t = e.touches[0];
+      const dx = t.clientX - touchStartRef.current.x;
+      const dy = t.clientY - touchStartRef.current.y;
+      setPanX(Math.round(touchStartRef.current.panX + dx));
+      setPanY(Math.round(touchStartRef.current.panY + dy));
+    }
+  }, [getSvgPoint, updateTablePosition]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (touchDragTableRef.current) {
+      const tid = touchDragTableRef.current;
+      touchDragTableRef.current = null;
+      if (didDragRef.current) {
+        if (dragOverlap) {
+          // Overlap → revert to original position
+          updateTablePosition(tid, dragStartPosRef.current.x, dragStartPosRef.current.y);
+        } else {
+          saveTablePosition(tid, dragStartPosRef.current.x, dragStartPosRef.current.y);
+        }
+      }
+      setDraggingTableId(null);
+      setDragOverlap(false);
+    }
+    touchStartRef.current = null;
+    pinchStartRef.current = null;
+  }, [tables, saveTablePosition, dragOverlap, updateTablePosition]);
 
   // 把 SVG 座標轉成容器內的螢幕座標（給 HTML overlay 定位）
   const updateScreenPositions = useCallback(() => {
@@ -968,6 +1021,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
                   isDimmed={shouldDim && !highlightedIds.has(table.id)}
                   zoom={zoom}
                   onMouseDown={(e) => handleMouseDown(table.id, e)}
+                  onTouchStart={(e) => handleTableTouchStart(table.id, e)}
                   onEmptySeatClick={(tableId, seatIndex, e) => {
                     const svg = svgRef.current;
                     const ctm = svg?.getScreenCTM();
