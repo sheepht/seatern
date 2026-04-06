@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
-
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { authFetch } from '@/lib/api';
 
 async function ensureEventExists() {
@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const urlError = searchParams.get('error');
@@ -64,10 +65,74 @@ export default function LoginPage() {
     }
   };
 
+  const oauthSection = (
+    <div className="space-y-2">
+      <button
+        onClick={handleGoogle}
+        className="w-full py-3 border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--accent-light)] text-sm text-[var(--text-secondary)] font-[family-name:var(--font-ui)] flex items-center justify-center gap-2"
+      >
+        <GoogleIcon /> 使用 Google 登入
+      </button>
+      <button
+        onClick={handleLINE}
+        className="w-full py-3 border border-green-200 rounded-[var(--radius-sm)] hover:bg-green-100 text-sm bg-green-50 text-green-800 font-[family-name:var(--font-ui)] flex items-center justify-center gap-2"
+      >
+        <LineIcon /> 使用 LINE 登入
+      </button>
+    </div>
+  );
+
+  const emailSection = (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium mb-1 text-[var(--text-primary)]">Email</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full px-3 py-3 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1 text-[var(--text-primary)]">密碼</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full px-3 py-3 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+          required
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full py-3 bg-[var(--accent)] text-white rounded-[var(--radius-sm)] hover:bg-[var(--accent-dark)] disabled:opacity-50 font-[family-name:var(--font-ui)] font-medium"
+      >
+        {loading ? '登入中...' : '登入'}
+      </button>
+    </form>
+  );
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+    <div className="min-h-dvh flex items-center justify-center bg-[var(--bg-primary)] px-4">
       <div className="w-full max-w-sm p-6 bg-[var(--bg-surface)] rounded-[var(--radius-md)] shadow-[var(--shadow-md)]">
-        <h1 className="text-2xl font-bold text-center mb-6 font-[family-name:var(--font-display)] text-[var(--text-primary)]">登入排位鷗鷗</h1>
+        {/* Brand mark — shown on mobile */}
+        {isMobile && (
+          <div className="text-center mb-6">
+            <h1 className="text-[28px] font-extrabold font-[family-name:var(--font-display)] text-[var(--text-primary)]">
+              排位鷗鷗
+            </h1>
+            <p className="text-sm text-[var(--text-secondary)] mt-1 font-[family-name:var(--font-body)]">
+              讓每位賓客都被照顧
+            </p>
+          </div>
+        )}
+
+        {/* Desktop: title only */}
+        {!isMobile && (
+          <h1 className="text-2xl font-bold text-center mb-6 font-[family-name:var(--font-display)] text-[var(--text-primary)]">登入排位鷗鷗</h1>
+        )}
 
         {error && (
           <div className="mb-4 p-2 text-sm text-[#991B1B] bg-red-50 rounded-[var(--radius-sm)]">
@@ -75,56 +140,28 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1 text-[var(--text-primary)]">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1 text-[var(--text-primary)]">密碼</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 bg-[var(--accent)] text-white rounded-[var(--radius-sm)] hover:bg-[var(--accent-dark)] disabled:opacity-50 font-[family-name:var(--font-ui)] font-medium"
-          >
-            {loading ? '登入中...' : '登入'}
-          </button>
-        </form>
-
-        <div className="my-4 flex items-center gap-2">
-          <div className="flex-1 border-t border-[var(--border)]" />
-          <span className="text-sm text-[var(--text-muted)]">或</span>
-          <div className="flex-1 border-t border-[var(--border)]" />
-        </div>
-
-        <div className="space-y-2">
-          <button
-            onClick={handleGoogle}
-            className="w-full py-2 border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--accent-light)] text-sm text-[var(--text-secondary)] font-[family-name:var(--font-ui)] flex items-center justify-center gap-2"
-          >
-            <GoogleIcon /> 使用 Google 登入
-          </button>
-          <button
-            onClick={handleLINE}
-            className="w-full py-2 border border-green-200 rounded-[var(--radius-sm)] hover:bg-green-100 text-sm bg-green-50 text-green-800 font-[family-name:var(--font-ui)] flex items-center justify-center gap-2"
-          >
-            <LineIcon /> 使用 LINE 登入
-          </button>
-        </div>
+        {/* Mobile: OAuth first, then email */}
+        {isMobile ? (
+          <>
+            {oauthSection}
+            <div className="my-4 flex items-center gap-2">
+              <div className="flex-1 border-t border-[var(--border)]" />
+              <span className="text-sm text-[var(--text-muted)]">或用 Email</span>
+              <div className="flex-1 border-t border-[var(--border)]" />
+            </div>
+            {emailSection}
+          </>
+        ) : (
+          <>
+            {emailSection}
+            <div className="my-4 flex items-center gap-2">
+              <div className="flex-1 border-t border-[var(--border)]" />
+              <span className="text-sm text-[var(--text-muted)]">或</span>
+              <div className="flex-1 border-t border-[var(--border)]" />
+            </div>
+            {oauthSection}
+          </>
+        )}
 
         <p className="mt-4 text-center text-sm text-[var(--text-secondary)]">
           還沒有帳號？{' '}

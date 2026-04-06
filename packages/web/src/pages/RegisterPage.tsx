@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/auth';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export default function RegisterPage() {
   const { signUpWithEmail } = useAuthStore();
@@ -9,6 +10,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const isMobile = useIsMobile();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +38,7 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+      <div className="min-h-dvh flex items-center justify-center bg-[var(--bg-primary)] px-4">
         <div className="w-full max-w-sm p-6 bg-[var(--bg-surface)] rounded-[var(--radius-md)] shadow-[var(--shadow-md)] text-center">
           <h1 className="text-2xl font-bold mb-4 font-[family-name:var(--font-display)] text-[var(--text-primary)]">註冊成功</h1>
           <p className="text-[var(--text-secondary)] mb-4">請查看信箱確認您的帳號。</p>
@@ -49,9 +51,24 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+    <div className="min-h-dvh flex items-center justify-center bg-[var(--bg-primary)] px-4">
       <div className="w-full max-w-sm p-6 bg-[var(--bg-surface)] rounded-[var(--radius-md)] shadow-[var(--shadow-md)]">
-        <h1 className="text-2xl font-bold text-center mb-6 font-[family-name:var(--font-display)] text-[var(--text-primary)]">註冊排位鷗鷗</h1>
+        {/* Brand mark — shown on mobile */}
+        {isMobile && (
+          <div className="text-center mb-6">
+            <h1 className="text-[28px] font-extrabold font-[family-name:var(--font-display)] text-[var(--text-primary)]">
+              排位鷗鷗
+            </h1>
+            <p className="text-sm text-[var(--text-secondary)] mt-1 font-[family-name:var(--font-body)]">
+              讓每位賓客都被照顧
+            </p>
+          </div>
+        )}
+
+        {/* Desktop: title only */}
+        {!isMobile && (
+          <h1 className="text-2xl font-bold text-center mb-6 font-[family-name:var(--font-display)] text-[var(--text-primary)]">註冊排位鷗鷗</h1>
+        )}
 
         {error && (
           <div className="mb-4 p-2 text-sm text-[#991B1B] bg-red-50 rounded-[var(--radius-sm)]">
@@ -66,7 +83,7 @@ export default function RegisterPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              className="w-full px-3 py-3 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
               required
             />
           </div>
@@ -76,7 +93,7 @@ export default function RegisterPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              className="w-full px-3 py-3 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
               required
             />
           </div>
@@ -86,14 +103,14 @@ export default function RegisterPage() {
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              className="w-full px-3 py-3 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
               required
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 bg-[var(--accent)] text-white rounded-[var(--radius-sm)] hover:bg-[var(--accent-dark)] disabled:opacity-50 font-[family-name:var(--font-ui)] font-medium"
+            className="w-full py-3 bg-[var(--accent)] text-white rounded-[var(--radius-sm)] hover:bg-[var(--accent-dark)] disabled:opacity-50 font-[family-name:var(--font-ui)] font-medium"
           >
             {loading ? '註冊中...' : '註冊'}
           </button>
