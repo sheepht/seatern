@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Map as MapIcon, List, Plus, Search, X, Zap, Save, Pencil } from 'lucide-react';
-import { useSeatingStore, type AvoidPair } from '@/stores/seating';
+import { Map as MapIcon, List, Search, X, Zap, Save, Pencil } from 'lucide-react';
+import { useSeatingStore } from '@/stores/seating';
 import { getSatisfactionColor } from '@/lib/satisfaction';
-import { getTableRecommendations, type TableRecommendation } from '@/lib/recommend';
+import { getTableRecommendations, getGuestRecommendations, type TableRecommendation } from '@/lib/recommend';
 import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors';
 import { FloorPlan, type FloorPlanHandle } from '@/components/workspace/FloorPlan';
 import type { Guest } from '@/stores/seating';
@@ -195,8 +195,6 @@ function MobileTableCard({ tableId, onAddGuest, onGuestLongPress, recommendCount
           const ringR = r + strokeW / 2 + 1;
           const circum = 2 * Math.PI * ringR;
           const size = (ringR + strokeW) * 2;
-          const companionR = 14;
-          const companionSize = (companionR + 2) * 2;
 
           // Group guests with their companions, then empty seats
           type SeatGroup =
@@ -523,6 +521,190 @@ function GuestContextMenu({ guest, tableId, onClose }: {
   );
 }
 
+// ─── Guided Assign (無腦排位) ───────────────────────
+
+function GuidedAssign({ onClose }: { onClose: () => void }) {
+  const guests = useSeatingStore((s) => s.guests);
+  const tables = useSeatingStore((s) => s.tables);
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs);
+  const moveGuest = useSeatingStore((s) => s.moveGuest);
+  const eventId = useSeatingStore((s) => s.eventId);
+  const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId]);
+
+  const unassigned = guests.filter((g) => !g.assignedTableId && g.rsvpStatus === 'confirmed');
+  const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  const [assigned, setAssigned] = useState(0);
+  const [done, setDone] = useState(false);
+
+  // Current guest to assign
+  const remaining = unassigned.filter((g) => !skipped.has(g.id));
+  const currentGuest = remaining[0] ?? null;
+
+  // Get recommendations for current guest
+  const recs = useMemo(() => {
+    if (!currentGuest) return [];
+    return getGuestRecommendations(currentGuest, tables, guests, avoidPairs, 3);
+  }, [currentGuest, tables, guests, avoidPairs]);
+
+  const handleAssign = (tableId: string) => {
+    if (!currentGuest) return;
+    moveGuest(currentGuest.id, tableId);
+    setAssigned((n) => n + 1);
+  };
+
+  const handleSkip = () => {
+    if (!currentGuest) return;
+    setSkipped((s) => new Set(s).add(currentGuest.id));
+  };
+
+  const handleFinish = () => {
+    setDone(true);
+  };
+
+  const totalUnassigned = unassigned.length + assigned;
+  const isFinished = done || (remaining.length === 0 && (assigned > 0 || skipped.size > 0));
+  const progress = totalUnassigned > 0 ? (assigned + skipped.size) / totalUnassigned : 0;
+
+  // Summary view
+  if (isFinished) {
+    const avgSat = (() => {
+      const assignedGuests = guests.filter((g) => g.assignedTableId && g.rsvpStatus === 'confirmed');
+      if (assignedGuests.length === 0) return 0;
+      return assignedGuests.reduce((s, g) => s + g.satisfactionScore, 0) / assignedGuests.length;
+    })();
+
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] bg-[var(--bg-primary)] flex flex-col items-center justify-center px-6">
+        <div className="text-center">
+          <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--text-primary)] mb-2">排位完成</h2>
+          <p className="text-[var(--text-secondary)] mb-6 font-[family-name:var(--font-body)]">
+            已排 {assigned} 人{skipped.size > 0 ? `，跳過 ${skipped.size} 人` : ''}
+          </p>
+          <div className="mb-8">
+            <span className="text-5xl font-[family-name:var(--font-data)] font-bold tabular-nums" style={{ color: avgSat > 0 ? getSatisfactionColor(avgSat) : 'var(--text-muted)' }}>
+              {avgSat > 0 ? avgSat.toFixed(1) : '—'}
+            </span>
+            <p className="text-sm text-[var(--text-muted)] mt-1">全場平均滿意度</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-8 py-3 bg-[var(--accent)] text-white rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)] font-medium cursor-pointer border-none"
+          >
+            完成
+          </button>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
+  // No guest to assign
+  if (!currentGuest) {
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] bg-[var(--bg-primary)] flex flex-col items-center justify-center px-6">
+        <p className="text-[var(--text-secondary)] mb-4">沒有待排賓客</p>
+        <button onClick={onClose} className="px-6 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)] font-medium cursor-pointer border-none">
+          返回
+        </button>
+      </div>,
+      document.body,
+    );
+  }
+
+  const cc = getCategoryColor(currentGuest.category, categoryColors);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-[var(--bg-primary)] flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      {/* Header */}
+      <div className="shrink-0 px-4 pt-3 pb-2 flex items-center justify-between">
+        <button onClick={onClose} className="text-sm text-[var(--text-secondary)] bg-transparent border-none cursor-pointer font-[family-name:var(--font-ui)]">
+          ✕ 結束
+        </button>
+        <span className="text-xs text-[var(--text-muted)] font-[family-name:var(--font-data)] tabular-nums">
+          {assigned + skipped.size + 1} / {totalUnassigned}
+        </span>
+        <button onClick={handleFinish} className="text-sm text-[var(--accent)] bg-transparent border-none cursor-pointer font-[family-name:var(--font-ui)] font-medium">
+          完成
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1 mx-4 rounded-full bg-[var(--border)] overflow-hidden shrink-0">
+        <div className="h-full bg-[var(--accent)] transition-all duration-300" style={{ width: `${progress * 100}%` }} />
+      </div>
+
+      {/* Guest card */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6">
+        <div className="text-center mb-6">
+          <div className="text-2xl font-[family-name:var(--font-display)] font-bold text-[var(--text-primary)] mb-1">
+            {currentGuest.aliases.length > 0 ? currentGuest.aliases[0] : currentGuest.name}
+          </div>
+          {currentGuest.aliases.length > 0 && (
+            <div className="text-sm text-[var(--text-muted)]">{currentGuest.name}</div>
+          )}
+          <div className="flex items-center justify-center gap-2 mt-2">
+            {currentGuest.category && (
+              <span className="px-2 py-0.5 rounded-[var(--radius-sm,4px)] text-xs font-[family-name:var(--font-ui)] font-medium" style={{ background: cc.background, border: `1px solid ${cc.border}`, color: cc.color }}>
+                {currentGuest.category}
+              </span>
+            )}
+            {currentGuest.subcategory?.name && (
+              <span className="text-xs text-[var(--text-muted)]">{currentGuest.subcategory.name}</span>
+            )}
+            {currentGuest.companionCount > 0 && (
+              <span className="text-xs text-[var(--text-muted)]">+{currentGuest.companionCount}</span>
+            )}
+          </div>
+          {currentGuest.seatPreferences.length > 0 && (
+            <div className="text-xs text-[var(--text-muted)] mt-1">
+              想同桌：{currentGuest.seatPreferences.map((p) => {
+                const g = guests.find((gg) => gg.id === p.preferredGuestId);
+                return g ? (g.aliases[0] || g.name) : '';
+              }).filter(Boolean).join('、')}
+            </div>
+          )}
+        </div>
+
+        {/* Recommended tables */}
+        <div className="w-full space-y-2">
+          {recs.length > 0 ? recs.map((rec, i) => (
+            <button
+              key={rec.tableId}
+              onClick={() => handleAssign(rec.tableId)}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-md,8px)] border cursor-pointer active:scale-[0.98] transition-transform"
+              style={{
+                background: i === 0 ? 'var(--accent-light)' : 'var(--bg-surface)',
+                borderColor: i === 0 ? 'var(--accent)' : 'var(--border)',
+              }}
+            >
+              <div className="text-left">
+                <div className="text-sm font-[family-name:var(--font-display)] font-semibold text-[var(--text-primary)]">{rec.tableName}</div>
+                <div className="text-xs text-[var(--text-muted)]">{rec.reason}</div>
+              </div>
+              <span className="font-[family-name:var(--font-data)] font-bold tabular-nums" style={{ color: getSatisfactionColor(rec.predictedScore) }}>
+                {rec.predictedScore.toFixed(0)}
+              </span>
+            </button>
+          )) : (
+            <div className="text-center py-4 text-sm text-[var(--text-muted)]">沒有合適的桌次</div>
+          )}
+        </div>
+      </div>
+
+      {/* Skip button */}
+      <div className="shrink-0 px-4 py-3">
+        <button
+          onClick={handleSkip}
+          className="w-full py-3 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--bg-surface)] text-sm font-[family-name:var(--font-ui)] text-[var(--text-secondary)] cursor-pointer"
+        >
+          跳過
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ─── Main MobileWorkspace ──────────────────────────
 
 export function MobileWorkspace() {
@@ -549,6 +731,8 @@ export function MobileWorkspace() {
   const [addingToTable, setAddingToTable] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ guest: Guest; tableId: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showAutoMenu, setShowAutoMenu] = useState(false);
+  const [guidedAssign, setGuidedAssign] = useState(false);
   const floorPlanRef = useRef<FloorPlanHandle>(null);
 
   const unassigned = guests.filter((g) => !g.assignedTableId && g.rsvpStatus === 'confirmed');
@@ -629,9 +813,29 @@ export function MobileWorkspace() {
           </div>
 
           {/* Bottom action bar */}
-          <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-t border-[var(--border)] bg-[var(--bg-surface)]">
+          <div className="shrink-0 px-4 py-2 border-t border-[var(--border)] bg-[var(--bg-surface)]">
+            {/* Auto-assign menu */}
+            {showAutoMenu && (
+              <div className="flex gap-2 mb-2 animate-[slideUp_200ms_ease-out]">
+                <button
+                  onClick={() => { setShowAutoMenu(false); handleAutoAssign(); }}
+                  disabled={!!autoAssignProgress || unassigned.length === 0}
+                  className="flex-1 py-2.5 rounded-[var(--radius-sm,4px)] text-xs font-[family-name:var(--font-ui)] font-medium cursor-pointer disabled:opacity-40 border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                >
+                  完整自動排位
+                </button>
+                <button
+                  onClick={() => { setShowAutoMenu(false); setGuidedAssign(true); }}
+                  disabled={unassigned.length === 0}
+                  className="flex-1 py-2.5 rounded-[var(--radius-sm,4px)] text-xs font-[family-name:var(--font-ui)] font-medium cursor-pointer disabled:opacity-40 border border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent)]"
+                >
+                  逐一確認模式
+                </button>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
             <button
-              onClick={handleAutoAssign}
+              onClick={() => setShowAutoMenu(!showAutoMenu)}
               disabled={!!autoAssignProgress || unassigned.length === 0}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)] font-medium cursor-pointer disabled:opacity-40 disabled:cursor-default border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)]"
             >
@@ -644,6 +848,7 @@ export function MobileWorkspace() {
             >
               <Save size={14} /> {saving ? '儲存中...' : '儲存排位'}
             </button>
+            </div>
           </div>
         </>
       ) : (
@@ -678,6 +883,11 @@ export function MobileWorkspace() {
           tableId={contextMenu.tableId}
           onClose={() => setContextMenu(null)}
         />
+      )}
+
+      {/* Guided assign (無腦排位) */}
+      {guidedAssign && (
+        <GuidedAssign onClose={() => setGuidedAssign(false)} />
       )}
     </div>
   );
