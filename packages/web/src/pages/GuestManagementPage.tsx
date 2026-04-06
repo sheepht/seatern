@@ -2,8 +2,9 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { authFetch } from '@/lib/api';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Search, X } from 'lucide-react';
+import { Plus, Trash2, Search, X, Palette } from 'lucide-react';
 import { useSeatingStore } from '@/stores/seating';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { getSatisfactionColor } from '@/lib/satisfaction';
 import { loadCategoryColors, saveCategoryColors, getCategoryColor, COLOR_PRESETS, PALETTE_HUES, PALETTE_SATS, type CategoryColor } from '@/lib/category-colors';
 import GuestFormModal from '@/components/GuestFormModal';
@@ -14,7 +15,7 @@ import type { Guest } from '@/lib/types';
 
 type SortField = 'name' | 'category' | 'rsvpStatus' | 'satisfactionScore' | 'assignedTableId' | 'companionCount' | 'prefCount' | 'avoidCount' | 'dietaryNote' | 'specialNote'
 type SortDir = 'asc' | 'desc'
-type CategoryFilter = '全部' | string
+type CategoryFilter = '全部' | '未排座' | string
 
 // ─── Helpers ────────────────────────────────────────
 
@@ -235,6 +236,8 @@ export default function GuestManagementPage() {
   const addAvoidPair = useSeatingStore((s) => s.addAvoidPair);
   const removeAvoidPair = useSeatingStore((s) => s.removeAvoidPair);
 
+  const isMobile = useIsMobile();
+
   // Category colors (localStorage-backed)
   const [categoryColors, setCategoryColors] = useState<Record<string, CategoryColor>>(() => loadCategoryColors(eventId || ''));
   const handleColorChange = useCallback((cat: string, c: CategoryColor) => {
@@ -275,6 +278,7 @@ export default function GuestManagementPage() {
   const [editingGuestId, setEditingGuestId] = useState<string | null>(null);
   const [showAvoidModal, setShowAvoidModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [mobileColorCat, setMobileColorCat] = useState<string | null>(null);
 
   // Cleanup delete timers on unmount / navigate away
   useEffect(() => {
@@ -305,7 +309,9 @@ export default function GuestManagementPage() {
 
   // Filter + sort
   const filtered = guests.filter((g) => {
-    if (categoryFilter !== '全部' && g.category !== categoryFilter) return false;
+    if (categoryFilter === '未排座' || categoryFilter === '未排') {
+      if (g.assignedTableId) return false;
+    } else if (categoryFilter !== '全部' && g.category !== categoryFilter) return false;
     if (rsvpFilter && g.rsvpStatus !== rsvpFilter) return false;
     if (!showDeclined && !search && g.rsvpStatus === 'declined') return false;
     if (search) {
@@ -445,15 +451,21 @@ export default function GuestManagementPage() {
     if (status === 'declined') setShowDeclined(true);
   };
 
-  // ─── Main table view ────────────────────────────────
+  // ─── Main view ────────────────────────────────
   return (
-    <div className="flex-1 bg-[var(--bg-primary)] flex flex-col overflow-hidden">
-      <div className="max-w-[1440px] mx-auto px-6 pt-6 w-full flex flex-col flex-1 min-h-0">
+    <div className={`flex-1 bg-[var(--bg-primary)] flex flex-col ${isMobile ? 'h-full' : 'overflow-hidden'}`}>
+      <div className={`mx-auto w-full flex flex-col flex-1 min-h-0 ${isMobile ? 'px-4 pt-3 overflow-hidden' : 'max-w-[1440px] px-6 pt-6'}`}>
 
-        {/* Toolbar: Search + Filter (left) | Stats (right) */}
-        <div className="flex flex-wrap items-center gap-3 py-3 font-[family-name:var(--font-body)] text-sm text-[var(--text-secondary)] border-b border-[var(--border)] shrink-0">
-          {/* Left: Search + Category + RSVP badge */}
-          <div className="relative flex-[0_1_240px]">
+        {/* Mobile: Stats bar */}
+        {isMobile && (
+          <div className="flex items-center gap-3 py-2 font-[family-name:var(--font-body)] text-sm text-[var(--text-secondary)] shrink-0">
+            <StatsBar guests={guests} onFilterClick={handleRsvpFilterClick} />
+          </div>
+        )}
+
+        {/* Search */}
+        <div className={`font-[family-name:var(--font-body)] text-sm text-[var(--text-secondary)] shrink-0 ${isMobile ? 'py-2' : 'flex flex-wrap items-center gap-3 py-3 border-b border-[var(--border)]'}`}>
+          <div className={`relative ${isMobile ? 'w-full mb-2' : 'flex-[0_1_240px]'}`}>
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               value={search}
@@ -468,33 +480,48 @@ export default function GuestManagementPage() {
             )}
           </div>
 
-          <div className="flex border border-[var(--border)] rounded-[var(--radius-sm,4px)] overflow-hidden">
+          <div className={`flex border border-[var(--border)] rounded-[var(--radius-sm,4px)] ${isMobile ? 'overflow-x-auto shrink-0' : 'overflow-hidden'}`}>
+            {isMobile && (
+              <button
+                onClick={() => setMobileColorCat(mobileColorCat ? null : categories[0])}
+                className="px-2.5 py-[5px] border-none text-[13px] cursor-pointer shrink-0"
+                style={{
+                  background: mobileColorCat ? 'var(--accent-light)' : 'var(--bg-surface)',
+                  color: mobileColorCat ? 'var(--accent)' : 'var(--text-muted)',
+                  borderRight: '1px solid var(--border)',
+                }}
+              >
+                <Palette size={14} />
+              </button>
+            )}
             {(() => {
               const visible = !showDeclined ? guests.filter((g) => g.rsvpStatus !== 'declined') : guests;
-              return ['全部', ...categories].map((cat) => {
-              const count = cat === '全部' ? visible.length : visible.filter((g) => g.category === cat).length;
+              const cats = isMobile ? ['全部', ...categories, '未排'] : ['全部', ...categories];
+              return cats.map((cat) => {
+              const count = cat === '全部' ? visible.length : (cat === '未排座' || cat === '未排') ? visible.filter((g) => !g.assignedTableId).length : visible.filter((g) => g.category === cat).length;
               return (
                 <button
                   key={cat}
                   onClick={() => { setCategoryFilter(cat as CategoryFilter); setRsvpFilter(null); }}
                   onMouseEnter={(e) => {
-                    if (cat === '全部') return;
+                    if (isMobile || cat === '全部' || cat === '未排座') return;
                     if (pickerTimer.current) clearTimeout(pickerTimer.current);
                     setHoldingCat(cat);
                     const r = e.currentTarget.getBoundingClientRect();
                     pickerTimer.current = setTimeout(() => { setHoldingCat(null); setPickerCat({ cat, rect: { left: r.left, bottom: r.bottom } }); }, PICKER_DELAY);
                   }}
                   onMouseLeave={() => {
+                    if (isMobile) return;
                     if (pickerTimer.current) clearTimeout(pickerTimer.current);
                     setHoldingCat(null);
                     schedulePickerClose();
                   }}
-                  className="relative overflow-hidden px-3 py-[5px] border-none text-[13px] font-[family-name:var(--font-ui)] font-medium cursor-pointer"
+                  className="relative overflow-hidden px-3 py-[5px] border-none text-[13px] font-[family-name:var(--font-ui)] font-medium cursor-pointer whitespace-nowrap"
                   style={{
                     ...(() => {
-                      if (cat === '全部') {
+                      if (cat === '全部' || cat === '未排座' || cat === '未排') {
                         return categoryFilter === cat
-                          ? { background: 'var(--accent)', color: '#fff' }
+                          ? { background: (cat === '未排座' || cat === '未排') ? 'var(--warning)' : 'var(--accent)', color: '#fff' }
                           : { background: 'var(--bg-surface)', color: 'var(--text-secondary)' };
                       }
                       const badge = getCategoryColor(cat, effectiveColors);
@@ -520,7 +547,52 @@ export default function GuestManagementPage() {
             })()}
           </div>
 
-          {/* Category color picker */}
+          {/* Mobile: palette button — moved into the chip row below */}
+
+          {/* Mobile: color picker panel */}
+          {isMobile && mobileColorCat && (
+            <div className="w-full flex flex-col gap-2 p-3 border border-[var(--border)] rounded-[var(--radius-md,8px)] bg-[var(--bg-surface)]">
+              <div className="flex gap-1.5 mb-1">
+                {categories.map((cat) => {
+                  const cc = getCategoryColor(cat, effectiveColors);
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setMobileColorCat(cat)}
+                      className="px-2.5 py-1 rounded-[var(--radius-sm,4px)] text-xs font-[family-name:var(--font-ui)] font-medium cursor-pointer"
+                      style={{
+                        border: mobileColorCat === cat ? `2px solid ${cc.color}` : `1px solid ${cc.border}`,
+                        background: cc.background,
+                        color: cc.color,
+                      }}
+                    >{cat}</button>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PALETTE_HUES.length + 1}, 28px)`, gap: 4 }}>
+                {Array.from({ length: PALETTE_SATS.length }, (_, si) =>
+                  COLOR_PRESETS.map((hueRow, hi) => {
+                    const c = hueRow[si];
+                    const current = getCategoryColor(mobileColorCat, effectiveColors);
+                    return (
+                      <div
+                        key={`${hi}-${si}`}
+                        onClick={() => { handleColorChange(mobileColorCat, c); }}
+                        className="w-7 h-7 rounded-[4px] cursor-pointer"
+                        style={{
+                          background: c.background,
+                          outline: c.color === current.color ? `2px solid ${c.color}` : 'none',
+                          outlineOffset: -1,
+                        }}
+                      />
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Category color picker (desktop) */}
           {pickerCat && (
             <CategoryColorPicker
               current={getCategoryColor(pickerCat.cat, effectiveColors)}
@@ -541,53 +613,150 @@ export default function GuestManagementPage() {
             </button>
           )}
 
-          <label className="flex items-center gap-1.5 text-[13px] font-[family-name:var(--font-ui)] text-[var(--text-secondary)] cursor-pointer select-none">
-            <div
-              onClick={() => setShowDeclined((v) => !v)}
-              className="w-8 h-[18px] rounded-[9px] relative cursor-pointer shrink-0 transition-colors duration-200"
-              style={{ background: showDeclined ? 'var(--accent)' : 'var(--border)' }}
-            >
-              <div
-                className="w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-[left] duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.2)]"
-                style={{ left: showDeclined ? 16 : 2 }}
-              />
-            </div>
-            顯示婉拒
-          </label>
+          {!isMobile && (
+            <>
+              <label className="flex items-center gap-1.5 text-[13px] font-[family-name:var(--font-ui)] text-[var(--text-secondary)] cursor-pointer select-none">
+                <div
+                  onClick={() => setShowDeclined((v) => !v)}
+                  className="w-8 h-[18px] rounded-[9px] relative cursor-pointer shrink-0 transition-colors duration-200"
+                  style={{ background: showDeclined ? 'var(--accent)' : 'var(--border)' }}
+                >
+                  <div
+                    className="w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-[left] duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.2)]"
+                    style={{ left: showDeclined ? 16 : 2 }}
+                  />
+                </div>
+                顯示婉拒
+              </label>
 
-          {/* Avoid pairs overview */}
-          <button
-            onClick={() => setShowAvoidModal(true)}
-            className="flex items-center gap-1 px-3 py-[5px] rounded-[var(--radius-sm,4px)] border border-[var(--border)] text-[13px] font-[family-name:var(--font-ui)] cursor-pointer"
-            style={{
-              background: avoidPairs.length > 0 ? '#FEF2F2' : 'var(--bg-surface)',
-              color: avoidPairs.length > 0 ? '#DC2626' : 'var(--text-secondary)',
-            }}
-          >
-            避桌 {avoidPairs.length > 0 && <span className="font-semibold">{avoidPairs.length}</span>}
-          </button>
+              {/* Avoid pairs overview */}
+              <button
+                onClick={() => setShowAvoidModal(true)}
+                className="flex items-center gap-1 px-3 py-[5px] rounded-[var(--radius-sm,4px)] border border-[var(--border)] text-[13px] font-[family-name:var(--font-ui)] cursor-pointer"
+                style={{
+                  background: avoidPairs.length > 0 ? '#FEF2F2' : 'var(--bg-surface)',
+                  color: avoidPairs.length > 0 ? '#DC2626' : 'var(--text-secondary)',
+                }}
+              >
+                避桌 {avoidPairs.length > 0 && <span className="font-semibold">{avoidPairs.length}</span>}
+              </button>
 
-          {/* 清除所有賓客 */}
-          <button
-            onClick={() => setShowClearAllConfirm(true)}
-            disabled={guests.length === 0}
-            className="flex items-center gap-1 px-3 py-[5px] rounded-[var(--radius-sm,4px)] border border-[var(--border)] text-[13px] font-[family-name:var(--font-ui)] cursor-pointer disabled:opacity-40 disabled:cursor-default"
-            style={{
-              background: guests.length > 0 ? '#FEF2F2' : 'var(--bg-surface)',
-              color: guests.length > 0 ? '#DC2626' : 'var(--text-secondary)',
-            }}
-          >
-            <Trash2 size={14} /> 刪除所有賓客
-          </button>
+              {/* 清除所有賓客 */}
+              <button
+                onClick={() => setShowClearAllConfirm(true)}
+                disabled={guests.length === 0}
+                className="flex items-center gap-1 px-3 py-[5px] rounded-[var(--radius-sm,4px)] border border-[var(--border)] text-[13px] font-[family-name:var(--font-ui)] cursor-pointer disabled:opacity-40 disabled:cursor-default"
+                style={{
+                  background: guests.length > 0 ? '#FEF2F2' : 'var(--bg-surface)',
+                  color: guests.length > 0 ? '#DC2626' : 'var(--text-secondary)',
+                }}
+              >
+                <Trash2 size={14} /> 刪除所有賓客
+              </button>
 
-          {/* Right: Stats */}
-          <div className="ml-auto flex items-center gap-3">
-            <StatsBar guests={guests} onFilterClick={handleRsvpFilterClick} />
-          </div>
+              {/* Right: Stats */}
+              <div className="ml-auto flex items-center gap-3">
+                <StatsBar guests={guests} onFilterClick={handleRsvpFilterClick} />
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Table */}
-        <div className="overflow-auto mt-2 flex-1 min-h-0">
+        {/* Mobile: Card list */}
+        {isMobile && (
+          <div className="overflow-auto mt-2 flex-1 min-h-0 space-y-2 pb-4">
+            {filtered.map((guest) => {
+              const tableName = guest.assignedTableId ? tableNameMap.get(guest.assignedTableId) || '—' : '未排座';
+              const satColor = guest.assignedTableId ? getSatisfactionColor(guest.satisfactionScore) : 'var(--text-muted)';
+              const subcatName = guest.subcategory?.name ?? '';
+              const prefGuests = guest.seatPreferences
+                .slice().sort((a, b) => a.rank - b.rank)
+                .map((p) => guests.find((g) => g.id === p.preferredGuestId))
+                .filter(Boolean) as Guest[];
+              const avoidGuestsList = avoidPairs
+                .filter((ap) => ap.guestAId === guest.id || ap.guestBId === guest.id)
+                .map((ap) => {
+                  const otherId = ap.guestAId === guest.id ? ap.guestBId : ap.guestAId;
+                  return guests.find((g) => g.id === otherId);
+                })
+                .filter(Boolean) as Guest[];
+              const catColor = getCategoryColor(guest.category, effectiveColors);
+
+              return (
+                <div
+                  key={guest.id}
+                  role="button"
+                  aria-label={`${guest.name} ${guest.category || ''} ${guest.rsvpStatus === 'confirmed' ? '確認' : '婉拒'}`}
+                  onClick={() => setEditingGuestId(guest.id)}
+                  className="p-3 border border-[var(--border)] rounded-[var(--radius-md,8px)] bg-[var(--bg-surface)] active:bg-[var(--accent-light)]"
+                >
+                  {/* Row 1: name + companion + RSVP */}
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium text-[var(--text-primary)] truncate">
+                        {guest.aliases.length > 0 ? <>{guest.aliases[0]}<span className="text-[var(--text-muted)] font-normal text-sm">({guest.name})</span></> : guest.name}
+                      </span>
+                      {guest.companionCount > 0 && (
+                        <span className="shrink-0 text-xs text-[var(--text-muted)] font-[family-name:var(--font-data)]">+{guest.companionCount}</span>
+                      )}
+                      {guest.category && (
+                        <span className="shrink-0 px-1.5 py-px rounded-[var(--radius-sm,4px)] text-xs font-[family-name:var(--font-ui)] font-medium" style={{ background: catColor.background, border: `1px solid ${catColor.border}`, color: catColor.color }}>
+                          {guest.category}
+                        </span>
+                      )}
+                    </div>
+                    <span className="shrink-0 text-sm font-semibold" style={{ color: rsvpColor(guest.rsvpStatus) }}>
+                      {rsvpIcon(guest.rsvpStatus)}
+                    </span>
+                  </div>
+
+                  {/* Row 2: table + subcategory + satisfaction */}
+                  <div className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
+                    <span style={{ color: guest.assignedTableId ? 'var(--text-primary)' : 'var(--text-muted)' }}>{tableName}</span>
+                    {subcatName && <span>{subcatName}</span>}
+                    {guest.assignedTableId && (
+                      <span className="ml-auto font-[family-name:var(--font-data)] tabular-nums font-semibold" style={{ color: satColor }}>
+                        {guest.satisfactionScore.toFixed(0)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Row 3: preferences, avoids, dietary (if any) */}
+                  {(prefGuests.length > 0 || avoidGuestsList.length > 0 || guest.dietaryNote || guest.specialNote) && (
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[var(--text-muted)]">
+                      {prefGuests.length > 0 && <span>想同桌：{prefGuests.map((g) => g.aliases[0] || g.name).join('、')}</span>}
+                      {avoidGuestsList.length > 0 && <span style={{ color: 'var(--error)' }}>避桌：{avoidGuestsList.map((g) => g.aliases[0] || g.name).join('、')}</span>}
+                      {guest.dietaryNote && <span>{guest.dietaryNote}</span>}
+                      {guest.specialNote && <span>{guest.specialNote}</span>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Empty states */}
+            {filtered.length === 0 && guests.length > 0 && (
+              <div className="text-center py-10 text-[var(--text-muted)]">沒有符合的賓客</div>
+            )}
+            {guests.length === 0 && (
+              <div className="text-center py-16">
+                <p className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--text-primary)] mb-2">尚無賓客</p>
+                <p className="font-[family-name:var(--font-body)] text-sm text-[var(--text-secondary)] mb-5">匯入名單或手動新增</p>
+                <div className="flex justify-center gap-3">
+                  <button onClick={() => setShowAddModal(true)} className="px-5 py-3 rounded-[var(--radius-sm,4px)] border-none bg-[var(--accent)] text-white cursor-pointer text-sm font-[family-name:var(--font-ui)] font-medium">
+                    <Plus size={14} className="mr-1 align-[-2px] inline" /> 新增賓客
+                  </button>
+                  <button onClick={() => navigate('/import')} className="px-5 py-3 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--bg-surface)] cursor-pointer text-sm font-[family-name:var(--font-ui)] text-[var(--text-secondary)]">
+                    匯入名單
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Desktop: Table */}
+        {!isMobile && <div className="overflow-auto mt-2 flex-1 min-h-0">
           <table className="w-full border-collapse font-[family-name:var(--font-body)] text-[15px]">
             <thead className="sticky top-0 z-10 bg-[var(--bg-primary)]">
               <tr className="border-b-2 border-[var(--border)]">
@@ -692,14 +861,15 @@ export default function GuestManagementPage() {
 
             </tbody>
           </table>
-        </div>
+        </div>}
 
         {/* Floating add button */}
         <button
           onClick={() => setShowAddModal(true)}
-          className="fixed right-8 bottom-8 z-50 flex items-center gap-1.5 px-5 py-3 bg-[var(--accent)] text-white border-none rounded-[var(--radius-md,8px)] cursor-pointer text-sm font-[family-name:var(--font-ui)] font-semibold shadow-[0_4px_16px_rgba(0,0,0,0.15)]"
+          className={`fixed z-50 flex items-center gap-1.5 bg-[var(--accent)] text-white border-none rounded-[var(--radius-md,8px)] cursor-pointer text-sm font-[family-name:var(--font-ui)] font-semibold shadow-[0_4px_16px_rgba(0,0,0,0.15)] ${isMobile ? 'right-4 bottom-[72px] w-12 h-12 justify-center p-0' : 'right-8 bottom-8 px-5 py-3'}`}
         >
-          <Plus size={16} /> 新增賓客
+          <Plus size={isMobile ? 20 : 16} />
+          {!isMobile && <span>新增賓客</span>}
         </button>
       </div>
 
@@ -897,11 +1067,13 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxCompanion, maxCom
       {/* Name + aliases */}
       <td className={tdClass}>
         <div className="flex items-baseline gap-1">
-          <span className="text-[15px] font-[family-name:var(--font-body)] text-[var(--text-primary)]">{guest.name}</span>
-          {guest.aliases.length > 0 && (
-            <span className="text-[13px] text-[var(--text-muted)] font-[family-name:var(--font-ui)]">
-              ({guest.aliases.join('、')})
-            </span>
+          {guest.aliases.length > 0 ? (
+            <>
+              <span className="text-[15px] font-[family-name:var(--font-body)] text-[var(--text-primary)]">{guest.aliases[0]}</span>
+              <span className="text-[13px] text-[var(--text-muted)] font-[family-name:var(--font-ui)]">({guest.name})</span>
+            </>
+          ) : (
+            <span className="text-[15px] font-[family-name:var(--font-body)] text-[var(--text-primary)]">{guest.name}</span>
           )}
         </div>
       </td>

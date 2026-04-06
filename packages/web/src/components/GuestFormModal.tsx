@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronDown } from 'lucide-react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import type { Guest, Table, AvoidPair } from '@/lib/types';
 import type { CategoryColor } from '@/lib/category-colors';
 import { getCategoryColor } from '@/lib/category-colors';
@@ -42,8 +43,17 @@ const labelStyle: React.CSSProperties = {
   width: 80, flexShrink: 0, paddingTop: 6,
 };
 
+const mobileLabelStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-secondary)',
+  fontWeight: 500, paddingBottom: 2,
+};
+
 const rowStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'flex-start', gap: 12, padding: '5px 0',
+};
+
+const mobileRowStyle: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 2, padding: '6px 0',
 };
 
 const sectionTitleStyle: React.CSSProperties = {
@@ -269,6 +279,9 @@ export default function GuestFormModal({
   mode, guest, categories, subcategories, tables, guests, avoidPairs, categoryColors,
   onSubmit, onDelete, onClose,
 }: GuestFormModalProps) {
+  const isMobile = useIsMobile();
+  const _row = isMobile ? mobileRowStyle : rowStyle;
+  const _label = isMobile ? mobileLabelStyle : labelStyle;
 
   // ─── Internal draft state ──────────────────────────
   const [name, setName] = useState(mode === 'edit' && guest ? guest.name : '');
@@ -373,7 +386,10 @@ export default function GuestFormModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--bg-surface)] rounded-[var(--radius-lg,12px)] p-6 max-w-[820px] w-[90%] max-h-[90vh] overflow-auto shadow-[0_8px_30px_rgba(0,0,0,0.12)]"
+        className={isMobile
+          ? 'bg-[var(--bg-surface)] w-full h-full overflow-auto p-4'
+          : 'bg-[var(--bg-surface)] rounded-[var(--radius-lg,12px)] p-6 max-w-[820px] w-[90%] max-h-[90vh] overflow-auto shadow-[0_8px_30px_rgba(0,0,0,0.12)]'
+        }
       >
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
@@ -388,8 +404,8 @@ export default function GuestFormModal({
           </button>
         </div>
 
-        {/* Form — two columns */}
-        <div className="flex gap-6">
+        {/* Form — two columns on desktop, single column on mobile */}
+        <div className={isMobile ? 'flex flex-col gap-4' : 'flex gap-6'}>
 
           {/* Left column: basic info */}
           <div className="flex-1 flex flex-col">
@@ -397,14 +413,14 @@ export default function GuestFormModal({
             <div style={sectionTitleStyle}>基本資料</div>
 
             {/* 1. 姓名 + 暱稱 */}
-            <div style={rowStyle}>
-              <span style={labelStyle}>
+            <div style={_row}>
+              <span style={_label}>
                 姓名{mode === 'add' && <span className="text-[var(--error)]"> *</span>}
               </span>
               <div className="flex-1">
                 <FieldInput value={name} onChange={setName} maxLength={50} />
               </div>
-              <span style={{ ...labelStyle, width: 'auto', paddingLeft: 8 }}>暱稱</span>
+              <span style={{ ..._label, width: 'auto', paddingLeft: 8 }}>暱稱</span>
               <div className="flex-1">
                 <FieldInput
                   value={alias}
@@ -416,8 +432,8 @@ export default function GuestFormModal({
             </div>
 
             {/* 2. 分類 */}
-            <div style={rowStyle}>
-              <span style={labelStyle}>分類</span>
+            <div style={_row}>
+              <span style={_label}>分類</span>
               <div className="flex-1 flex gap-1.5 pt-0.5">
                 {categories.map((cat) => {
                   const cc = getCategoryColor(cat, categoryColors);
@@ -439,8 +455,8 @@ export default function GuestFormModal({
             </div>
 
             {/* 3. 子分類 */}
-            <div style={rowStyle}>
-              <span style={labelStyle}>子分類</span>
+            <div style={_row}>
+              <span style={_label}>子分類</span>
               <div className="flex-1 pt-1 relative">
                 <span
                   ref={subcatAnchorRef}
@@ -527,8 +543,8 @@ export default function GuestFormModal({
             <div style={{ ...sectionTitleStyle, marginTop: 12 }}>出席狀態</div>
 
             {/* 4. 出席 */}
-            <div style={rowStyle}>
-              <span style={labelStyle}>出席</span>
+            <div style={_row}>
+              <span style={_label}>出席</span>
               <div className="flex-1 flex gap-2 pt-1">
                 <button
                   onClick={() => setRsvp('confirmed')}
@@ -563,8 +579,8 @@ export default function GuestFormModal({
             <div style={sectionTitleStyle}>排位</div>
 
             {/* 1. 桌次 + 攜眷 */}
-            <div style={rowStyle}>
-              <span style={labelStyle}>桌次</span>
+            <div style={_row}>
+              <span style={_label}>桌次</span>
               <div className="flex-1 pt-1 relative">
                 <span
                   ref={tableAnchorRef}
@@ -615,7 +631,7 @@ export default function GuestFormModal({
                   </FixedDropdown>
                 )}
               </div>
-              <span style={{ ...labelStyle, width: 'auto', paddingLeft: 8 }}>攜眷</span>
+              <span style={{ ..._label, width: 'auto', paddingLeft: 8 }}>攜眷</span>
               <div className="flex items-center gap-1 pt-1">
                 <button
                   onClick={() => companion > 0 && setCompanion(companion - 1)}
@@ -642,8 +658,8 @@ export default function GuestFormModal({
             </div>
 
             {/* 2. 想同桌 */}
-            <div style={rowStyle}>
-              <span style={labelStyle}>想同桌</span>
+            <div style={_row}>
+              <span style={_label}>想同桌</span>
               <div className="flex-1 pt-1">
                 <div className="flex gap-1 flex-wrap items-center">
                   {prefIds.map((pid) => {
@@ -681,8 +697,8 @@ export default function GuestFormModal({
             </div>
 
             {/* 3. 要避桌 */}
-            <div style={rowStyle}>
-              <span style={labelStyle}>要避桌</span>
+            <div style={_row}>
+              <span style={_label}>要避桌</span>
               <div className="flex-1 pt-1">
                 <div className="flex gap-1 flex-wrap items-center">
                   {avoidIds.map((aid) => {
@@ -720,16 +736,16 @@ export default function GuestFormModal({
             <div style={{ ...sectionTitleStyle, marginTop: 12 }}>備註</div>
 
             {/* 4. 飲食 */}
-            <div style={rowStyle}>
-              <span style={labelStyle}>飲食</span>
+            <div style={_row}>
+              <span style={_label}>飲食</span>
               <div className="flex-1">
                 <FieldInput value={dietary} onChange={setDietary} placeholder="素食、過敏等..." />
               </div>
             </div>
 
             {/* 5. 特殊需求 */}
-            <div style={rowStyle}>
-              <span style={labelStyle}>特殊需求</span>
+            <div style={_row}>
+              <span style={_label}>特殊需求</span>
               <div className="flex-1">
                 <FieldInput value={special} onChange={setSpecial} placeholder="輪椅、兒童椅等..." />
               </div>

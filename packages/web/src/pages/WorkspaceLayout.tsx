@@ -24,7 +24,7 @@ export default function WorkspaceLayout() {
 
   if (loading) {
     return (
-      <div className="h-screen flex flex-col bg-[var(--bg-primary)]">
+      <div className="h-dvh flex flex-col bg-[var(--bg-primary)]">
         {!isMobile && <Toolbar page={page} />}
         <div className="flex-1 flex items-center justify-center">
           <p className="text-[var(--text-muted)] font-[family-name:var(--font-body)]">載入中...</p>
@@ -35,9 +35,9 @@ export default function WorkspaceLayout() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--bg-primary)]">
+    <div className="h-dvh flex flex-col bg-[var(--bg-primary)]">
       {!isMobile && <Toolbar page={page} />}
-      <div className={isMobile ? 'flex-1 overflow-auto pb-14' : 'flex-1 flex flex-col overflow-hidden'}>
+      <div className={isMobile ? 'flex-1 flex flex-col overflow-hidden pb-14' : 'flex-1 flex flex-col overflow-hidden'}>
         <Outlet />
       </div>
       {isMobile && <MobileBottomNav />}

@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, Users, Upload, Settings, LogIn } from 'lucide-react';
+import { LayoutGrid, Users, Download, Settings, LogIn } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
 
 export function MobileBottomNav() {
@@ -13,7 +13,7 @@ export function MobileBottomNav() {
   const navItems = [
     { path: '/', icon: LayoutGrid, label: '排位' },
     { path: '/guests', icon: Users, label: '賓客' },
-    { path: '/import', icon: Upload, label: '匯入' },
+    { path: '/import', icon: Download, label: '匯入' },
     isLoggedIn
       ? { path: '/settings', icon: Settings, label: '設定' }
       : { path: '/login', icon: LogIn, label: '登入' },
