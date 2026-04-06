@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/auth';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 
 export default function RegisterPage() {
   const { signUpWithEmail } = useAuthStore();
@@ -39,20 +40,21 @@ export default function RegisterPage() {
   if (success) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-[var(--bg-primary)] px-4">
-        <div className="w-full max-w-sm p-6 bg-[var(--bg-surface)] rounded-[var(--radius-md)] shadow-[var(--shadow-md)] text-center">
+        <div className="w-full max-w-sm p-6 bg-[var(--bg-surface)] rounded-[var(--radius-md)] border border-[var(--border)] text-center">
           <h1 className="text-2xl font-bold mb-4 font-[family-name:var(--font-display)] text-[var(--text-primary)]">註冊成功</h1>
           <p className="text-[var(--text-secondary)] mb-4">請查看信箱確認您的帳號。</p>
           <a href="/login" className="text-[var(--accent)] hover:text-[var(--accent-dark)] hover:underline">
             前往登入
           </a>
         </div>
+        {isMobile && <MobileBottomNav />}
       </div>
     );
   }
 
   return (
     <div className="min-h-dvh flex items-center justify-center bg-[var(--bg-primary)] px-4">
-      <div className="w-full max-w-sm p-6 bg-[var(--bg-surface)] rounded-[var(--radius-md)] shadow-[var(--shadow-md)]">
+      <div className="w-full max-w-sm p-6 bg-[var(--bg-surface)] rounded-[var(--radius-md)] border border-[var(--border)]">
         {/* Brand mark — shown on mobile */}
         {isMobile && (
           <div className="text-center mb-6">
@@ -123,6 +125,7 @@ export default function RegisterPage() {
           </a>
         </p>
       </div>
+      {isMobile && <MobileBottomNav />}
     </div>
   );
 }

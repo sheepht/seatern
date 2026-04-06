@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 import { authFetch } from '@/lib/api';
 
 async function ensureEventExists() {
@@ -116,7 +117,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-dvh flex items-center justify-center bg-[var(--bg-primary)] px-4">
-      <div className="w-full max-w-sm p-6 bg-[var(--bg-surface)] rounded-[var(--radius-md)] shadow-[var(--shadow-md)]">
+      <div className="w-full max-w-sm p-6 bg-[var(--bg-surface)] rounded-[var(--radius-md)] border border-[var(--border)]">
         {/* Brand mark — shown on mobile */}
         {isMobile && (
           <div className="text-center mb-6">
@@ -170,6 +171,7 @@ export default function LoginPage() {
           </a>
         </p>
       </div>
+      {isMobile && <MobileBottomNav />}
     </div>
   );
 }

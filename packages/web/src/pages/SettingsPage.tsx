@@ -283,6 +283,13 @@ export default function SettingsPage() {
 
               <div className="border-t border-[var(--border)] my-5" />
 
+              {/* 登出 */}
+              <h2 className="card-title">登出</h2>
+              <p className="text-sm mb-3 text-[var(--text-secondary)]">登出後可重新登入或使用其他帳號。</p>
+              <button onClick={async () => { await signOut(); navigate('/login'); }} className="btn-primary">登出</button>
+
+              <div className="border-t border-[var(--border)] my-5" />
+
               {/* 刪除帳號 */}
               <h2 className="card-title text-[var(--error)]">刪除帳號</h2>
               <p className="text-sm mb-3 text-[var(--text-secondary)]">刪除後你的所有資料將無法存取。此操作無法復原。</p>
