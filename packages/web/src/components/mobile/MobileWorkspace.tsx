@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Map as MapIcon, List, Search, X, Zap, Save, Pencil, Undo2, Redo2, Plus, Trash2, Shuffle, History, LayoutGrid, Dices } from 'lucide-react';
 import { useSeatingStore } from '@/stores/seating';
-import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction';
+import { getSatisfactionColor, recalculateAll, calculateSatisfaction, calculateTableAverage } from '@/lib/satisfaction';
 import { getTableRecommendations, getGuestRecommendations, type TableRecommendation } from '@/lib/recommend';
 import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors';
 import { findFreePosition, calculateGridLayout } from '@/lib/viewport';
@@ -317,6 +317,7 @@ function MobileTableCard({ tableId, onAddGuest, onGuestLongPress, recommendCount
 function AddGuestSheet({ tableId, onClose, recommendedGuestIds }: { tableId: string; onClose: () => void; recommendedGuestIds: Set<string> }) {
   const guests = useSeatingStore((s) => s.guests);
   const tables = useSeatingStore((s) => s.tables);
+  const avoidPairs = useSeatingStore((s) => s.avoidPairs);
   const moveGuest = useSeatingStore((s) => s.moveGuest);
   const eventId = useSeatingStore((s) => s.eventId);
   const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId]);
@@ -324,6 +325,33 @@ function AddGuestSheet({ tableId, onClose, recommendedGuestIds }: { tableId: str
 
   const table = tables.find((t) => t.id === tableId);
   const tableName = table?.name || '';
+  const tableGuests = guests.filter((g) => g.assignedTableId === tableId && g.rsvpStatus === 'confirmed');
+  const seatUsed = tableGuests.reduce((s, g) => s + g.seatCount, 0);
+  const remaining = (table?.capacity ?? 10) - seatUsed;
+
+  // 目前桌子平均滿意度
+  const currentTableAvg = tableGuests.length > 0
+    ? tableGuests.reduce((s, g) => s + g.satisfactionScore, 0) / tableGuests.length
+    : 0;
+
+  // 預算每位賓客加入後的分數（useMemo 避免重複計算）
+  const predictions = useMemo(() => {
+    const map = new Map<string, { guestScore: number; tableDelta: number }>();
+    const unassigned = guests.filter((g) => !g.assignedTableId && g.rsvpStatus === 'confirmed');
+    for (const g of unassigned) {
+      if (g.seatCount > remaining) continue;
+      const simGuest = { ...g, assignedTableId: tableId };
+      const simAll = guests.map((gg) => (gg.id === g.id ? simGuest : gg));
+      const guestScore = calculateSatisfaction(simGuest, simAll, tables, avoidPairs);
+      // 模擬後的桌子平均
+      const simTableGuests = simAll.filter((gg) => gg.assignedTableId === tableId && gg.rsvpStatus === 'confirmed');
+      const simAvg = simTableGuests.length > 0
+        ? simTableGuests.reduce((s, gg) => s + (gg.id === g.id ? guestScore : gg.satisfactionScore), 0) / simTableGuests.length
+        : 0;
+      map.set(g.id, { guestScore, tableDelta: simAvg - currentTableAvg });
+    }
+    return map;
+  }, [guests, tables, avoidPairs, tableId, remaining, currentTableAvg]);
 
   const unassigned = guests.filter((g) => !g.assignedTableId && g.rsvpStatus === 'confirmed');
   const searched = search
@@ -341,6 +369,7 @@ function AddGuestSheet({ tableId, onClose, recommendedGuestIds }: { tableId: str
 
   const handleAdd = (guestId: string) => {
     moveGuest(guestId, tableId);
+    onClose();
   };
 
   return createPortal(
@@ -391,26 +420,46 @@ function AddGuestSheet({ tableId, onClose, recommendedGuestIds }: { tableId: str
           )}
           {filtered.map((g) => {
             const cc = getCategoryColor(g.category, categoryColors);
+            const wouldExceed = g.seatCount > remaining;
+            const pred = predictions.get(g.id);
+            const guestScore = pred?.guestScore ?? 0;
+            const tableDelta = pred?.tableDelta ?? 0;
             return (
               <button
                 key={g.id}
-                onClick={() => handleAdd(g.id)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 border-b border-[var(--border)] bg-transparent cursor-pointer text-left active:bg-[var(--accent-light)]"
+                onClick={() => !wouldExceed && handleAdd(g.id)}
+                disabled={wouldExceed}
+                className={`w-full flex items-center gap-2 px-3 py-2.5 border-b border-[var(--border)] bg-transparent text-left ${wouldExceed ? 'opacity-30 cursor-default' : 'cursor-pointer active:bg-[var(--accent-light)]'}`}
               >
-                <span className="flex-1 text-sm font-[family-name:var(--font-body)] text-[var(--text-primary)] truncate">
-                  {g.aliases.length > 0 ? <>{g.aliases[0]} <span className="text-[var(--text-muted)]">({g.name})</span></> : g.name}
-                  {g.companionCount > 0 && <span className="text-[var(--text-muted)]"> +{g.companionCount}</span>}
-                </span>
-                {recommendedGuestIds.has(g.id) && (
-                  <span className="shrink-0 px-1.5 py-px rounded-full text-[10px] font-[family-name:var(--font-ui)] font-medium bg-[var(--accent-light)] text-[var(--accent)]">推薦</span>
-                )}
-                {g.category && (
-                  <span className="shrink-0 px-1.5 py-px rounded-[var(--radius-sm,4px)] text-xs font-[family-name:var(--font-ui)]" style={{ background: cc.background, border: `1px solid ${cc.border}`, color: cc.color }}>
-                    {g.category}
-                  </span>
-                )}
-                {g.subcategory?.name && (
-                  <span className="shrink-0 text-xs text-[var(--text-muted)] font-[family-name:var(--font-ui)]">{g.subcategory.name}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-[family-name:var(--font-body)] text-[var(--text-primary)] truncate">
+                    {g.aliases.length > 0 ? <>{g.aliases[0]} <span className="text-[var(--text-muted)]">({g.name})</span></> : g.name}
+                    {g.companionCount > 0 && <span className="text-[var(--text-muted)]"> +{g.companionCount}</span>}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {g.category && (
+                      <span className="px-1.5 py-px rounded-[var(--radius-sm,4px)] text-[11px] font-[family-name:var(--font-ui)]" style={{ background: cc.background, border: `1px solid ${cc.border}`, color: cc.color }}>
+                        {g.category}
+                      </span>
+                    )}
+                    {g.subcategory?.name && (
+                      <span className="text-[11px] text-[var(--text-muted)]">{g.subcategory.name}</span>
+                    )}
+                    {recommendedGuestIds.has(g.id) && (
+                      <span className="px-1.5 py-px rounded-full text-[10px] font-[family-name:var(--font-ui)] font-medium bg-[var(--accent-light)] text-[var(--accent)]">推薦</span>
+                    )}
+                  </div>
+                </div>
+                {/* Score predictions */}
+                {pred && !wouldExceed && (
+                  <div className="shrink-0 text-right">
+                    <div className="font-[family-name:var(--font-data)] font-bold tabular-nums text-sm" style={{ color: getSatisfactionColor(guestScore) }}>
+                      {guestScore.toFixed(0)}
+                    </div>
+                    <div className="text-[11px] font-[family-name:var(--font-data)] tabular-nums" style={{ color: tableDelta >= 0 ? 'var(--satisfaction-green)' : 'var(--satisfaction-red)' }}>
+                      桌{tableDelta >= 0 ? '+' : ''}{tableDelta.toFixed(1)}
+                    </div>
+                  </div>
                 )}
               </button>
             );
