@@ -81,6 +81,20 @@ function MobileTableCard({ tableId, onAddGuest, onGuestLongPress }: {
     : 0;
   const satColor = avgSat > 0 ? getSatisfactionColor(avgSat) : 'var(--text-muted)';
 
+  // 滿意度即時回饋：顯示 delta
+  const prevSatRef = useRef(avgSat);
+  const [satDelta, setSatDelta] = useState<number | null>(null);
+  const deltaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const prev = prevSatRef.current;
+    prevSatRef.current = avgSat;
+    if (prev > 0 && avgSat > 0 && Math.abs(avgSat - prev) >= 0.5) {
+      setSatDelta(avgSat - prev);
+      if (deltaTimerRef.current) clearTimeout(deltaTimerRef.current);
+      deltaTimerRef.current = setTimeout(() => setSatDelta(null), 2000);
+    }
+  }, [avgSat]);
+
 
   return (
     <div className="border border-[var(--border)] rounded-[var(--radius-lg,12px)] bg-[var(--bg-surface)] overflow-hidden">
@@ -96,9 +110,19 @@ function MobileTableCard({ tableId, onAddGuest, onGuestLongPress }: {
             <Pencil size={12} />
           </button>
         </div>
-        <span className="font-[family-name:var(--font-data)] font-bold tabular-nums text-sm" style={{ color: satColor }}>
-          {avgSat > 0 ? avgSat.toFixed(0) : '—'}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {satDelta !== null && (
+            <span
+              className="text-xs font-[family-name:var(--font-data)] font-semibold tabular-nums animate-[fadeInOut_2s_ease-out_forwards]"
+              style={{ color: satDelta > 0 ? 'var(--satisfaction-green)' : 'var(--satisfaction-red)' }}
+            >
+              {satDelta > 0 ? '+' : ''}{satDelta.toFixed(1)}
+            </span>
+          )}
+          <span className="font-[family-name:var(--font-data)] font-bold tabular-nums text-sm" style={{ color: satColor }}>
+            {avgSat > 0 ? avgSat.toFixed(0) : '—'}
+          </span>
+        </div>
       </div>
 
       {/* Edit table modal */}

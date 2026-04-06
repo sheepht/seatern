@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { authFetch } from '@/lib/api';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Search, X, Palette } from 'lucide-react';
+import { Plus, Trash2, Search, X, Palette, Check } from 'lucide-react';
 import { useSeatingStore } from '@/stores/seating';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { getSatisfactionColor } from '@/lib/satisfaction';
@@ -10,6 +10,65 @@ import { loadCategoryColors, saveCategoryColors, getCategoryColor, COLOR_PRESETS
 import GuestFormModal from '@/components/GuestFormModal';
 import { AvoidPairModal } from '@/components/workspace/AvoidPairModal';
 import type { Guest } from '@/lib/types';
+
+// ─── Swipeable Card Wrapper ────────────────────────
+
+function SwipeableCard({ onSwipeLeft, onSwipeRight, onClick, children }: {
+  onSwipeLeft: () => void; onSwipeRight: () => void; onClick: () => void; children: React.ReactNode
+}) {
+  const startRef = useRef<{ x: number; y: number } | null>(null);
+  const lockRef = useRef<'h' | 'v' | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [offset, setOffset] = useState(0);
+  const swiped = useRef(false);
+
+  return (
+    <div className="relative overflow-hidden rounded-[var(--radius-md,8px)]">
+      {/* Left bg: green (confirm) */}
+      <div className="absolute inset-0 flex items-center pl-4" style={{ background: 'rgba(34,197,94,0.12)' }}>
+        <Check size={20} style={{ color: 'var(--success)' }} />
+      </div>
+      {/* Right bg: red (decline) */}
+      <div className="absolute inset-0 flex items-center justify-end pr-4" style={{ background: 'rgba(239,68,68,0.12)' }}>
+        <X size={20} style={{ color: 'var(--error)' }} />
+      </div>
+      <div
+        ref={cardRef}
+        style={{ transform: `translateX(${offset}px)`, transition: offset === 0 ? 'transform 200ms ease-out' : 'none' }}
+        onTouchStart={(e) => {
+          startRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          lockRef.current = null;
+          swiped.current = false;
+        }}
+        onTouchMove={(e) => {
+          if (!startRef.current) return;
+          const dx = e.touches[0].clientX - startRef.current.x;
+          const dy = e.touches[0].clientY - startRef.current.y;
+          if (!lockRef.current && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+            lockRef.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+          }
+          if (lockRef.current === 'h') {
+            e.preventDefault();
+            setOffset(dx);
+          }
+        }}
+        onTouchEnd={() => {
+          if (lockRef.current === 'h' && Math.abs(offset) >= 50) {
+            swiped.current = true;
+            if (offset < 0) onSwipeLeft();
+            else onSwipeRight();
+          }
+          setOffset(0);
+          startRef.current = null;
+        }}
+        onTouchCancel={() => { setOffset(0); startRef.current = null; }}
+        onClick={() => { if (!swiped.current) onClick(); }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 // ─── Types ──────────────────────────────────────────
 
@@ -683,11 +742,15 @@ export default function GuestManagementPage() {
               const catColor = getCategoryColor(guest.category, effectiveColors);
 
               return (
-                <div
+                <SwipeableCard
                   key={guest.id}
+                  onSwipeRight={() => handleSave(guest.id, { rsvpStatus: 'confirmed' })}
+                  onSwipeLeft={() => handleSave(guest.id, { rsvpStatus: 'declined' })}
+                  onClick={() => setEditingGuestId(guest.id)}
+                >
+                <div
                   role="button"
                   aria-label={`${guest.name} ${guest.category || ''} ${guest.rsvpStatus === 'confirmed' ? '確認' : '婉拒'}`}
-                  onClick={() => setEditingGuestId(guest.id)}
                   className="p-3 border border-[var(--border)] rounded-[var(--radius-md,8px)] bg-[var(--bg-surface)] active:bg-[var(--accent-light)]"
                 >
                   {/* Row 1: name + companion + RSVP */}
@@ -731,6 +794,7 @@ export default function GuestManagementPage() {
                     </div>
                   )}
                 </div>
+                </SwipeableCard>
               );
             })}
 
