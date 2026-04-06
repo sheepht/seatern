@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Minus, Plus, Maximize2, HelpCircle } from 'lucide-react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface Props {
   zoom: number
@@ -12,6 +13,7 @@ interface Props {
 const PRESETS = [0.25, 0.5, 0.75, 1];
 
 export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }: Props) {
+  const isMobile = useIsMobile();
   const [showPresets, setShowPresets] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const presetsRef = useRef<HTMLDivElement>(null);
@@ -108,10 +110,10 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }:
         <Maximize2 size={14} />
       </button>
 
-      {/* Divider */}
+      {/* Divider + Help（手機版隱藏快捷鍵） */}
+      {!isMobile && <>
       <div className="w-px h-5 bg-[var(--border,#E7E5E4)]" />
 
-      {/* Help */}
       <div className="relative" ref={helpRef}>
         <button
           onClick={() => { setShowHelp(!showHelp); setShowPresets(false); }}
@@ -148,6 +150,7 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }:
           </div>
         )}
       </div>
+      </>}
     </div>
   );
 }

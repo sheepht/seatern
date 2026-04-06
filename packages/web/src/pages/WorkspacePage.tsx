@@ -2,6 +2,8 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { authFetch } from '@/lib/api';
 import { createPortal } from 'react-dom';
 import { ChevronRight } from 'lucide-react';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { MobileWorkspace } from '@/components/mobile/MobileWorkspace';
 import {
   DndContext,
   DragOverlay,
@@ -53,6 +55,7 @@ function ExpandButton({ collapsed, onClick }: { collapsed: boolean; onClick: () 
 }
 
 export default function WorkspacePage() {
+  const isMobile = useIsMobile();
   const guests = useSeatingStore((s) => s.guests);
   const tables = useSeatingStore((s) => s.tables);
   const avoidPairs = useSeatingStore((s) => s.avoidPairs);
@@ -249,6 +252,10 @@ export default function WorkspacePage() {
       : pendingMove.violation.guestAId;
     return guests.find((g) => g.id === conflictId)?.name || '';
   };
+
+  if (isMobile) {
+    return <MobileWorkspace />;
+  }
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>

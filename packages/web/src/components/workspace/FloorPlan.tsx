@@ -332,6 +332,62 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
+  // Touch 狀態追蹤（手機 pan + pinch zoom）
+  const touchStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const pinchStartRef = useRef<{ dist: number; zoom: number } | null>(null);
+
+  const getTouchDist = (t1: React.Touch, t2: React.Touch) =>
+    Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      // Pinch start
+      e.preventDefault();
+      pinchStartRef.current = {
+        dist: getTouchDist(e.touches[0], e.touches[1]),
+        zoom: zoomRef.current,
+      };
+      touchStartRef.current = null;
+    } else if (e.touches.length === 1) {
+      // Pan start
+      const t = e.touches[0];
+      touchStartRef.current = { x: t.clientX, y: t.clientY, panX: panXRef.current, panY: panYRef.current };
+      pinchStartRef.current = null;
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStartRef.current) {
+      e.preventDefault();
+      const newDist = getTouchDist(e.touches[0], e.touches[1]);
+      const scale = newDist / pinchStartRef.current.dist;
+      const nextZoom = Math.max(0.25, Math.min(1, pinchStartRef.current.zoom * scale));
+
+      // Zoom toward the midpoint of the two touches
+      const svg = svgRef.current;
+      if (svg) {
+        const rect = svg.getBoundingClientRect();
+        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+        const s = nextZoom / zoomRef.current;
+        setPanX(Math.round(cx - s * (cx - panXRef.current)));
+        setPanY(Math.round(cy - s * (cy - panYRef.current)));
+      }
+      setZoom(nextZoom);
+    } else if (e.touches.length === 1 && touchStartRef.current && !pinchStartRef.current) {
+      const t = e.touches[0];
+      const dx = t.clientX - touchStartRef.current.x;
+      const dy = t.clientY - touchStartRef.current.y;
+      setPanX(Math.round(touchStartRef.current.panX + dx));
+      setPanY(Math.round(touchStartRef.current.panY + dy));
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    touchStartRef.current = null;
+    pinchStartRef.current = null;
+  }, []);
+
   // Wheel zoom — 用 native listener 確保 non-passive（trackpad pinch 需要 preventDefault）
   const wheelRafRef = useRef<number | null>(null);
   const handleWheelNative = useCallback((e: WheelEvent) => {
@@ -428,17 +484,17 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
 
   useImperativeHandle(ref, () => ({ fitAll, panToPoint }), [fitAll, panToPoint]);
 
-  // 初始載入時 fit-all（等桌子載完）
+  // 初始載入時 fit-all（等桌子載完 + 容器尺寸就緒）
   const initialFitDoneRef = useRef(false);
   useEffect(() => {
-    if (tables.length > 0 && !initialFitDoneRef.current) {
+    if (tables.length > 0 && containerSize.w > 0 && containerSize.h > 0 && !initialFitDoneRef.current) {
       initialFitDoneRef.current = true;
-      const { zoom: z, panX: px, panY: py } = calculateFitAll(tables, cw, ch);
+      const { zoom: z, panX: px, panY: py } = calculateFitAll(tables, containerSize.w, containerSize.h);
       setZoom(z);
       setPanX(px);
       setPanY(py);
     }
-  }, [tables.length, cw, ch]);
+  }, [tables.length, containerSize.w, containerSize.h]);
 
   // 螢幕座標的座位位置（給 HTML drop zone + draggable overlay 用）
   const [screenSeats, setScreenSeats] = useState<ScreenSeat[]>([]);
@@ -741,7 +797,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
     : undefined;
 
   return (
-    <div ref={containerRef} className="relative w-full h-full [clip-path:inset(0_0_0_-200px)]" style={{ cursor: cursorStyle }} onMouseMove={handleGlobalMouseMove}>
+    <div ref={containerRef} className="relative w-full h-full [clip-path:inset(0_0_0_-200px)] select-none" style={{ cursor: cursorStyle, touchAction: 'none', WebkitUserSelect: 'none' }} onMouseMove={handleGlobalMouseMove}>
       {/* SVG 平面圖 — tabIndex={0} 讓畫布可以接收 focus 和鍵盤事件 */}
       <svg
         id="floorplan-svg"
@@ -755,6 +811,10 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onClick={handleCanvasClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
       >
         <defs>
           <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
@@ -1268,7 +1328,11 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
           seatY={seatPopover.y}
           tableCenterX={seatPopover.tableCenterX}
           tableCenterY={seatPopover.tableCenterY}
-          onClose={() => setSeatPopover(null)}
+          onClose={() => {
+            const t = tables.find((t) => t.id === seatPopover.tableId);
+            setSeatPopover(null);
+            if (t) setTimeout(() => panToPoint(t.positionX, t.positionY), 50);
+          }}
         />
       )}
     </div>

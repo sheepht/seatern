@@ -93,6 +93,12 @@ button, a, input, select, textarea {
   background: var(--text-muted);
 }
 
+/* Mobile bottom sheet slide up */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
 /* Guest chip staggered entrance after reset */
 @keyframes chip-enter {
   0%   { transform: translateX(-12px) scale(0.8); opacity: 0; }
