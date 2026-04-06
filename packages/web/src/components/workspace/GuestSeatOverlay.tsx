@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useDraggable } from '@dnd-kit/core';
 import { useSeatingStore, type Guest } from '@/stores/seating';
@@ -38,9 +38,34 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
   const delayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; r: number } | null>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
   const [longPressProgress, setLongPressProgress] = useState(false);
   const elRef = useRef<HTMLDivElement | null>(null);
+
+  // 即時計算 tooltip 位置（跟著元素移動）
+  const getTooltipPos = useCallback(() => {
+    if (!elRef.current) return null;
+    const rect = elRef.current.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, r: rect.width / 2 };
+  }, []);
+
+  // showTooltip 為 true 時持續更新位置（RAF loop）
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number; r: number } | null>(null);
+  const rafRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!showTooltip) {
+      setTooltipPos(null);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      return;
+    }
+    const tick = () => {
+      const pos = getTooltipPos();
+      if (pos) setTooltipPos(pos);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [showTooltip, getTooltipPos]);
 
   const size = radius * 2;
 
@@ -66,7 +91,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
           longPressRef.current = setTimeout(() => {
             setLongPressProgress(false);
             useSeatingStore.setState({ longPressActive: false });
-            setTooltip(null);
+            setShowTooltip(false);
             setHoveredGuest(null);
             // 找目標桌的第一個空位
             const targetTable = useSeatingStore.getState().tables.find((t) => t.id === bestSwapTableId);
@@ -102,7 +127,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
           clearTimeout(clickTimerRef.current);
           clickTimerRef.current = null;
           setHoveredGuest(null);
-          setTooltip(null);
+          setShowTooltip(false);
           moveGuest(guest.id, null);
         } else {
           // 第一次點擊 → 延遲判斷，等看有沒有雙擊
@@ -127,7 +152,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         }
         // 立刻顯示 tooltip
         const rect = el.getBoundingClientRect();
-        setTooltip({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, r: rect.width / 2 });
+        setShowTooltip(true);
       }}
       onMouseLeave={(e) => {
         if (delayRef.current) { clearTimeout(delayRef.current); delayRef.current = null; }
@@ -136,17 +161,17 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         useSeatingStore.setState({ longPressActive: false });
         e.currentTarget.style.borderColor = 'transparent';
         setHoveredGuest(null);
-        setTooltip(null);
+        setShowTooltip(false);
       }}
     />
-    {tooltip && createPortal(
+    {showTooltip && tooltipPos && createPortal(
       <>
         {/* 上方：賓客基本資訊 */}
         <div
           className="fixed -translate-x-1/2 -translate-y-full bg-[var(--bg-surface,#fff)] border border-[var(--border,#E7E5E4)] px-2.5 py-[5px] rounded-md pointer-events-none z-[9999] font-[family-name:var(--font-body)] shadow-[0_4px_12px_rgba(28,25,23,0.08)] text-center max-w-[200px]"
           style={{
-            left: tooltip.x,
-            top: Math.max(8, tooltip.y - tooltip.r - 8),
+            left: tooltipPos.x,
+            top: Math.max(8, tooltipPos.y - tooltipPos.r - 8),
           }}
         >
           <div className="text-[13px] font-medium text-[#1C1917] whitespace-nowrap overflow-hidden text-ellipsis">
@@ -162,8 +187,8 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         <div
           className="fixed -translate-y-1/2 bg-[var(--bg-surface,#fff)] text-[var(--text-secondary,#78716C)] border border-[var(--border,#E7E5E4)] py-1 px-2.5 rounded-md text-xs whitespace-nowrap pointer-events-none z-[9999] font-[family-name:var(--font-body)] shadow-[0_4px_12px_rgba(28,25,23,0.08)]"
           style={{
-            left: tooltip.x + tooltip.r + 6,
-            top: tooltip.y,
+            left: tooltipPos.x + tooltipPos.r + 6,
+            top: tooltipPos.y,
           }}
         >
           雙擊移除
@@ -173,8 +198,8 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
           <div
             className="fixed -translate-x-full -translate-y-1/2 bg-[#B08D57] text-white py-1 px-2.5 rounded-md text-xs whitespace-nowrap pointer-events-none z-[9999] font-[family-name:var(--font-body)] shadow-[0_4px_12px_rgba(28,25,23,0.08)] overflow-hidden"
             style={{
-              left: tooltip.x - tooltip.r - 6,
-              top: tooltip.y,
+              left: tooltipPos.x - tooltipPos.r - 6,
+              top: tooltipPos.y,
             }}
           >
             {/* 長按進度條 */}
