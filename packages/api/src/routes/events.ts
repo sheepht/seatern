@@ -5,6 +5,40 @@ import type { SessionEnv } from '../middleware/session';
 
 const events = new Hono<SessionEnv>();
 
+// ─── 方案桌數對照表 ─────────────────────────────────
+//
+//   planType   桌數上限   有效期
+//   ─────────  ────────  ──────
+//   null       10 / 20   無限
+//   "30"       30        30 天
+//   "50"       50        30 天
+//   "80"       80        60 天
+//   "200"      200       90 天
+//
+const PLAN_TABLE_LIMITS: Record<string, number> = {
+  '30': 30,
+  '50': 50,
+  '80': 80,
+  '200': 200,
+};
+
+/** 根據 Event 的方案狀態回傳桌數上限 */
+function getTableLimit(event: { planType: string | null; planExpiresAt: Date | null; planStatus: string | null; ownerType: string }): number {
+  if (!event.planType || !event.planExpiresAt || event.planStatus !== 'active') {
+    return event.ownerType === 'anonymous' ? 10 : 20;
+  }
+  if (new Date() > event.planExpiresAt) {
+    return event.ownerType === 'anonymous' ? 10 : 20;
+  }
+  return PLAN_TABLE_LIMITS[event.planType] ?? 20;
+}
+
+/** 檢查 Event 方案是否到期（到期 → 拒絕寫入操作） */
+function isEventExpired(event: { planType: string | null; planExpiresAt: Date | null; planStatus: string | null }): boolean {
+  if (!event.planType || !event.planExpiresAt || event.planStatus !== 'active') return false;
+  return new Date() > event.planExpiresAt;
+}
+
 /** Dev 模式下放寬 owner 檢查：先用 owner 查，找不到就用 ID 查 */
 async function findEventWithDevFallback(
   eventId: string,
@@ -18,6 +52,14 @@ async function findEventWithDevFallback(
 
   if (process.env.NODE_ENV !== 'production') {
     return prisma.event.findUnique({ where: { id: eventId } });
+  }
+  return null;
+}
+
+/** 寫入操作的到期 guard — 方案到期時拒絕修改 */
+function expiredResponse(event: { planType: string | null; planExpiresAt: Date | null; planStatus: string | null }) {
+  if (isEventExpired(event)) {
+    return { code: 'PLAN_EXPIRED' as const, message: '方案已到期，請續費' };
   }
   return null;
 }
@@ -61,7 +103,7 @@ events.get('/mine', async (c) => {
   });
 
   if (!event) return c.json({ error: 'No event found' }, 404);
-  return c.json(event);
+  return c.json({ ...event, tableLimit: getTableLimit(event) });
 });
 
 // GET /events/:id — 取得單一活動（含賓客、桌次、標籤）
@@ -92,14 +134,14 @@ events.get('/:id', async (c) => {
     : null;
 
   if (!event) return c.json({ error: 'Event not found' }, 404);
-  return c.json(event);
+  return c.json({ ...event, tableLimit: getTableLimit(event) });
 });
 
 // POST /events — 建立新活動（同一 owner 已有活動時直接回傳，防重複建立）
 events.post('/', async (c) => {
   const ownerId = c.get('ownerId');
   const ownerType = c.get('ownerType');
-  const body = await c.req.json<{ name: string; date?: string; type?: string; categories?: string[] }>();
+  const body = await c.req.json<{ name: string; date?: string; categories?: string[] }>();
 
   // 先查是否已有活動，防 race condition 產生重複
   const existing = await prisma.event.findFirst({
@@ -112,7 +154,6 @@ events.post('/', async (c) => {
     data: {
       name: body.name,
       date: body.date,
-      type: (body.type as any) || 'wedding',
       categories: body.categories || ['男方', '女方', '共同'],
       ownerId,
       ownerType,
@@ -132,6 +173,8 @@ events.post('/:id/guests/batch', async (c) => {
   // 驗證活動歸屬
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<{
     guests: Array<{
@@ -173,6 +216,8 @@ events.patch('/:eventId', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<{ name?: string }>();
   const updated = await prisma.event.update({
@@ -190,6 +235,8 @@ events.patch('/:eventId/guests/assign-batch', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<{
     assignments: Array<{ guestId: string; tableId: string | null; seatIndex?: number | null }>
@@ -238,6 +285,8 @@ events.patch('/:eventId/guests/:guestId/table', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<{ tableId: string | null; seatIndex?: number | null }>();
 
@@ -260,6 +309,8 @@ events.post('/:eventId/guests', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<{
     name: string
@@ -306,6 +357,8 @@ events.patch('/:eventId/guests/:guestId', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<Record<string, any>>();
 
@@ -345,6 +398,8 @@ events.delete('/:eventId/guests/:guestId', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   try {
     await prisma.guest.delete({ where: { id: guestId } });
@@ -365,12 +420,19 @@ events.post('/:id/tables', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
-  // Table limit: anonymous = 10, user = 20
-  const tableLimit = ownerType === 'anonymous' ? 10 : 20;
+  // 動態桌數限制：根據 Event 方案決定上限
+  const tableLimit = getTableLimit(event);
   const tableCount = await prisma.table.count({ where: { eventId } });
   if (tableCount >= tableLimit) {
     return c.json({ code: 'TABLE_LIMIT_REACHED', limit: tableLimit }, 403);
+  }
+
+  // 方案到期 → 拒絕寫入
+  if (isEventExpired(event)) {
+    return c.json({ code: 'PLAN_EXPIRED', message: '方案已到期，請續費' }, 403);
   }
 
   const body = await c.req.json<{ id?: string; name: string; capacity?: number; positionX?: number; positionY?: number }>();
@@ -397,6 +459,8 @@ events.patch('/:eventId/tables/:tableId', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<{ name?: string; capacity?: number; positionX?: number; positionY?: number }>();
 
@@ -416,6 +480,8 @@ events.delete('/:eventId/tables/empty', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const allTables = await prisma.table.findMany({ where: { eventId } });
   const occupiedTableIds = await prisma.guest.groupBy({
@@ -444,6 +510,8 @@ events.delete('/:eventId/tables/:tableId', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   // 清除該桌所有賓客的分配
   await prisma.guest.updateMany({
@@ -464,6 +532,8 @@ events.delete('/:eventId/reset', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   await prisma.$transaction([
     prisma.seatPreference.deleteMany({ where: { guest: { eventId } } }),
@@ -488,6 +558,8 @@ events.post('/:id/preferences/batch', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<{
     preferences: Array<{ guestId: string; preferredGuestId: string; rank: number }>
@@ -527,6 +599,8 @@ events.put('/:eventId/guests/:guestId/preferences', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<{
     preferences: Array<{ preferredGuestId: string; rank: number }>
@@ -564,6 +638,8 @@ events.post('/:id/subcategories/batch', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<{
     assignments: Array<{ guestId: string; subcategoryName: string; category: string }>
@@ -607,6 +683,8 @@ events.post('/:id/avoid-pairs/batch', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<{
     pairs: Array<{ guestAId: string; guestBId: string; reason?: string }>
@@ -642,6 +720,8 @@ events.post('/:id/avoid-pairs', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<{ guestAId: string; guestBId: string; reason?: string }>();
 
@@ -674,6 +754,8 @@ events.post('/:id/snapshots', async (c) => {
 
   const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
   if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
 
   const body = await c.req.json<{ name: string; data: any; averageSatisfaction: number }>();
 
@@ -697,6 +779,74 @@ events.post('/:id/snapshots', async (c) => {
   });
 
   return c.json(snapshot, 201);
+});
+
+// ─── 付費通知 ──────────────────────────────────────
+
+// POST /events/:id/notify-payment — 通知已匯款
+events.post('/:id/notify-payment', async (c) => {
+  const ownerId = c.get('ownerId');
+  const ownerType = c.get('ownerType');
+  const eventId = c.req.param('id');
+
+  if (ownerType === 'anonymous') {
+    return c.json({ error: '請先登入再購買方案' }, 401);
+  }
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
+  if (!event) return c.json({ error: 'Event not found' }, 404);
+
+  // 已經在處理中或已啟用 → 冪等回應
+  if (event.planStatus === 'pending' || event.planStatus === 'active') {
+    return c.json({ status: event.planStatus, message: '已收到通知' });
+  }
+
+  const body = await c.req.json<{ planType: string }>();
+
+  if (!PLAN_TABLE_LIMITS[body.planType]) {
+    return c.json({ error: '無效的方案類型' }, 400);
+  }
+
+  await prisma.event.update({
+    where: { id: eventId },
+    data: {
+      planType: body.planType,
+      planStatus: 'pending',
+      planCreatedAt: new Date(),
+    },
+  });
+
+  // TODO: 發送通知給創辦人（email / LINE / push）
+  console.log(`[PAYMENT] 用戶 ${ownerId} 通知已匯款，活動 ${eventId}，方案 ${body.planType} 桌`);
+
+  return c.json({ status: 'pending', message: '已通知，我們會盡快確認' }, 200);
+});
+
+// POST /events/:id/approve-plan — 手動核准方案（創辦人用）
+events.post('/:id/approve-plan', async (c) => {
+  const eventId = c.req.param('id');
+
+  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!event) return c.json({ error: 'Event not found' }, 404);
+  if (!event.planType) return c.json({ error: '此活動沒有待審方案' }, 400);
+
+  // 有效期天數對照
+  const PLAN_DAYS: Record<string, number> = { '30': 30, '50': 30, '80': 60, '200': 90 };
+  const days = PLAN_DAYS[event.planType] ?? 30;
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + days);
+
+  await prisma.event.update({
+    where: { id: eventId },
+    data: {
+      planStatus: 'active',
+      planExpiresAt: expiresAt,
+    },
+  });
+
+  console.log(`[PAYMENT] 核准活動 ${eventId} 的 ${event.planType} 桌方案，到期 ${expiresAt.toISOString()}`);
+
+  return c.json({ status: 'active', expiresAt: expiresAt.toISOString() });
 });
 
 export { events };

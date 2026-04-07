@@ -81,7 +81,6 @@ users.get('/me/export', async (c) => {
     event: event ? {
       name: event.name,
       date: event.date,
-      type: event.type,
       categories: event.categories,
     } : null,
     guests: (event?.guests ?? []).map((g) => ({

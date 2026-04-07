@@ -10,6 +10,8 @@ import WorkspacePage from '@/pages/WorkspacePage';
 import GuestManagementPage from '@/pages/GuestManagementPage';
 import AuthCallbackPage from '@/pages/AuthCallbackPage';
 import SettingsPage from '@/pages/SettingsPage';
+import PricingPage from '@/pages/PricingPage';
+import AdminPage from '@/pages/AdminPage';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -32,7 +34,11 @@ function App() {
               <Route path="guests" element={<GuestManagementPage />} />
               <Route path="import" element={<ImportPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="pricing" element={<PricingPage />} />
             </Route>
+
+            {/* Admin（靠 URL 隱藏，不需要登入驗證） */}
+            <Route path="/admin" element={<AdminPage />} />
 
             {/* Protected routes */}
             <Route path="/dashboard" element={<ProtectedRoute><DashboardPlaceholder /></ProtectedRoute>} />

@@ -43,7 +43,7 @@ export default function AuthCallbackPage() {
         await authFetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: '我的婚禮', type: 'wedding' }),
+          body: JSON.stringify({ name: '我的排位' }),
         });
       }
 

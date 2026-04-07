@@ -17,7 +17,8 @@ export default function SettingsPage() {
   }, []);
 
   const tables = useSeatingStore((s) => s.tables);
-  const tableLimit = user ? 20 : 10;
+  const tableLimit = useSeatingStore((s) => s.tableLimit);
+  const planStatus = useSeatingStore((s) => s.planStatus);
 
   // Provider detection
   const provider =
@@ -247,8 +248,14 @@ export default function SettingsPage() {
               <div className="settings-split-plan flex gap-6 flex-wrap">
                 <div className="flex-1 min-w-[180px]">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg font-bold text-[var(--accent)] font-[family-name:var(--font-display)]">免費版</span>
-                    <span className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold bg-[var(--accent-light)] text-[var(--accent)]">目前方案</span>
+                    <span className="text-lg font-bold text-[var(--accent)] font-[family-name:var(--font-display)]">
+                      {tableLimit > 20 ? `${tableLimit} 桌方案` : '免費版'}
+                    </span>
+                    {planStatus === 'pending' ? (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-700">匯款確認中</span>
+                    ) : (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold bg-[var(--accent-light)] text-[var(--accent)]">目前方案</span>
+                    )}
                   </div>
                   <div className="mb-2">
                     <div className="flex justify-between text-[13px] mb-1 text-[var(--text-secondary)]">
@@ -267,10 +274,21 @@ export default function SettingsPage() {
                 </div>
                 <div className="settings-divider-col flex-1 min-w-[180px]">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg font-bold text-[var(--text-primary)] font-[family-name:var(--font-display)]">專業版</span>
-                    <span className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold bg-[var(--bg-primary)] text-[var(--text-muted)]">即將推出</span>
+                    <span className="text-lg font-bold text-[var(--text-primary)] font-[family-name:var(--font-display)]">
+                      {tableLimit > 20 ? '更高方案' : '付費版'}
+                    </span>
                   </div>
-                  <button disabled className="btn-primary !cursor-not-allowed bg-[var(--border)] text-[var(--text-muted)]">敬請期待</button>
+                  <ul className="text-[13px] pl-4 flex flex-col gap-1 m-0 text-[var(--text-secondary)] mb-4">
+                    <li>最多 200 桌</li>
+                    <li>更長有效期</li>
+                    <li>多活動管理</li>
+                  </ul>
+                  <button
+                    onClick={() => navigate('/pricing')}
+                    className="w-full h-9 rounded-lg text-sm font-medium text-white bg-[var(--accent)]"
+                  >
+                    {tableLimit > 20 ? '查看更多方案' : '升級方案'}
+                  </button>
                 </div>
               </div>
 

@@ -6,6 +6,7 @@ import { healthRoute } from './routes/health';
 import { events } from './routes/events';
 import { auth } from './routes/auth';
 import { users } from './routes/users';
+import { admin } from './routes/admin';
 import { sessionMiddleware } from './middleware/session';
 import { authMiddleware } from './middleware/auth';
 
@@ -31,6 +32,9 @@ app.route('/api/auth', auth);
 // Authenticated routes（僅登入用戶）
 app.use('/api/users/*', authMiddleware);
 app.route('/api/users', users);
+
+// Admin routes（無驗證，靠 URL 隱藏）
+app.route('/api/admin', admin);
 
 // Session-aware routes（匿名 + 登入都能用）
 app.use('/api/events/*', sessionMiddleware);

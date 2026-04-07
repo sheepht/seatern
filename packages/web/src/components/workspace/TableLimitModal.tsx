@@ -5,13 +5,13 @@ import { useNavigate } from 'react-router-dom';
 export default function TableLimitModal() {
   const tableLimitReached = useSeatingStore((s) => s.tableLimitReached);
   const tables = useSeatingStore((s) => s.tables);
+  const limit = useSeatingStore((s) => s.tableLimit);
   const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
 
   if (!tableLimitReached) return null;
 
   const isLoggedIn = !!user;
-  const limit = isLoggedIn ? 20 : 10;
 
   const dismiss = () => {
     useSeatingStore.setState({ tableLimitReached: false });
@@ -57,10 +57,10 @@ export default function TableLimitModal() {
 
           <div className="mt-6">
             <button
-              onClick={dismiss}
+              onClick={() => { dismiss(); navigate('/pricing'); }}
               className="w-full h-11 rounded-lg text-sm font-medium text-white flex items-center justify-center bg-[#B08D57]"
             >
-              了解付費方案（即將推出）
+              升級方案
             </button>
           </div>
 

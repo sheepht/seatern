@@ -26,12 +26,18 @@ model Event {
   id         String    @id @default(uuid())
   name       String
   date       String?
-  type       EventType @default(wedding)
   categories String[]  @default(["男方", "女方", "共同"])
 
   // 擁有者：登入用戶或匿名 session
   ownerType OwnerType @default(anonymous)
   ownerId   String    // User.id 或 anonymous session UUID
+
+  // 付費方案（V1 人工金流）
+  planType      String?   // "30" | "50" | "80" | "200"，null = 免費版
+  planExpiresAt DateTime? // 方案到期時間，null = 免費版（無到期）
+  planStatus    String?   // "pending" | "active" | null
+  planNote      String?   // 管理備註
+  planCreatedAt DateTime? // 訂單建立時間（用戶按通知已匯款的時間）
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -46,13 +52,6 @@ model Event {
   snapshots SeatingSnapshot[]
 
   @@index([ownerType, ownerId])
-}
-
-enum EventType {
-  wedding
-  banquet
-  corporate
-  other
 }
 
 enum OwnerType {
