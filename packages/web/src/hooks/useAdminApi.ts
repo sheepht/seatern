@@ -1,11 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
 function adminAxios(token: string) {
   return axios.create({
-    baseURL: `${API}/api/admin`,
+    baseURL: '/api/admin',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
   });
 }

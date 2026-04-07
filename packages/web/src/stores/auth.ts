@@ -47,7 +47,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   signInWithLINE: async () => {
     // LINE OAuth 由後端處理（Supabase 沒有內建 LINE provider）
     // 跳轉到 API 發起 LINE OAuth 流程
-    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/line`;
+    window.location.href = '/api/auth/line';
   },
 
   claimEvent: async () => {

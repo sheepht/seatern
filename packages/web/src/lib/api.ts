@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth';
  * baseURL 根據環境變數決定（dev 用 proxy，prod 用相對路徑）。
  */
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
+  baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 });

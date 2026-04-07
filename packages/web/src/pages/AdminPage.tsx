@@ -7,8 +7,6 @@ import {
   type PlanEvent,
 } from '@/hooks/useAdminApi';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
 const PLAN_PRICE: Record<string, number> = { '30': 199, '50': 499, '80': 799, '200': 1499 };
 
 function AdminLogin({ onLogin }: { onLogin: (token: string) => void }) {
@@ -21,7 +19,7 @@ function AdminLogin({ onLogin }: { onLogin: (token: string) => void }) {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/admin/login`, {
+      const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
