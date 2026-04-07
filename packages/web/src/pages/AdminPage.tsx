@@ -1,19 +1,11 @@
-import { useEffect, useState } from 'react';
-
-interface PlanEvent {
-  id: string;
-  name: string;
-  planType: string | null;
-  planStatus: string | null;
-  planExpiresAt: string | null;
-  planCreatedAt: string | null;
-  planNote: string | null;
-  ownerName: string;
-  ownerEmail: string;
-  guestCount: number;
-  tableCount: number;
-  updatedAt: string;
-}
+import { useState } from 'react';
+import {
+  useAdminPlans,
+  useAdminApprove,
+  useAdminReject,
+  useAdminUpdateEvent,
+  type PlanEvent,
+} from '@/hooks/useAdminApi';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -94,64 +86,25 @@ function toDateInput(iso: string | null) {
 
 export default function AdminPage() {
   const [token, setToken] = useState(() => sessionStorage.getItem('admin_token') || '');
-  const [pending, setPending] = useState<PlanEvent[]>([]);
-  const [all, setAll] = useState<PlanEvent[]>([]);
   const [tab, setTab] = useState<'pending' | 'all'>('pending');
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ planType: '', planStatus: '', planExpiresAt: '', planCreatedAt: '', planNote: '' });
 
-  const adminFetch = (path: string, opts?: RequestInit) =>
-    fetch(`${API}/api/admin/${path}`, {
-      ...opts,
-      headers: { 'Content-Type': 'application/json', ...opts?.headers, Authorization: `Bearer ${token}` },
-    });
+  const { data, isLoading, refetch, isError } = useAdminPlans(token);
+  const approveMut = useAdminApprove(token);
+  const rejectMut = useAdminReject(token);
+  const updateMut = useAdminUpdateEvent(token);
 
-  const fetchData = async () => {
-    if (!token) { setLoading(false); return; }
-    setLoading(true);
-    try {
-      const [pendingRes, allRes] = await Promise.all([
-        adminFetch('pending-plans'),
-        adminFetch('all-plans'),
-      ]);
-      if (pendingRes.status === 401 || allRes.status === 401) {
-        sessionStorage.removeItem('admin_token');
-        setToken('');
-        return;
-      }
-      if (pendingRes.ok) setPending(await pendingRes.json());
-      if (allRes.ok) setAll(await allRes.json());
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchData(); }, [token]);
+  // 401 → 清除 token
+  if (isError) {
+    sessionStorage.removeItem('admin_token');
+    if (token) setToken('');
+  }
 
   const handleLogin = (t: string) => setToken(t);
 
-  const approve = async (eventId: string) => {
-    setActionLoading(eventId);
-    try {
-      const res = await adminFetch(`approve/${eventId}`, { method: 'POST' });
-      if (res.ok) await fetchData();
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const reject = async (eventId: string) => {
-    if (!confirm('確定要拒絕這個付費申請？')) return;
-    setActionLoading(eventId);
-    try {
-      const res = await adminFetch(`reject/${eventId}`, { method: 'POST' });
-      if (res.ok) await fetchData();
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  const pending = data?.pending ?? [];
+  const all = data?.all ?? [];
 
   const startEdit = (event: PlanEvent) => {
     setEditingId(event.id);
@@ -164,27 +117,18 @@ export default function AdminPage() {
     });
   };
 
-  const saveEdit = async () => {
+  const saveEdit = () => {
     if (!editingId) return;
-    setActionLoading(editingId);
-    try {
-      const res = await adminFetch(`events/${editingId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          planType: editForm.planType || null,
-          planStatus: editForm.planStatus || null,
-          planExpiresAt: editForm.planExpiresAt ? new Date(editForm.planExpiresAt).toISOString() : null,
-          planCreatedAt: editForm.planCreatedAt ? new Date(editForm.planCreatedAt).toISOString() : null,
-          planNote: editForm.planNote || null,
-        }),
-      });
-      if (res.ok) {
-        setEditingId(null);
-        await fetchData();
-      }
-    } finally {
-      setActionLoading(null);
-    }
+    updateMut.mutate({
+      eventId: editingId,
+      patch: {
+        planType: editForm.planType || null,
+        planStatus: editForm.planStatus || null,
+        planExpiresAt: editForm.planExpiresAt ? new Date(editForm.planExpiresAt).toISOString() : null,
+        planCreatedAt: editForm.planCreatedAt ? new Date(editForm.planCreatedAt).toISOString() : null,
+        planNote: editForm.planNote || null,
+      },
+    }, { onSuccess: () => setEditingId(null) });
   };
 
   if (!token) return <AdminLogin onLogin={handleLogin} />;
@@ -203,6 +147,8 @@ export default function AdminPage() {
   };
 
   const list = tab === 'pending' ? pending : all;
+  const actionLoading = approveMut.isPending || rejectMut.isPending || updateMut.isPending;
+  const actionId = approveMut.variables ?? rejectMut.variables ?? (updateMut.variables as { eventId: string } | undefined)?.eventId ?? null;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
@@ -243,7 +189,7 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <p className="text-base text-stone-400 text-center py-12">載入中...</p>
       ) : list.length === 0 ? (
         <div className="text-center py-16">
@@ -255,9 +201,10 @@ export default function AdminPage() {
         <div className="space-y-3">
           {list.map((event) => {
             const isEditing = editingId === event.id;
+            const isBusy = actionLoading && actionId === event.id;
             return (
               <div key={event.id} className="rounded-xl border border-stone-200 p-5">
-                {/* 基本資訊（一直顯示） */}
+                {/* 基本資訊 */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -287,15 +234,15 @@ export default function AdminPage() {
                     {event.planStatus === 'pending' && !isEditing && (
                       <>
                         <button
-                          onClick={() => approve(event.id)}
-                          disabled={actionLoading === event.id}
+                          onClick={() => approveMut.mutate(event.id)}
+                          disabled={isBusy}
                           className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-[var(--accent)] disabled:opacity-50"
                         >
-                          {actionLoading === event.id ? '...' : '核准'}
+                          {isBusy ? '...' : '核准'}
                         </button>
                         <button
-                          onClick={() => reject(event.id)}
-                          disabled={actionLoading === event.id}
+                          onClick={() => { if (confirm('確定要拒絕這個付費申請？')) rejectMut.mutate(event.id); }}
+                          disabled={isBusy}
                           className="px-5 py-2 rounded-lg text-sm font-medium text-stone-500 border border-stone-200 hover:bg-stone-50 disabled:opacity-50"
                         >
                           拒絕
@@ -313,7 +260,7 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* 編輯表單（展開） */}
+                {/* 編輯表單 */}
                 {isEditing && (
                   <div className="mt-4 pt-4 border-t border-stone-100">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
@@ -375,10 +322,10 @@ export default function AdminPage() {
                       </button>
                       <button
                         onClick={saveEdit}
-                        disabled={actionLoading === event.id}
+                        disabled={updateMut.isPending}
                         className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-[var(--accent)] disabled:opacity-50"
                       >
-                        {actionLoading === event.id ? '儲存中...' : '儲存'}
+                        {updateMut.isPending ? '儲存中...' : '儲存'}
                       </button>
                     </div>
                   </div>
@@ -390,7 +337,7 @@ export default function AdminPage() {
       )}
 
       <div className="mt-8 text-center">
-        <button onClick={fetchData} className="text-sm text-[var(--accent)] hover:underline">
+        <button onClick={() => refetch()} className="text-sm text-[var(--accent)] hover:underline">
           重新整理
         </button>
       </div>

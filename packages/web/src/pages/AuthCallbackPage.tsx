@@ -40,10 +40,10 @@ export default function AuthCallbackPage() {
 
       // Ensure an event exists before navigating to workspace
       try {
-        await api.get('/api/events/mine');
+        await api.get('/events/mine');
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 404) {
-          await api.post('/api/events', { name: '我的排位' });
+          await api.post('/events', { name: '我的排位' });
         }
       }
 

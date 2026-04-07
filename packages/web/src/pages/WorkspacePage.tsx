@@ -337,7 +337,7 @@ export default function WorkspacePage() {
             }
             if (data.subcategoryName) {
               try {
-                await api.post(`/api/events/${eventId}/subcategories/batch`, {
+                await api.post(`/events/${eventId}/subcategories/batch`, {
                   assignments: [{ guestId: editGuest.id, subcategoryName: data.subcategoryName, category: data.category }],
                 });
               } catch { /* no-op */ }

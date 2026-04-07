@@ -128,7 +128,7 @@ export default function ImportPage() {
       if (!eventId) throw new Error('缺少活動 ID');
 
       // 批次匯入賓客
-      const guestRes = await api.post(`/api/events/${eventId}/guests/batch`, {
+      const guestRes = await api.post(`/events/${eventId}/guests/batch`, {
         guests: guestList.map((g) => ({
           name: g.name,
           aliases: g.aliases,
@@ -164,7 +164,7 @@ export default function ImportPage() {
           .filter((p): p is NonNullable<typeof p> => p !== null);
 
         if (preferences.length > 0) {
-          await api.post(`/api/events/${eventId}/preferences/batch`, { preferences });
+          await api.post(`/events/${eventId}/preferences/batch`, { preferences });
         }
       }
 
@@ -181,7 +181,7 @@ export default function ImportPage() {
         });
       });
       if (subcatAssignments.length > 0) {
-        await api.post(`/api/events/${eventId}/subcategories/batch`, { assignments: subcatAssignments });
+        await api.post(`/events/${eventId}/subcategories/batch`, { assignments: subcatAssignments });
       }
 
       // 建立避免同桌（如果有）
@@ -203,7 +203,7 @@ export default function ImportPage() {
         }
       });
       if (avoidPairs.length > 0) {
-        await api.post(`/api/events/${eventId}/avoid-pairs/batch`, { pairs: avoidPairs });
+        await api.post(`/events/${eventId}/avoid-pairs/batch`, { pairs: avoidPairs });
       }
 
       // 自動補桌次（根據新增的確認出席席位數）
@@ -214,7 +214,7 @@ export default function ImportPage() {
       if (newConfirmedSeats > 0) {
         const newTableCount = Math.ceil(newConfirmedSeats / 10);
         // 取得現有桌次數量來決定新桌的名稱和位置
-        const eventRes = await api.get(`/api/events/${eventId}`);
+        const eventRes = await api.get(`/events/${eventId}`);
         const eventData = eventRes.data;
         const existingTableCount = eventData.tables?.length || 0;
         for (let i = 0; i < newTableCount; i++) {
@@ -224,7 +224,7 @@ export default function ImportPage() {
           const idx = existingTableCount + i;
           const row = Math.floor(idx / cols);
           const col = idx % cols;
-          await api.post(`/api/events/${eventId}/tables`, {
+          await api.post(`/events/${eventId}/tables`, {
             name: `第${tableNum}桌`,
             capacity: 10,
             positionX: 200 + col * 350,

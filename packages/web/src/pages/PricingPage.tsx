@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
 import { useSeatingStore } from '@/stores/seating';
-import { api } from '@/lib/api';
+import { useNotifyPayment } from '@/hooks/usePricingApi';
 
 const PLANS = [
   { type: '30', tables: 30, price: 199, days: 30, label: '小型婚禮', hasGroupPref: false },
@@ -22,23 +22,14 @@ export default function PricingPage() {
   const currentPlanType = PLANS.find((p) => p.tables === tableLimit)?.type ?? null;
   const isActive = planStatus === 'active' && currentPlanType;
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const notifyMut = useNotifyPayment();
+  const submitted = notifyMut.isSuccess;
+  const submitting = notifyMut.isPending;
 
-  const handleNotify = async () => {
+  const handleNotify = () => {
     if (!selectedPlan || !eventId) return;
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await api.post(`/api/events/${eventId}/notify-payment`, { planType: selectedPlan });
-      setSubmitted(true);
-      useSeatingStore.setState({ planStatus: 'pending' });
-    } finally {
-      setSubmitting(false);
-    }
+    if (!user) { navigate('/login'); return; }
+    notifyMut.mutate({ eventId, planType: selectedPlan });
   };
 
   // 已經通知過

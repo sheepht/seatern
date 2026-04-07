@@ -347,7 +347,7 @@ export default function GuestManagementPage() {
         // Fire pending deletes immediately
         const { eventId } = useSeatingStore.getState();
         if (eventId) {
-          api.delete(`/api/events/${eventId}/guests/${guestId}`);
+          api.delete(`/events/${eventId}/guests/${guestId}`);
         }
       });
       deleteTimers.current.clear();
@@ -432,7 +432,7 @@ export default function GuestManagementPage() {
         setToast(null);
         // Timer 到了才真正刪 DB
         try {
-          await api.delete(`/api/events/${eventId}/guests/${guest.id}`);
+          await api.delete(`/events/${eventId}/guests/${guest.id}`);
         } catch { /* ignore */ }
       }, 5000);
       deleteTimers.current.set(guest.id, timer);
@@ -470,7 +470,7 @@ export default function GuestManagementPage() {
       deleteTimers.current.delete(guestId);
       setToast(null);
       try {
-        await api.delete(`/api/events/${eventId}/guests/${guestId}`);
+        await api.delete(`/events/${eventId}/guests/${guestId}`);
       } catch { /* ignore */ }
     }, 5000);
     deleteTimers.current.set(guestId, timer);
@@ -1033,7 +1033,7 @@ export default function GuestManagementPage() {
                 onClick={async () => {
                   setClearingAll(true);
                   try {
-                    await api.delete(`/api/events/${eventId}/reset`);
+                    await api.delete(`/events/${eventId}/reset`);
                     const { loadEvent } = useSeatingStore.getState();
                     if (eventId) await loadEvent();
                   } finally {
@@ -1111,7 +1111,7 @@ export default function GuestManagementPage() {
               // Handle subcategory
               if (data.subcategoryName) {
                 try {
-                  await api.post(`/api/events/${eventId}/subcategories/batch`, {
+                  await api.post(`/events/${eventId}/subcategories/batch`, {
                     assignments: [{ guestId: editGuest.id, subcategoryName: data.subcategoryName, category: data.category }],
                   });
                 } catch { /* no-op */ }
@@ -1154,7 +1154,7 @@ export default function GuestManagementPage() {
               }
               if (subcategoryName && data.category) {
                 try {
-                  await api.post(`/api/events/${eventId}/subcategories/batch`, {
+                  await api.post(`/events/${eventId}/subcategories/batch`, {
                     assignments: [{ guestId: guest.id, subcategoryName, category: data.category }],
                   });
                 } catch { /* no-op */ }
