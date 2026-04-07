@@ -39,11 +39,8 @@ describe('placeGuest', () => {
   });
 
   it('不可放在不可移動的位子（帶眷屬賓客）', () => {
-    const slots = buildSlotArray([{ id: 'g1', seatIndex: 2, seatCount: 2 }], 6);
-    // Try to place directly on immovable slot
-    // tryPlaceAt checks if target area has immovable, returns null
-    // but placeGuest will search nearby
-    // Let's fill all other slots to ensure it truly can't place on immovable
+    buildSlotArray([{ id: 'g1', seatIndex: 2, seatCount: 2 }], 6);
+    // 填滿其他位子，確保完全放不下
     const fullSlots = buildSlotArray([
       { id: 'g1', seatIndex: 0, seatCount: 2 },
       { id: 'g2', seatIndex: 2, seatCount: 2 },
