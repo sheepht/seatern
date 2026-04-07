@@ -4,9 +4,10 @@ import { parseCSV, parseXLSX, readFileAsText } from '@/lib/csv-parser';
 
 interface Props {
   onParsed: (result: ParseResult) => void
+  compact?: boolean
 }
 
-export function CsvUpload({ onParsed }: Props) {
+export function CsvUpload({ onParsed, compact }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -55,7 +56,7 @@ export function CsvUpload({ onParsed }: Props) {
   return (
     <div>
       <div
-        className="border-2 border-dashed p-8 text-center cursor-pointer transition-colors rounded-[var(--radius-lg)]"
+        className={`border-2 border-dashed text-center cursor-pointer transition-colors rounded-[var(--radius-lg)] ${compact ? 'p-4' : 'p-8'}`}
         style={{
           borderColor: isDragging ? 'var(--accent)' : 'var(--border)',
           background: isDragging ? 'var(--accent-light)' : 'transparent',

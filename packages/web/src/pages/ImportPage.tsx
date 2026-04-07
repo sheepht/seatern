@@ -274,14 +274,14 @@ export default function ImportPage() {
       {/* input 步驟：居中卡片 */}
       {step === 'input' && (
       <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
-      <div className="w-full max-w-3xl p-8 bg-[var(--bg-surface)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)]">
+      <div className={`w-full max-w-3xl bg-[var(--bg-surface)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] ${isMobile ? 'p-5' : 'p-8'}`}>
         {(
-          <div className="space-y-6">
+          <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
             <div>
-              <h1 className="text-2xl font-bold font-[family-name:var(--font-display)] text-[var(--text-primary)]">
+              <h1 className={`font-bold font-[family-name:var(--font-display)] text-[var(--text-primary)] ${isMobile ? 'text-xl' : 'text-2xl'}`}>
                 {existingGuests.length > 0 ? '追加賓客' : '匯入賓客名單'}
               </h1>
-              <p className="mt-1 text-[var(--text-secondary)]">
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
                 {existingGuests.length > 0
                   ? `已有 ${existingGuests.length} 位賓客，系統會自動跳過已存在的人`
                   : '選擇匯入方式'
@@ -292,18 +292,18 @@ export default function ImportPage() {
             {existingLoading ? (
               <div className="text-center py-8 text-[var(--text-muted)]">載入中...</div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={`grid grid-cols-1 md:grid-cols-2 ${isMobile ? 'gap-3' : 'gap-4'}`}>
                 {/* 本機上傳（手機版排第一） */}
-                <div className={`p-5 flex flex-col border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)] ${isMobile ? 'order-1' : 'order-2'}`}>
+                <div className={`flex flex-col border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)] ${isMobile ? 'p-4 order-1' : 'p-5 order-2'}`}>
                   <div className="text-base font-medium mb-1 font-[family-name:var(--font-display)] text-[var(--text-primary)]">
                     本機上傳
                   </div>
-                  <p className="text-sm mb-4 text-[var(--text-secondary)]">
+                  <p className="text-sm mb-3 text-[var(--text-secondary)]">
                     上傳 CSV 或 Excel 檔案
                   </p>
 
-                  <div className="flex-1 mb-4">
-                    <CsvUpload onParsed={handleParsed} />
+                  <div className="flex-1 mb-3">
+                    <CsvUpload onParsed={handleParsed} compact={isMobile} />
                   </div>
 
                   <div className="mt-auto text-sm text-[var(--text-muted)]">
@@ -319,11 +319,11 @@ export default function ImportPage() {
                 </div>
 
                 {/* Google Sheet 網址匯入（手機版排第二） */}
-                <div className={`p-5 flex flex-col border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)] ${isMobile ? 'order-2' : 'order-1'}`}>
+                <div className={`flex flex-col border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--bg-surface)] ${isMobile ? 'p-4 order-2' : 'p-5 order-1'}`}>
                   <div className="text-base font-medium mb-1 font-[family-name:var(--font-display)] text-[var(--text-primary)]">
                     Google Sheet
                   </div>
-                  <p className="text-sm mb-4 text-[var(--text-secondary)]">
+                  <p className="text-sm mb-3 text-[var(--text-secondary)]">
                     貼上公開的 Google Sheet 網址
                   </p>
 
@@ -338,7 +338,7 @@ export default function ImportPage() {
                   <button
                     onClick={handleSheetImport}
                     disabled={!sheetUrl.trim() || sheetLoading}
-                    className="btn-primary text-sm font-medium mb-4 w-full py-2 hover:opacity-80 disabled:opacity-40 disabled:cursor-default"
+                    className="btn-primary text-sm font-medium mb-3 w-full py-2 hover:opacity-80 disabled:opacity-40 disabled:cursor-default"
                   >
                     {sheetLoading ? '匯入中...' : '匯入'}
                   </button>
