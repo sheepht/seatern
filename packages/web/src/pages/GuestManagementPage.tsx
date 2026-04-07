@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { authFetch } from '@/lib/api';
+import { api } from '@/lib/api';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Search, X, Palette, Check } from 'lucide-react';
@@ -347,7 +347,7 @@ export default function GuestManagementPage() {
         // Fire pending deletes immediately
         const { eventId } = useSeatingStore.getState();
         if (eventId) {
-          authFetch(`/api/events/${eventId}/guests/${guestId}`, { method: 'DELETE', credentials: 'include' });
+          api.delete(`/api/events/${eventId}/guests/${guestId}`);
         }
       });
       deleteTimers.current.clear();
@@ -432,10 +432,7 @@ export default function GuestManagementPage() {
         setToast(null);
         // Timer 到了才真正刪 DB
         try {
-          await authFetch(`/api/events/${eventId}/guests/${guest.id}`, {
-            method: 'DELETE',
-            credentials: 'include',
-          });
+          await api.delete(`/api/events/${eventId}/guests/${guest.id}`);
         } catch { /* ignore */ }
       }, 5000);
       deleteTimers.current.set(guest.id, timer);
@@ -473,10 +470,7 @@ export default function GuestManagementPage() {
       deleteTimers.current.delete(guestId);
       setToast(null);
       try {
-        await authFetch(`/api/events/${eventId}/guests/${guestId}`, {
-          method: 'DELETE',
-          credentials: 'include',
-        });
+        await api.delete(`/api/events/${eventId}/guests/${guestId}`);
       } catch { /* ignore */ }
     }, 5000);
     deleteTimers.current.set(guestId, timer);
@@ -1039,7 +1033,7 @@ export default function GuestManagementPage() {
                 onClick={async () => {
                   setClearingAll(true);
                   try {
-                    await authFetch(`/api/events/${eventId}/reset`, { method: 'DELETE' });
+                    await api.delete(`/api/events/${eventId}/reset`);
                     const { loadEvent } = useSeatingStore.getState();
                     if (eventId) await loadEvent();
                   } finally {
@@ -1117,11 +1111,8 @@ export default function GuestManagementPage() {
               // Handle subcategory
               if (data.subcategoryName) {
                 try {
-                  await authFetch(`/api/events/${eventId}/subcategories/batch`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ assignments: [{ guestId: editGuest.id, subcategoryName: data.subcategoryName, category: data.category }] }),
+                  await api.post(`/api/events/${eventId}/subcategories/batch`, {
+                    assignments: [{ guestId: editGuest.id, subcategoryName: data.subcategoryName, category: data.category }],
                   });
                 } catch { /* no-op */ }
               } else if (editGuest.subcategory) {
@@ -1163,11 +1154,8 @@ export default function GuestManagementPage() {
               }
               if (subcategoryName && data.category) {
                 try {
-                  await authFetch(`/api/events/${eventId}/subcategories/batch`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ assignments: [{ guestId: guest.id, subcategoryName, category: data.category }] }),
+                  await api.post(`/api/events/${eventId}/subcategories/batch`, {
+                    assignments: [{ guestId: guest.id, subcategoryName, category: data.category }],
                   });
                 } catch { /* no-op */ }
               }

@@ -4,16 +4,16 @@ import { useAuthStore } from '@/stores/auth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 import { SeaternLogo } from '@/components/SeaternLogo';
-import { authFetch } from '@/lib/api';
+import { api } from '@/lib/api';
+import axios from 'axios';
 
 async function ensureEventExists() {
-  const res = await authFetch('/api/events/mine');
-  if (res.status === 404) {
-    await authFetch('/api/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: '我的排位' }),
-    });
+  try {
+    await api.get('/api/events/mine');
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 404) {
+      await api.post('/api/events', { name: '我的排位' });
+    }
   }
 }
 

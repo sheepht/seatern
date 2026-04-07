@@ -11,7 +11,7 @@ export function resetDemoFlag(): void {
 import { parseCSV } from './csv-parser';
 import { detectColumns, normalizeGuest, type RawGuest } from './column-detector';
 import { matchAllPreferences } from './preference-matcher';
-import { authFetch } from './api';
+import { api } from './api';
 import { useSeatingStore } from '@/stores/seating';
 import type { CreatedGuest, CreateGuestPayload, SubcategoryBatchPayload, AvoidPairBatchPayload, CreateTablePayload } from './types';
 
@@ -60,13 +60,8 @@ export async function loadDemoData(eventId: string): Promise<void> {
     dietaryNote: g.dietaryNote || undefined,
     specialNote: g.specialNote || undefined,
   }));
-  const guestRes = await authFetch(`/api/events/${eventId}/guests/batch`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ guests: payload }),
-  });
-  if (!guestRes.ok) return;
-  const { guests: createdGuests } = await guestRes.json();
+  const guestRes = await api.post(`/api/events/${eventId}/guests/batch`, { guests: payload });
+  const { guests: createdGuests } = guestRes.data;
 
   // 4. 建立座位偏好
   const prefMatches = matchAllPreferences(guests);
@@ -86,11 +81,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
       .filter((p): p is NonNullable<typeof p> => p !== null);
 
     if (preferences.length > 0) {
-      await authFetch(`/api/events/${eventId}/preferences/batch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ preferences }),
-      });
+      await api.post(`/api/events/${eventId}/preferences/batch`, { preferences });
     }
   }
 
@@ -103,11 +94,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
     subcatAssignments.push({ guestId, subcategoryName: g.rawSubcategory, category: g.category });
   });
   if (subcatAssignments.length > 0) {
-    await authFetch(`/api/events/${eventId}/subcategories/batch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assignments: subcatAssignments }),
-    });
+    await api.post(`/api/events/${eventId}/subcategories/batch`, { assignments: subcatAssignments });
   }
 
   // 6. 建立避免同桌
@@ -129,11 +116,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
     }
   });
   if (avoidPairs.length > 0) {
-    await authFetch(`/api/events/${eventId}/avoid-pairs/batch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pairs: avoidPairs }),
-    });
+    await api.post(`/api/events/${eventId}/avoid-pairs/batch`, { pairs: avoidPairs });
   }
 
   // 7. 自動補桌次
@@ -143,16 +126,12 @@ export async function loadDemoData(eventId: string): Promise<void> {
   for (let i = 0; i < tableCount; i++) {
     const row = Math.floor(i / cols);
     const col = i % cols;
-    await authFetch(`/api/events/${eventId}/tables`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: `第${i + 1}桌`,
-        capacity: 10,
-        positionX: 200 + col * 350,
-        positionY: 200 + row * 350,
-      } satisfies CreateTablePayload),
-    });
+    await api.post(`/api/events/${eventId}/tables`, {
+      name: `第${i + 1}桌`,
+      capacity: 10,
+      positionX: 200 + col * 350,
+      positionY: 200 + row * 350,
+    } satisfies CreateTablePayload);
   }
 
   // 8. 重新載入 store + 隨機排桌（100% 全排進去）

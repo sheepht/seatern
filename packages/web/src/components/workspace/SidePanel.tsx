@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
-import { authFetch } from '@/lib/api';
+import { api } from '@/lib/api';
 import { createPortal } from 'react-dom';
 import { useDroppable } from '@dnd-kit/core';
 import { useNavigate } from 'react-router-dom';
@@ -123,11 +123,11 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
   const handleDeleteEmptyTables = async () => {
     const eventId = useSeatingStore.getState().eventId;
     if (!eventId) return;
-    const res = await authFetch(`/api/events/${eventId}/tables/empty`, { method: 'DELETE' });
-    if (res.ok) {
+    try {
+      await api.delete(`/api/events/${eventId}/tables/empty`);
       const { loadEvent } = useSeatingStore.getState();
       await loadEvent();
-    }
+    } catch { /* ignore */ }
   };
 
   const handleAutoArrange = async () => {
@@ -520,7 +520,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
             <button
               onClick={async () => {
                 const eid = useSeatingStore.getState().eventId;
-                if (eid) await authFetch(`/api/events/${eid}/reset`, { method: 'DELETE' });
+                if (eid) await api.delete(`/api/events/${eid}/reset`);
                 resetDemoFlag();
                 window.location.reload();
               }}

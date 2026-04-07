@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { authFetch } from '@/lib/api';
+import { api } from '@/lib/api';
 import { createPortal } from 'react-dom';
 import { ChevronRight } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -337,11 +337,8 @@ export default function WorkspacePage() {
             }
             if (data.subcategoryName) {
               try {
-                await authFetch(`/api/events/${eventId}/subcategories/batch`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: JSON.stringify({ assignments: [{ guestId: editGuest.id, subcategoryName: data.subcategoryName, category: data.category }] }),
+                await api.post(`/api/events/${eventId}/subcategories/batch`, {
+                  assignments: [{ guestId: editGuest.id, subcategoryName: data.subcategoryName, category: data.category }],
                 });
               } catch { /* no-op */ }
             } else if (editGuest.subcategory) {

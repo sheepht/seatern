@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authFetch } from '@/lib/api';
+import { api } from '@/lib/api';
 import { recalculateAll } from '@/lib/satisfaction';
 import { type AutoAssignMode, type AutoAssignProgress } from '@/lib/auto-assign';
 import { runAutoAssignInWorker } from '@/lib/auto-assign-client';
@@ -220,23 +220,25 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   loadEvent: async () => {
     set({ loading: true });
     try {
-      let res = await authFetch('/api/events/mine');
-      if (res.status === 404) {
-        // 沒有活動，自動建立一個
-        const createRes = await authFetch('/api/events', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: '我的排位' }),
-        });
-        if (!createRes.ok) {
-          set({ loading: false });
-          window.location.href = '/';
-          return;
+      let res;
+      try {
+        res = await api.get('/api/events/mine');
+      } catch (err: unknown) {
+        if (err && typeof err === 'object' && 'response' in err && (err as { response?: { status?: number } }).response?.status === 404) {
+          // 沒有活動，自動建立一個
+          try {
+            await api.post('/api/events', { name: '我的排位' });
+          } catch {
+            set({ loading: false });
+            window.location.href = '/';
+            return;
+          }
+          res = await api.get('/api/events/mine');
+        } else {
+          throw err;
         }
-        res = await authFetch('/api/events/mine');
       }
-      if (!res.ok) throw new Error('Failed to load event');
-      const data = await res.json();
+      const data = res.data;
 
       interface ApiGuest {
         id: string; name: string; aliases: string[]; category: string | null;
@@ -381,12 +383,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     // 非同步存到後端（不 block UI）
     const { eventId } = get();
     if (eventId) {
-      fetch(`/api/events/${eventId}/guests/${guestId}/table`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ tableId: toTableId, seatIndex: toTableId === null ? null : guest.seatIndex }),
-      }).catch(console.error);
+      api.patch(`/api/events/${eventId}/guests/${guestId}/table`, { tableId: toTableId, seatIndex: toTableId === null ? null : guest.seatIndex }).catch(console.error);
     }
   },
 
@@ -456,24 +453,14 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const { eventId } = get();
     if (eventId) {
       // 被拖的賓客
-      fetch(`/api/events/${eventId}/guests/${guestId}/table`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ tableId, seatIndex: newIndices.get(guestId) ?? seatIndex }),
-      }).catch(console.error);
+      api.patch(`/api/events/${eventId}/guests/${guestId}/table`, { tableId, seatIndex: newIndices.get(guestId) ?? seatIndex }).catch(console.error);
 
       // 被位移的同桌賓客
       for (const [id, newIdx] of newIndices) {
         if (id !== guestId) {
           const prev = prevSeatIndices.get(id);
           if (prev !== newIdx) {
-            fetch(`/api/events/${eventId}/guests/${id}/table`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ tableId, seatIndex: newIdx }),
-            }).catch(console.error);
+            api.patch(`/api/events/${eventId}/guests/${id}/table`, { tableId, seatIndex: newIdx }).catch(console.error);
           }
         }
       }
@@ -571,19 +558,11 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       });
       if (eventId) {
         if (tableGuests.length > 0) {
-          fetch(`/api/events/${eventId}/guests/assign-batch`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              assignments: tableGuests.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
-            }),
+          api.patch(`/api/events/${eventId}/guests/assign-batch`, {
+            assignments: tableGuests.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
           }).catch(console.error);
         }
-        fetch(`/api/events/${eventId}/tables/${tableId}`, {
-          method: 'DELETE',
-          credentials: 'include',
-        }).catch(console.error);
+        api.delete(`/api/events/${eventId}/tables/${tableId}`).catch(console.error);
       }
       return;
     }
@@ -596,12 +575,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         undoStack: undoStack.slice(0, -1),
       });
       if (eventId) {
-        fetch(`/api/events/${eventId}/tables/${tableId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ positionX: fromX, positionY: fromY }),
-        }).catch(console.error);
+        api.patch(`/api/events/${eventId}/tables/${tableId}`, { positionX: fromX, positionY: fromY }).catch(console.error);
       }
       return;
     }
@@ -614,12 +588,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         undoStack: undoStack.slice(0, -1),
       });
       if (eventId) {
-        fetch(`/api/events/${eventId}/tables/${tableId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ name: oldName }),
-        }).catch(console.error);
+        api.patch(`/api/events/${eventId}/tables/${tableId}`, { name: oldName }).catch(console.error);
       }
       return;
     }
@@ -633,12 +602,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       set({ tables: updatedTables, undoStack: undoStack.slice(0, -1) });
       if (eventId) {
         for (const [tableId, { fromX, fromY }] of last.positions) {
-          fetch(`/api/events/${eventId}/tables/${tableId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ positionX: fromX, positionY: fromY }),
-          }).catch(console.error);
+          api.patch(`/api/events/${eventId}/tables/${tableId}`, { positionX: fromX, positionY: fromY }).catch(console.error);
         }
       }
       return;
@@ -664,22 +628,14 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       });
       set({ guests: finalGuests, tables: finalTables, undoStack: undoStack.slice(0, -1) });
       if (eventId) {
-        fetch(`/api/events/${eventId}/guests/assign-batch`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            assignments: last.assignments.map((a) => ({
-              guestId: a.guestId, tableId: a.fromTableId, seatIndex: a.fromSeatIndex ?? null,
-            })),
-          }),
+        api.patch(`/api/events/${eventId}/guests/assign-batch`, {
+          assignments: last.assignments.map((a) => ({
+            guestId: a.guestId, tableId: a.fromTableId, seatIndex: a.fromSeatIndex ?? null,
+          })),
         }).catch(console.error);
         // 刪除自動新增的桌子
         for (const tableId of last.createdTableIds) {
-          fetch(`/api/events/${eventId}/tables/${tableId}`, {
-            method: 'DELETE',
-            credentials: 'include',
-          }).catch(console.error);
+          api.delete(`/api/events/${eventId}/tables/${tableId}`).catch(console.error);
         }
       }
       return;
@@ -750,12 +706,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         }
       }
       if (batchAssignments.length > 0) {
-        fetch(`/api/events/${eventId}/guests/assign-batch`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ assignments: batchAssignments }),
-        }).catch(console.error);
+        api.patch(`/api/events/${eventId}/guests/assign-batch`, { assignments: batchAssignments }).catch(console.error);
       }
     }
   },
@@ -779,40 +730,30 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     // 回寫 API：移除桌上賓客
     await Promise.all(
       tableGuests.map((g) =>
-        fetch(`/api/events/${eventId}/guests/${g.id}/seat`, {
-          method: 'DELETE',
-          credentials: 'include',
-        }).catch(console.error),
+        api.delete(`/api/events/${eventId}/guests/${g.id}/seat`).catch(console.error),
       ),
     );
 
-    await authFetch(`/api/events/${eventId}/tables/${tableId}`, {
-      method: 'DELETE',
-      credentials: 'include',
-    }).catch(console.error);
+    await api.delete(`/api/events/${eventId}/tables/${tableId}`).catch(console.error);
   },
 
   addTable: async (name, positionX, positionY) => {
     const { eventId, tables } = get();
     if (!eventId) return;
 
-    const res = await authFetch(`/api/events/${eventId}/tables`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ name, positionX, positionY }),
-    });
-
-    if (res.status === 403) {
-      const data = await res.json();
-      if (data.code === 'TABLE_LIMIT_REACHED') {
-        set({ tableLimitReached: true });
-        return;
+    let table;
+    try {
+      const res = await api.post(`/api/events/${eventId}/tables`, { name, positionX, positionY });
+      table = res.data;
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as { response?: { status?: number; data?: { code?: string } } };
+        if (axiosErr.response?.status === 403 && axiosErr.response?.data?.code === 'TABLE_LIMIT_REACHED') {
+          set({ tableLimitReached: true });
+        }
       }
+      return;
     }
-    if (!res.ok) return;
-
-    const table = await res.json();
     set({ tables: [...tables, table], undoStack: [...get().undoStack, { type: 'add-table' as const, tableId: table.id }] });
   },
 
@@ -846,13 +787,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     set({ guests: finalGuests, tables: finalTables, undoStack: [...undoStack, ...undoEntries] });
 
     if (eventId && tableGuests.length > 0) {
-      fetch(`/api/events/${eventId}/guests/assign-batch`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          assignments: tableGuests.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
-        }),
+      api.patch(`/api/events/${eventId}/guests/assign-batch`, {
+        assignments: tableGuests.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
       }).catch(console.error);
     }
   },
@@ -884,13 +820,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     // 批次清除後端座位分配（一次寫入）
     if (eventId) {
-      fetch(`/api/events/${eventId}/guests/assign-batch`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          assignments: assigned.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
-        }),
+      api.patch(`/api/events/${eventId}/guests/assign-batch`, {
+        assignments: assigned.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
       }).catch(console.error);
     }
   },
@@ -899,12 +830,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const { eventId } = get();
     set({ eventName: name });
     if (!eventId) return;
-    fetch(`/api/events/${eventId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ name }),
-    }).catch(console.error);
+    api.patch(`/api/events/${eventId}`, { name }).catch(console.error);
   },
 
   updateTableName: (tableId, name) => {
@@ -917,12 +843,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         : undoStack,
     });
     if (!eventId) return;
-    fetch(`/api/events/${eventId}/tables/${tableId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ name }),
-    }).catch(console.error);
+    api.patch(`/api/events/${eventId}/tables/${tableId}`, { name }).catch(console.error);
   },
 
   updateTableCapacity: (tableId, capacity) => {
@@ -940,12 +861,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       }),
     });
     if (!eventId) return;
-    fetch(`/api/events/${eventId}/tables/${tableId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ capacity }),
-    }).catch(console.error);
+    api.patch(`/api/events/${eventId}/tables/${tableId}`, { capacity }).catch(console.error);
   },
 
   updateTablePosition: (tableId, x, y) => {
@@ -993,12 +909,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       }),
     });
 
-    fetch(`/api/events/${eventId}/tables/${tableId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ positionX: table.positionX, positionY: table.positionY }),
-    }).catch(console.error);
+    api.patch(`/api/events/${eventId}/tables/${tableId}`, { positionX: table.positionX, positionY: table.positionY }).catch(console.error);
   },
 
   autoArrangeTables: async (positions) => {
@@ -1022,12 +933,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       try {
         await Promise.all(
           positions.map((p) =>
-            fetch(`/api/events/${eventId}/tables/${p.tableId}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ positionX: p.x, positionY: p.y }),
-            }).then((res) => { if (!res.ok) throw new Error(`Save failed: ${p.tableId}`); }),
+            api.patch(`/api/events/${eventId}/tables/${p.tableId}`, { positionX: p.x, positionY: p.y }),
           ),
         );
       } catch {
@@ -1163,18 +1069,12 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     // 存 DB（批次一次寫入）
     if (eventId) {
       try {
-        const res = await authFetch(`/api/events/${eventId}/guests/assign-batch`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            assignments: assignments.map((a) => {
-              const guest = finalGuests.find((g) => g.id === a.guestId);
-              return { guestId: a.guestId, tableId: a.tableId, seatIndex: guest?.seatIndex ?? null };
-            }),
+        await api.patch(`/api/events/${eventId}/guests/assign-batch`, {
+          assignments: assignments.map((a) => {
+            const guest = finalGuests.find((g) => g.id === a.guestId);
+            return { guestId: a.guestId, tableId: a.tableId, seatIndex: guest?.seatIndex ?? null };
           }),
         });
-        if (!res.ok) throw new Error('Save failed');
       } catch {
         // 失敗 → 自動 revert
         const reverted = get().guests.map((g) => {
@@ -1235,9 +1135,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     if (eventId) {
       const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed');
-      authFetch(`/api/events/${eventId}/guests/assign-batch`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignments: confirmed.map((g) => ({ guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null })) }),
+      api.patch(`/api/events/${eventId}/guests/assign-batch`, {
+        assignments: confirmed.map((g) => ({ guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null })),
       }).catch(console.error);
     }
   },
@@ -1268,14 +1167,13 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       })),
     };
 
-    const res = await authFetch(`/api/events/${eventId}/snapshots`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ name, data, averageSatisfaction: avg }),
-    });
-    if (!res.ok) return;
-    const snapshot = await res.json();
+    let snapshot;
+    try {
+      const res = await api.post(`/api/events/${eventId}/snapshots`, { name, data, averageSatisfaction: avg });
+      snapshot = res.data;
+    } catch {
+      return;
+    }
     set({ snapshots: [snapshot, ...snapshots] });
   },
 
@@ -1350,32 +1248,19 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       if (missingSnapTables.length > 0) {
         await Promise.all(
           missingSnapTables.map((st) =>
-            fetch(`/api/events/${eventId}/tables`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ id: st.tableId, name: st.name || '桌', positionX: st.positionX, positionY: st.positionY }),
-            }).catch(console.error)
+            api.post(`/api/events/${eventId}/tables`, { id: st.tableId, name: st.name || '桌', positionX: st.positionX, positionY: st.positionY }).catch(console.error)
           )
         );
       }
       // 還原賓客座位（批次一次寫入，桌子已確保存在）
       if (snapData.guests.length > 0) {
-        fetch(`/api/events/${eventId}/guests/assign-batch`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            assignments: snapData.guests.map((sg) => ({ guestId: sg.guestId, tableId: sg.tableId, seatIndex: sg.seatIndex ?? null })),
-          }),
+        api.patch(`/api/events/${eventId}/guests/assign-batch`, {
+          assignments: snapData.guests.map((sg) => ({ guestId: sg.guestId, tableId: sg.tableId, seatIndex: sg.seatIndex ?? null })),
         }).catch(console.error);
       }
       // 刪除快照後新增的桌
       for (const tableId of extraTableIds) {
-        fetch(`/api/events/${eventId}/tables/${tableId}`, {
-          method: 'DELETE',
-          credentials: 'include',
-        }).catch(console.error);
+        api.delete(`/api/events/${eventId}/tables/${tableId}`).catch(console.error);
       }
     }
   },
@@ -1384,14 +1269,13 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const { eventId, avoidPairs } = get();
     if (!eventId) return;
 
-    const res = await authFetch(`/api/events/${eventId}/avoid-pairs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ guestAId, guestBId, reason }),
-    });
-    if (!res.ok) return;
-    const pair = await res.json();
+    let pair;
+    try {
+      const res = await api.post(`/api/events/${eventId}/avoid-pairs`, { guestAId, guestBId, reason });
+      pair = res.data;
+    } catch {
+      return;
+    }
     set({ avoidPairs: [...avoidPairs, pair] });
   },
 
@@ -1399,10 +1283,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const { eventId, avoidPairs } = get();
     if (!eventId) return;
 
-    await authFetch(`/api/events/${eventId}/avoid-pairs/${pairId}`, {
-      method: 'DELETE',
-      credentials: 'include',
-    });
+    await api.delete(`/api/events/${eventId}/avoid-pairs/${pairId}`);
     set({ avoidPairs: avoidPairs.filter((ap) => ap.id !== pairId) });
   },
 
@@ -1437,12 +1318,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       merged.seatIndex = null;
       // Also persist the table removal to backend
       if (eventId) {
-        fetch(`/api/events/${eventId}/guests/${guestId}/table`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ tableId: null, seatIndex: null }),
-        }).catch(console.error);
+        api.patch(`/api/events/${eventId}/guests/${guestId}/table`, { tableId: null, seatIndex: null }).catch(console.error);
       }
     }
 
@@ -1485,12 +1361,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
               if (id !== guestId) {
                 const prev = tableGuests.find((g) => g.id === id);
                 if (prev && prev.seatIndex !== newIdx) {
-                  fetch(`/api/events/${eventId}/guests/${id}/table`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ tableId: table.id, seatIndex: newIdx }),
-                  }).catch(console.error);
+                  api.patch(`/api/events/${eventId}/guests/${id}/table`, { tableId: table.id, seatIndex: newIdx }).catch(console.error);
                 }
               }
             }
@@ -1516,17 +1387,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     }
 
     try {
-      const res = await authFetch(`/api/events/${eventId}/guests/${guestId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(patch),
-      });
-      if (!res.ok) {
-        // Rollback
-        set({ guests: prevGuests });
-        return false;
-      }
+      await api.patch(`/api/events/${eventId}/guests/${guestId}`, patch);
       return true;
     } catch {
       set({ guests: prevGuests });
@@ -1561,11 +1422,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     set({ guests: recalcedGuests, tables: recalcedTables });
 
     try {
-      const res = await authFetch(`/api/events/${eventId}/guests/${guestId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      return res.ok;
+      await api.delete(`/api/events/${eventId}/guests/${guestId}`);
+      return true;
     } catch {
       return false;
     }
@@ -1576,14 +1434,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     if (!eventId) return null;
 
     try {
-      const res = await authFetch(`/api/events/${eventId}/guests`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) return null;
-      const raw = await res.json();
+      const res = await api.post(`/api/events/${eventId}/guests`, data);
+      const raw = res.data;
       const guest: Guest = { ...raw, seatCount: (raw.companionCount ?? 0) + 1 };
       const nextGuests = [...guests, guest];
       set({ guests: nextGuests });
@@ -1626,16 +1478,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     set({ guests: nextGuests });
 
     try {
-      const res = await authFetch(`/api/events/${eventId}/guests/${guestId}/preferences`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ preferences: clamped }),
-      });
-      if (!res.ok) {
-        set({ guests: prevGuests });
-        return false;
-      }
+      await api.put(`/api/events/${eventId}/guests/${guestId}/preferences`, { preferences: clamped });
       // Recalculate since preferences affect satisfaction scores
       const latest = get();
       const result = recalculateAll(latest.guests, latest.tables, latest.avoidPairs);
@@ -1663,14 +1506,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     if (idx < 0) return false;
 
     try {
-      const res = await authFetch(`/api/events/${eventId}/guests/${guestId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ subcategoryId }),
-      });
-      if (!res.ok) return false;
-      const updated = await res.json();
+      const res = await api.patch(`/api/events/${eventId}/guests/${guestId}`, { subcategoryId });
+      const updated = res.data;
 
       const nextGuests = [...guests];
       nextGuests[idx] = {

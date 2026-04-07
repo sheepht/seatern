@@ -6,7 +6,7 @@ import { getSatisfactionColor, calculateSatisfaction } from '@/lib/satisfaction'
 import { getTableRecommendations, getGuestRecommendations, type TableRecommendation } from '@/lib/recommend';
 import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors';
 import { findFreePosition, calculateGridLayout } from '@/lib/viewport';
-import { authFetch } from '@/lib/api';
+import { api } from '@/lib/api';
 import { FloorPlan, type FloorPlanHandle } from '@/components/workspace/FloorPlan';
 import type { Guest } from '@/stores/seating';
 
@@ -980,8 +980,10 @@ export function MobileWorkspace() {
                   onClick={async () => {
                     const eid = useSeatingStore.getState().eventId;
                     if (!eid) return;
-                    const res = await authFetch(`/api/events/${eid}/tables/empty`, { method: 'DELETE' });
-                    if (res.ok) await useSeatingStore.getState().loadEvent();
+                    try {
+                      await api.delete(`/api/events/${eid}/tables/empty`);
+                      await useSeatingStore.getState().loadEvent();
+                    } catch { /* ignore */ }
                   }}
                   disabled={!tables.some((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed'))}
                   className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap"
@@ -1057,8 +1059,10 @@ export function MobileWorkspace() {
                 onClick={async () => {
                   const eid = useSeatingStore.getState().eventId;
                   if (!eid) return;
-                  const res = await authFetch(`/api/events/${eid}/tables/empty`, { method: 'DELETE' });
-                  if (res.ok) await useSeatingStore.getState().loadEvent();
+                  try {
+                    await api.delete(`/api/events/${eid}/tables/empty`);
+                    await useSeatingStore.getState().loadEvent();
+                  } catch { /* ignore */ }
                 }}
                 disabled={!tables.some((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed'))}
                 className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap"

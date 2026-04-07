@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
 import { useSeatingStore } from '@/stores/seating';
-import { authFetch } from '@/lib/api';
+import { api } from '@/lib/api';
 
 const PLANS = [
   { type: '30', tables: 30, price: 199, days: 30, label: '小型婚禮', hasGroupPref: false },
@@ -33,15 +33,9 @@ export default function PricingPage() {
     }
     setSubmitting(true);
     try {
-      const res = await authFetch(`/api/events/${eventId}/notify-payment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planType: selectedPlan }),
-      });
-      if (res.ok) {
-        setSubmitted(true);
-        useSeatingStore.setState({ planStatus: 'pending' });
-      }
+      await api.post(`/api/events/${eventId}/notify-payment`, { planType: selectedPlan });
+      setSubmitted(true);
+      useSeatingStore.setState({ planStatus: 'pending' });
     } finally {
       setSubmitting(false);
     }
