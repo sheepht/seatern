@@ -1,0 +1,1 @@
+/workspaces/seatern/.claude/skills/gstack/devex-review/SKILL.md

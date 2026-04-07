@@ -1,0 +1,1 @@
+/workspaces/seatern/.claude/skills/gstack/browse/SKILL.md
