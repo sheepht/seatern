@@ -152,6 +152,33 @@ export function placeGuest(
   seatCount: number,
   cursorBias?: 'left' | 'right',
 ): Slot[] | null {
+  // 先嘗試原始 drop 位置
+  const result = tryPlaceAt(slots, targetIndex, guestId, seatCount, cursorBias);
+  if (result) return result;
+
+  // 放不下時，向左/右搜尋最近的可放位置（最多搜半圈）
+  const len = slots.length;
+  const maxSearch = Math.floor(len / 2);
+  for (let offset = 1; offset <= maxSearch; offset++) {
+    const leftIdx = (targetIndex - offset + len) % len;
+    const rightIdx = (targetIndex + offset) % len;
+    const leftResult = tryPlaceAt(slots, leftIdx, guestId, seatCount, cursorBias);
+    if (leftResult) return leftResult;
+    const rightResult = tryPlaceAt(slots, rightIdx, guestId, seatCount, cursorBias);
+    if (rightResult) return rightResult;
+  }
+
+  return null;
+}
+
+/** 嘗試在指定位置放入賓客，失敗回傳 null */
+function tryPlaceAt(
+  slots: Slot[],
+  targetIndex: number,
+  guestId: string,
+  seatCount: number,
+  cursorBias?: 'left' | 'right',
+): Slot[] | null {
   const len = slots.length;
 
   // 檢查空位總數
@@ -178,8 +205,6 @@ export function placeGuest(
   }
 
   // 位移所有佔用的目標格
-  // 'right'：從左往右處理，讓最左的賓客先推出右邊界，後面的依序跟上
-  // 'left'：從右往左處理，讓最右的賓客先推出左邊界，前面的依序跟上
   if (direction !== null) {
     if (direction === 'right') {
       for (let i = 0; i < seatCount; i++) {
@@ -201,7 +226,7 @@ export function placeGuest(
   // 驗證目標區域已全部清空
   for (let i = 0; i < seatCount; i++) {
     const idx = (targetIndex + i) % len;
-    if (workingSlots[idx] !== null) return null; // 無法清空（不應發生）
+    if (workingSlots[idx] !== null) return null;
   }
 
   // 放入賓客
