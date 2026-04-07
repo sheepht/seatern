@@ -955,10 +955,10 @@ export function MobileWorkspace() {
           </div>
 
           {/* Bottom action bar */}
-          <div className="shrink-0 px-4 py-2 border-t border-[var(--border)] bg-[var(--bg-surface)]">
+          <div className="shrink-0 border-t border-[var(--border)] bg-[var(--bg-surface)]">
             {/* Auto-assign menu */}
             {showAutoMenu && (
-              <div className="flex gap-2 mb-2 animate-[slideUp_200ms_ease-out]">
+              <div className="flex gap-2 px-3 pt-2 animate-[slideUp_200ms_ease-out]">
                 <button
                   onClick={() => { setShowAutoMenu(false); handleAutoAssign(); }}
                   disabled={!!autoAssignProgress || unassigned.length === 0}
@@ -975,21 +975,81 @@ export function MobileWorkspace() {
                 </button>
               </div>
             )}
-            <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAutoMenu(!showAutoMenu)}
-              disabled={!!autoAssignProgress || unassigned.length === 0}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)] font-medium cursor-pointer disabled:opacity-40 disabled:cursor-default border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)]"
-            >
-              <Zap size={14} /> {autoAssignProgress ? '排位中...' : '自動排位'}
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-[var(--radius-sm,4px)] text-sm font-[family-name:var(--font-ui)] font-medium cursor-pointer disabled:opacity-40 bg-[var(--accent)] text-white border-none"
-            >
-              <Save size={14} /> {saving ? '儲存中...' : '儲存排位'}
-            </button>
+            {/* Toolbar — same style as map mode */}
+            <div className="flex items-center gap-2 px-3 py-2 overflow-x-auto">
+              {/* 自動排位 */}
+              <button
+                onClick={() => setShowAutoMenu(!showAutoMenu)}
+                disabled={!!autoAssignProgress || unassigned.length === 0}
+                className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-sm,4px)] border border-[var(--border)] cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap"
+              >
+                <Zap size={13} /> {autoAssignProgress ? '排位中...' : '自動排位'}
+              </button>
+              {/* 儲存/讀取 */}
+              <div className="flex shrink-0 rounded-[var(--radius-sm,4px)] border border-[var(--border)] overflow-hidden">
+                <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-50 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] border-r border-[var(--border)] text-xs whitespace-nowrap">
+                  <Save size={13} /> {saving ? '儲存中...' : '儲存'}
+                </button>
+                <button onClick={() => { if (snapshots.length > 0) restoreSnapshot(snapshots[0].id); }} disabled={snapshots.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap">
+                  <History size={13} /> 讀取
+                </button>
+              </div>
+              {/* 還原/重做 */}
+              <div className="flex shrink-0 rounded-[var(--radius-sm,4px)] border border-[var(--border)] overflow-hidden">
+                <button onClick={() => undo()} disabled={undoStack.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] border-r border-[var(--border)] text-xs whitespace-nowrap">
+                  <Undo2 size={13} /> 還原
+                </button>
+                <button disabled className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap">
+                  <Redo2 size={13} /> 重做
+                </button>
+              </div>
+              {/* 新桌/清桌 */}
+              <div className="flex shrink-0 rounded-[var(--radius-sm,4px)] border border-[var(--border)] overflow-hidden">
+                <button
+                  onClick={async () => {
+                    setAdding(true);
+                    const pos = findFreePosition(tables);
+                    await addTable(`第${tables.length + 1}桌`, pos.x, pos.y);
+                    setAdding(false);
+                  }}
+                  disabled={adding}
+                  className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-50 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] border-r border-[var(--border)] text-xs whitespace-nowrap"
+                >
+                  <Plus size={13} /> 新桌
+                </button>
+                <button
+                  onClick={async () => {
+                    const eid = useSeatingStore.getState().eventId;
+                    if (!eid) return;
+                    const res = await authFetch(`/api/events/${eid}/tables/empty`, { method: 'DELETE' });
+                    if (res.ok) await useSeatingStore.getState().loadEvent();
+                  }}
+                  disabled={!tables.some((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed'))}
+                  className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap"
+                >
+                  <Trash2 size={13} /> 清桌
+                </button>
+              </div>
+              {/* 重排 */}
+              <button
+                onClick={() => resetAllSeats()}
+                disabled={!guests.some((g) => g.assignedTableId)}
+                className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-sm,4px)] border border-[var(--border)] cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap"
+              >
+                <Shuffle size={13} /> 重排
+              </button>
+              {/* DEV 工具 */}
+              {isDev && (
+                <>
+                  <button
+                    onClick={handleRandomAssign}
+                    disabled={tables.length === 0}
+                    className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-sm,4px)] border border-[#C4B5FD] cursor-pointer disabled:opacity-50 text-[#7C3AED] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap"
+                  >
+                    <Dices size={12} /> 隨機
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </>
