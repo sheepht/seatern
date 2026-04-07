@@ -172,21 +172,22 @@ describe('calculateGridLayout', () => {
   it('places 4 tables in a 2x2 grid', () => {
     const tables = [makeTable('1', 0, 0), makeTable('2', 0, 0), makeTable('3', 0, 0), makeTable('4', 0, 0)];
     const result = calculateGridLayout(tables);
+    // spacing=300, startOffset=200, cols=ceil(sqrt(4))=2
     expect(result).toEqual([
       { tableId: '1', x: 200, y: 200 },
-      { tableId: '2', x: 450, y: 200 },
-      { tableId: '3', x: 200, y: 450 },
-      { tableId: '4', x: 450, y: 450 },
+      { tableId: '2', x: 500, y: 200 },
+      { tableId: '3', x: 200, y: 500 },
+      { tableId: '4', x: 500, y: 500 },
     ]);
   });
 
   it('places 10 tables in a grid', () => {
     const tables = Array.from({ length: 10 }, (_, i) => makeTable(`${i + 1}`, 0, 0));
     const result = calculateGridLayout(tables);
-    // 10 tables → ceil(sqrt(10)) = 4 cols
+    // 10 tables → ceil(sqrt(10)) = 4 cols, spacing=300
     expect(result).toHaveLength(10);
     expect(result[0]).toEqual({ tableId: '1', x: 200, y: 200 });
     // Last table: index 9, col = 9%4=1, row = floor(9/4)=2
-    expect(result[9]).toEqual({ tableId: '10', x: 450, y: 700 });
+    expect(result[9]).toEqual({ tableId: '10', x: 500, y: 800 });
   });
 });
