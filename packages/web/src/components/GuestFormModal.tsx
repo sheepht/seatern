@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronDown } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import type { Guest, Table, AvoidPair, Subcategory } from '@/lib/types';
+import type { Guest, Table, AvoidPair, Subcategory, RsvpStatus } from '@/lib/types';
 import type { CategoryColor } from '@/lib/category-colors';
 import { getCategoryColor } from '@/lib/category-colors';
 
@@ -13,7 +13,7 @@ export interface GuestFormData {
   aliases: string[]
   category: string
   subcategoryName?: string
-  rsvpStatus: 'confirmed' | 'declined'
+  rsvpStatus: RsvpStatus
   companionCount: number
   assignedTableId: string | null
   dietaryNote: string

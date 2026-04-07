@@ -13,7 +13,7 @@ import { detectColumns, normalizeGuest, type RawGuest } from './column-detector'
 import { matchAllPreferences } from './preference-matcher';
 import { authFetch } from './api';
 import { useSeatingStore } from '@/stores/seating';
-import type { CreatedGuest } from './types';
+import type { CreatedGuest, CreateGuestPayload, SubcategoryBatchPayload, AvoidPairBatchPayload, CreateTablePayload } from './types';
 
 /**
  * 為未登入的新使用者載入範例資料：
@@ -51,20 +51,19 @@ export async function loadDemoData(eventId: string): Promise<void> {
   if (confirmed.length === 0) return;
 
   // 3. 批次匯入賓客
+  const payload: CreateGuestPayload[] = guests.map((g) => ({
+    name: g.name,
+    aliases: g.aliases,
+    category: g.category || undefined,
+    rsvpStatus: g.rsvpStatus,
+    companionCount: g.companionCount,
+    dietaryNote: g.dietaryNote || undefined,
+    specialNote: g.specialNote || undefined,
+  }));
   const guestRes = await authFetch(`/api/events/${eventId}/guests/batch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      guests: guests.map((g) => ({
-        name: g.name,
-        aliases: g.aliases,
-        category: g.category || undefined,
-        rsvpStatus: g.rsvpStatus,
-        companionCount: g.companionCount,
-        dietaryNote: g.dietaryNote || undefined,
-        specialNote: g.specialNote || undefined,
-      })),
-    }),
+    body: JSON.stringify({ guests: payload }),
   });
   if (!guestRes.ok) return;
   const { guests: createdGuests } = await guestRes.json();
@@ -96,7 +95,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
   }
 
   // 5. 建立子分類
-  const subcatAssignments: Array<{ guestId: string; subcategoryName: string; category: string }> = [];
+  const subcatAssignments: SubcategoryBatchPayload['assignments'] = [];
   guests.forEach((g, i) => {
     if (!g.rawSubcategory || !g.category) return;
     const guestId = createdGuests[i]?.id;
@@ -112,7 +111,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
   }
 
   // 6. 建立避免同桌
-  const avoidPairs: Array<{ guestAId: string; guestBId: string }> = [];
+  const avoidPairs: AvoidPairBatchPayload['pairs'] = [];
   const seenAvoidPairs = new Set<string>();
   guests.forEach((g, i) => {
     if (g.rawAvoids.length === 0) return;
@@ -152,7 +151,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
         capacity: 10,
         positionX: 200 + col * 350,
         positionY: 200 + row * 350,
-      }),
+      } satisfies CreateTablePayload),
     });
   }
 

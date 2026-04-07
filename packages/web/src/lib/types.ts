@@ -11,6 +11,15 @@ export type {
   AvoidPair,
   SeatPreference,
   CreatedGuest,
+  CreateGuestPayload,
+  CreateTablePayload,
+  AssignSeatsBatchPayload,
+  PreferenceBatchPayload,
+  AvoidPairBatchPayload,
+  SubcategoryBatchPayload,
+  SnapshotData,
+  SnapshotGuestEntry,
+  SnapshotTableEntry,
 } from '@seatern/shared';
 
 import type { RsvpStatus, SeatPreference, Subcategory } from '@seatern/shared';

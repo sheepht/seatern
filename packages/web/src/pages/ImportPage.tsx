@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { authFetch } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useSeatingStore } from '@/stores/seating';
-import type { CreatedGuest } from '@/lib/types';
+import type { CreatedGuest, SubcategoryBatchPayload, AvoidPairBatchPayload } from '@/lib/types';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import type { ParseResult } from '@/lib/csv-parser';
 import { parseCSV } from '@/lib/csv-parser';
@@ -181,7 +181,7 @@ export default function ImportPage() {
       }
 
       // 建立子分類（如果有）
-      const subcatAssignments: Array<{ guestId: string; subcategoryName: string; category: string }> = [];
+      const subcatAssignments: SubcategoryBatchPayload['assignments'] = [];
       guestList.forEach((g, i) => {
         if (!g.rawSubcategory || !g.category) return;
         const guestId = createdGuests[i]?.id;
@@ -202,7 +202,7 @@ export default function ImportPage() {
       }
 
       // 建立避免同桌（如果有）
-      const avoidPairs: Array<{ guestAId: string; guestBId: string }> = [];
+      const avoidPairs: AvoidPairBatchPayload['pairs'] = [];
       const seenAvoidPairs = new Set<string>();
       guestList.forEach((g, i) => {
         if (g.rawAvoids.length === 0) return;

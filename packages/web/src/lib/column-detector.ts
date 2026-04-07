@@ -145,11 +145,13 @@ export function detectColumns(headers: string[]): DetectionResult {
 /**
  * 將原始列轉換成標準化的賓客資料
  */
+import type { RsvpStatus } from '@/lib/types';
+
 export interface RawGuest {
   name: string
   aliases: string[]
   category: string
-  rsvpStatus: 'confirmed' | 'declined'
+  rsvpStatus: RsvpStatus
   companionCount: number
   dietaryNote: string
   specialNote: string
@@ -180,7 +182,7 @@ export function normalizeGuest(
 
   // 解析 RSVP
   const rsvpRaw = get('rsvpStatus').toLowerCase();
-  let rsvpStatus: 'confirmed' | 'declined' = 'confirmed';
+  let rsvpStatus: RsvpStatus = 'confirmed';
   if (['否', '不', '婉拒', 'no', 'n', '0', 'false', '不會'].some((k) => rsvpRaw.includes(k))) {
     rsvpStatus = 'declined';
   }

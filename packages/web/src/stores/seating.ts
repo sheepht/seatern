@@ -8,13 +8,8 @@ import { buildSlotArray, placeGuest, extractSeatIndices, type Slot } from '@/lib
 
 // ─── Types ──────────────────────────────────────────
 
-export type { Guest, Table, AvoidPair, Subcategory, SeatPreviewGuest } from '@/lib/types';
-import type { Guest, Table, AvoidPair, Subcategory, SeatPreviewGuest } from '@/lib/types';
-
-export interface SnapshotData {
-  guests: Array<{ guestId: string; tableId: string; satisfactionScore: number; isOverflow: boolean }>
-  tables: Array<{ tableId: string; positionX: number; positionY: number }>
-}
+export type { Guest, Table, AvoidPair, Subcategory, SeatPreviewGuest, SnapshotData } from '@/lib/types';
+import type { Guest, Table, AvoidPair, Subcategory, SeatPreviewGuest, SnapshotData } from '@/lib/types';
 
 export interface SeatingSnapshot {
   id: string

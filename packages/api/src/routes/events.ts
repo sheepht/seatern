@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { prisma } from '@seatern/db';
 import type { OwnerType, Prisma } from '@prisma/client';
 import type { SessionEnv } from '../middleware/session';
+import type { CreateGuestPayload, CreateTablePayload, AssignSeatsBatchPayload, PreferenceBatchPayload, AvoidPairBatchPayload, SubcategoryBatchPayload } from '@seatern/shared';
 
 const events = new Hono<SessionEnv>();
 
@@ -176,17 +177,7 @@ events.post('/:id/guests/batch', async (c) => {
   const expired = expiredResponse(event);
   if (expired) return c.json(expired, 403);
 
-  const body = await c.req.json<{
-    guests: Array<{
-      name: string
-      aliases?: string[]
-      category?: string
-      rsvpStatus?: string
-      companionCount?: number
-      dietaryNote?: string
-      specialNote?: string
-    }>
-  }>();
+  const body = await c.req.json<{ guests: CreateGuestPayload[] }>();
 
   const created = await prisma.$transaction(
     body.guests.map((g) =>
@@ -238,9 +229,7 @@ events.patch('/:eventId/guests/assign-batch', async (c) => {
   const expired = expiredResponse(event);
   if (expired) return c.json(expired, 403);
 
-  const body = await c.req.json<{
-    assignments: Array<{ guestId: string; tableId: string | null; seatIndex?: number | null }>
-  }>();
+  const body = await c.req.json<AssignSeatsBatchPayload>();
 
   // 正規化：空字串視為 null
   const normalized = body.assignments.map((a) => ({
@@ -312,15 +301,7 @@ events.post('/:eventId/guests', async (c) => {
   const expired = expiredResponse(event);
   if (expired) return c.json(expired, 403);
 
-  const body = await c.req.json<{
-    name: string
-    aliases?: string[]
-    category?: string
-    rsvpStatus?: string
-    companionCount?: number
-    dietaryNote?: string
-    specialNote?: string
-  }>();
+  const body = await c.req.json<CreateGuestPayload>();
 
   if (!body.name?.trim()) return c.json({ error: 'Name is required' }, 400);
 
@@ -435,7 +416,7 @@ events.post('/:id/tables', async (c) => {
     return c.json({ code: 'PLAN_EXPIRED', message: '方案已到期，請續費' }, 403);
   }
 
-  const body = await c.req.json<{ id?: string; name: string; capacity?: number; positionX?: number; positionY?: number }>();
+  const body = await c.req.json<CreateTablePayload & { id?: string }>();
 
   const table = await prisma.table.create({
     data: {
@@ -561,9 +542,7 @@ events.post('/:id/preferences/batch', async (c) => {
   const expired = expiredResponse(event);
   if (expired) return c.json(expired, 403);
 
-  const body = await c.req.json<{
-    preferences: Array<{ guestId: string; preferredGuestId: string; rank: number }>
-  }>();
+  const body = await c.req.json<PreferenceBatchPayload>();
 
   // 先清除該活動的所有舊偏好
   const guestIds = await prisma.guest.findMany({
@@ -641,9 +620,7 @@ events.post('/:id/subcategories/batch', async (c) => {
   const expired = expiredResponse(event);
   if (expired) return c.json(expired, 403);
 
-  const body = await c.req.json<{
-    assignments: Array<{ guestId: string; subcategoryName: string; category: string }>
-  }>();
+  const body = await c.req.json<SubcategoryBatchPayload>();
 
   // Upsert subcategories
   const subcatMap = new Map<string, string>();
@@ -686,9 +663,7 @@ events.post('/:id/avoid-pairs/batch', async (c) => {
   const expired = expiredResponse(event);
   if (expired) return c.json(expired, 403);
 
-  const body = await c.req.json<{
-    pairs: Array<{ guestAId: string; guestBId: string; reason?: string }>
-  }>();
+  const body = await c.req.json<AvoidPairBatchPayload>();
 
   let created = 0;
   for (const p of body.pairs) {
