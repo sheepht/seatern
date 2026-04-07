@@ -22,7 +22,7 @@ export function useSwipeGesture(
   options: SwipeOptions,
   offsetRef: React.MutableRefObject<number>,
 ): SwipeHandlers {
-  const { onSwipeLeft, onSwipeRight, threshold = 50, ratioMin = 2 } = options;
+  const { onSwipeLeft, onSwipeRight, threshold = 50 } = options;
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const lockRef = useRef<'horizontal' | 'vertical' | null>(null);
 

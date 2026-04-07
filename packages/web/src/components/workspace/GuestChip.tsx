@@ -79,7 +79,7 @@ export function GuestChip({ guest, animIndex: _animIndex }: Props) {
             moveGuestToSeat(guest.id, bestSwapTableId, freeSeat);
           }, 1500);
         }
-        listeners?.onPointerDown?.(e as any);
+        listeners?.onPointerDown?.(e as unknown as Event);
       }}
       onPointerUp={() => cancelLongPress()}
       onClick={() => { if (!isDragging) setEditingGuest(guest.id); }}

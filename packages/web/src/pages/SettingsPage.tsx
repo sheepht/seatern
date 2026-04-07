@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useSeatingStore } from '@/stores/seating';
 import { supabase } from '@/lib/supabase';
 import { api } from '@/lib/api';
+import type { UserIdentity } from '@supabase/supabase-js';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -22,8 +23,8 @@ export default function SettingsPage() {
 
   // Provider detection
   const provider =
-    (user as any)?.app_metadata?.provider ??
-    (user as any)?.user_metadata?.provider ??
+    user?.app_metadata?.provider ??
+    (user?.user_metadata?.provider as string | undefined) ??
     'email';
   const isEmailUser = provider === 'email';
 
@@ -58,10 +59,10 @@ export default function SettingsPage() {
   const initial = name ? name[0] : '?';
 
   // Identities — Google/Email 用 Supabase identities，LINE 用 user_metadata
-  const identities = (user as any)?.identities ?? [];
-  const linkedGoogle = identities.find((i: any) => i.provider === 'google');
-  const linkedEmail = identities.find((i: any) => i.provider === 'email');
-  const linkedLine = !!(user as any)?.user_metadata?.line_user_id;
+  const identities = user?.identities ?? [];
+  const linkedGoogle = identities.find((i) => i.provider === 'google');
+  const linkedEmail = identities.find((i) => i.provider === 'email');
+  const linkedLine = !!(user?.user_metadata?.line_user_id);
   const linkedCount = (linkedGoogle ? 1 : 0) + (linkedEmail ? 1 : 0) + (linkedLine ? 1 : 0);
 
   // --- Handlers ---
@@ -133,7 +134,7 @@ export default function SettingsPage() {
       if (data.user) useAuthStore.setState({ user: data.user });
     } catch { /* */ } finally { setUnlinking(null); }
   };
-  const handleUnlinkGoogle = async (identity: any) => {
+  const handleUnlinkGoogle = async (identity: UserIdentity) => {
     setUnlinking('google');
     try {
       await supabase.auth.unlinkIdentity(identity);

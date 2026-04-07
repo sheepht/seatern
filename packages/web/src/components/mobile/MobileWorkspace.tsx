@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Map as MapIcon, List, Search, X, Zap, Save, Pencil, Undo2, Redo2, Plus, Trash2, Shuffle, History, LayoutGrid, Dices } from 'lucide-react';
 import { useSeatingStore } from '@/stores/seating';
-import { getSatisfactionColor, calculateSatisfaction, calculateTableAverage } from '@/lib/satisfaction';
+import { getSatisfactionColor, calculateSatisfaction } from '@/lib/satisfaction';
 import { getTableRecommendations, getGuestRecommendations, type TableRecommendation } from '@/lib/recommend';
 import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors';
 import { findFreePosition, calculateGridLayout } from '@/lib/viewport';
@@ -779,7 +779,6 @@ export function MobileWorkspace() {
   const addTable = useSeatingStore((s) => s.addTable);
   const resetAllSeats = useSeatingStore((s) => s.resetAllSeats);
   const autoArrangeTables = useSeatingStore((s) => s.autoArrangeTables);
-  const eventId = useSeatingStore((s) => s.eventId);
   const [adding, setAdding] = useState(false);
   const [arranging, setArranging] = useState(false);
   const isDev = import.meta.env.DEV;

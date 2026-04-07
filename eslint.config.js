@@ -21,7 +21,7 @@ export default tseslint.config(
           destructuredArrayIgnorePattern: "^_",
         },
       ],
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "error",
       "semi": ["error", "always"],
     },
   },

@@ -41,7 +41,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       },
     );
     self.postMessage({ type: 'result', assignments } as WorkerResponse);
-  } catch (err: any) {
-    self.postMessage({ type: 'error', error: err?.message || 'Unknown error' } as WorkerResponse);
+  } catch (err: unknown) {
+    self.postMessage({ type: 'error', error: err instanceof Error ? err.message : 'Unknown error' } as WorkerResponse);
   }
 };

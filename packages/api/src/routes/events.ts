@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { prisma } from '@seatern/db';
-import type { OwnerType } from '@prisma/client';
+import type { OwnerType, Prisma } from '@prisma/client';
 import type { SessionEnv } from '../middleware/session';
 
 const events = new Hono<SessionEnv>();
@@ -196,7 +196,7 @@ events.post('/:id/guests/batch', async (c) => {
           name: g.name,
           aliases: g.aliases || [],
           category: g.category,
-          rsvpStatus: (g.rsvpStatus as any) || 'confirmed',
+          rsvpStatus: (g.rsvpStatus === 'confirmed' || g.rsvpStatus === 'declined') ? g.rsvpStatus : 'confirmed',
           companionCount: g.companionCount ?? 0,
           dietaryNote: g.dietaryNote,
           specialNote: g.specialNote,
@@ -330,7 +330,7 @@ events.post('/:eventId/guests', async (c) => {
       name: body.name.trim(),
       aliases: body.aliases || [],
       category: body.category,
-      rsvpStatus: (body.rsvpStatus as any) || 'confirmed',
+      rsvpStatus: (body.rsvpStatus === 'confirmed' || body.rsvpStatus === 'declined') ? body.rsvpStatus : 'confirmed',
       companionCount: body.companionCount ?? 0,
       dietaryNote: body.dietaryNote,
       specialNote: body.specialNote,
@@ -360,10 +360,10 @@ events.patch('/:eventId/guests/:guestId', async (c) => {
   const expired = expiredResponse(event);
   if (expired) return c.json(expired, 403);
 
-  const body = await c.req.json<Record<string, any>>();
+  const body = await c.req.json<Record<string, unknown>>();
 
   // Whitelist: only allow known fields
-  const data: Record<string, any> = {};
+  const data: Record<string, unknown> = {};
   for (const field of GUEST_UPDATABLE_FIELDS) {
     if (field in body) data[field] = body[field];
   }
@@ -371,8 +371,8 @@ events.patch('/:eventId/guests/:guestId', async (c) => {
   if (Object.keys(data).length === 0) return c.json({ error: 'No updatable fields provided' }, 400);
 
   // Validate name if provided
-  if ('name' in data && !data.name?.trim()) return c.json({ error: 'Name cannot be empty' }, 400);
-  if ('name' in data) data.name = data.name.trim();
+  if ('name' in data && !(data.name as string)?.trim()) return c.json({ error: 'Name cannot be empty' }, 400);
+  if ('name' in data) data.name = (data.name as string).trim();
 
   try {
     const guest = await prisma.guest.update({
@@ -384,8 +384,8 @@ events.patch('/:eventId/guests/:guestId', async (c) => {
       },
     });
     return c.json(guest);
-  } catch (e: any) {
-    if (e.code === 'P2025') return c.json({ error: 'Guest not found' }, 404);
+  } catch (e: unknown) {
+    if (e instanceof Error && 'code' in e && (e as { code: string }).code === 'P2025') return c.json({ error: 'Guest not found' }, 404);
     throw e;
   }
 });
@@ -404,8 +404,8 @@ events.delete('/:eventId/guests/:guestId', async (c) => {
   try {
     await prisma.guest.delete({ where: { id: guestId } });
     return c.json({ ok: true });
-  } catch (e: any) {
-    if (e.code === 'P2025') return c.json({ error: 'Guest not found' }, 404);
+  } catch (e: unknown) {
+    if (e instanceof Error && 'code' in e && (e as { code: string }).code === 'P2025') return c.json({ error: 'Guest not found' }, 404);
     throw e;
   }
 });
@@ -757,7 +757,7 @@ events.post('/:id/snapshots', async (c) => {
   const expired = expiredResponse(event);
   if (expired) return c.json(expired, 403);
 
-  const body = await c.req.json<{ name: string; data: any; averageSatisfaction: number }>();
+  const body = await c.req.json<{ name: string; data: Prisma.InputJsonValue; averageSatisfaction: number }>();
 
   // 免費版限制 1 份快照
   const existing = await prisma.seatingSnapshot.count({ where: { eventId } });

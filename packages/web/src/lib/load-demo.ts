@@ -73,7 +73,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
   const validPrefs = prefMatches.filter((m) => m.selectedIndex !== null && m.selectedIndex >= 0);
   if (validPrefs.length > 0) {
     const nameToId = new Map<string, string>();
-    createdGuests.forEach((g: any) => nameToId.set(g.name.trim().toLowerCase(), g.id));
+    createdGuests.forEach((g: { id: string; name: string }) => nameToId.set(g.name.trim().toLowerCase(), g.id));
 
     const preferences = validPrefs
       .map((m) => {

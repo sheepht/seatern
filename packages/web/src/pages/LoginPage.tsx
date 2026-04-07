@@ -44,8 +44,8 @@ export default function LoginPage() {
       await claimEvent();
       await ensureEventExists();
       navigate('/');
-    } catch (err: any) {
-      setError(err.message || '登入失敗');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '登入失敗');
     } finally {
       setLoading(false);
     }
@@ -54,16 +54,16 @@ export default function LoginPage() {
   const handleGoogle = async () => {
     try {
       await signInWithGoogle();
-    } catch (err: any) {
-      setError(err.message || 'Google 登入失敗');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Google 登入失敗');
     }
   };
 
   const handleLINE = async () => {
     try {
       await signInWithLINE();
-    } catch (err: any) {
-      setError(err.message || 'LINE 登入失敗');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'LINE 登入失敗');
     }
   };
 

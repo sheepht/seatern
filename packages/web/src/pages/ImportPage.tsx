@@ -154,7 +154,7 @@ export default function ImportPage() {
       if (validPrefs.length > 0) {
         // 建立名字 → DB ID 的 lookup（新建的 + 已存在的）
         const nameToId = new Map<string, string>();
-        createdGuests.forEach((g: any) => nameToId.set(g.name.trim().toLowerCase(), g.id));
+        createdGuests.forEach((g: { id: string; name: string }) => nameToId.set(g.name.trim().toLowerCase(), g.id));
         existingGuests.forEach((g) => nameToId.set(g.name.trim().toLowerCase(), g.id));
 
         const preferences = validPrefs

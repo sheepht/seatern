@@ -154,8 +154,8 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
         positions = calculateGridLayout(tables);
       }
       await autoArrangeTables(positions);
-    } catch (err: any) {
-      alert(err.message || '保存失敗，已恢復原排列');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : '保存失敗，已恢復原排列');
     } finally {
       setArranging(false);
     }
@@ -189,9 +189,9 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
     // Step 3: 執行分配
     try {
       await autoAssignGuests(mode);
-    } catch (err: any) {
+    } catch (err: unknown) {
       useSeatingStore.setState({ flyingGuestIds: new Set() });
-      alert(err.message || '自動分配失敗');
+      alert(err instanceof Error ? err.message : '自動分配失敗');
       setAssigning(false);
       return;
     }

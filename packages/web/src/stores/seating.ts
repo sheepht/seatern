@@ -11,10 +11,15 @@ import { buildSlotArray, placeGuest, extractSeatIndices, type Slot } from '@/lib
 export type { Guest, Table, AvoidPair } from '@/lib/types';
 import type { Guest, Table, AvoidPair } from '@/lib/types';
 
+export interface SnapshotData {
+  guests: Array<{ guestId: string; tableId: string; satisfactionScore: number; isOverflow: boolean }>
+  tables: Array<{ tableId: string; positionX: number; positionY: number }>
+}
+
 export interface SeatingSnapshot {
   id: string
   name: string
-  data: any
+  data: SnapshotData
   averageSatisfaction: number
   createdAt: string
 }
@@ -238,7 +243,15 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       if (!res.ok) throw new Error('Failed to load event');
       const data = await res.json();
 
-      const guests = data.guests.map((g: any) => ({
+      interface ApiGuest {
+        id: string; name: string; aliases: string[]; category: string | null;
+        rsvpStatus: Guest['rsvpStatus']; companionCount: number;
+        dietaryNote: string | null; specialNote: string | null;
+        assignedTableId: string | null; seatIndex: number | null;
+        isOverflow: boolean; isIsolated: boolean;
+        seatPreferences: Guest['seatPreferences']; subcategory: Guest['subcategory'];
+      }
+      const guests = data.guests.map((g: ApiGuest) => ({
         id: g.id,
         name: g.name,
         aliases: g.aliases || [],
@@ -1081,9 +1094,9 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       assignments = await runAutoAssignInWorker(latestGuests, currentTables, avoidPairs, mode, (progress) => {
         set({ autoAssignProgress: progress });
       }, abortController.signal);
-    } catch (e: any) {
+    } catch (e: unknown) {
       set({ autoAssignProgress: null, autoAssignAbort: null });
-      if (e?.name === 'AbortError') return; // 使用者取消
+      if (e instanceof Error && e.name === 'AbortError') return; // 使用者取消
       throw e;
     }
     set({ autoAssignProgress: null, autoAssignAbort: null });

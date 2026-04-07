@@ -495,7 +495,7 @@ export default function GuestManagementPage() {
   const handleRsvpToggle = useCallback((guest: Guest) => {
     const idx = RSVP_CYCLE.indexOf(guest.rsvpStatus);
     const next = RSVP_CYCLE[(idx + 1) % RSVP_CYCLE.length];
-    handleSave(guest.id, { rsvpStatus: next as any });
+    handleSave(guest.id, { rsvpStatus: next as Guest['rsvpStatus'] });
   }, [handleSave]);
 
   const handleSort = (field: SortField) => {
@@ -755,7 +755,6 @@ export default function GuestManagementPage() {
         {isMobile && (
           <div className="overflow-auto mt-2 flex-1 min-h-0 space-y-2 pb-4">
             {filtered.map((guest) => {
-              const tableName = guest.assignedTableId ? tableNameMap.get(guest.assignedTableId) || '—' : '未排座';
               const satColor = guest.assignedTableId ? getSatisfactionColor(guest.satisfactionScore) : 'var(--text-muted)';
               const subcatName = guest.subcategory?.name ?? '';
               const prefGuests = guest.seatPreferences

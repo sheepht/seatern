@@ -54,9 +54,10 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
   const rafRef = useRef<number | null>(null);
   useEffect(() => {
     if (!showTooltip) {
-      setTooltipPos(null);
+      // 延遲清除避免 cascading render
+      const id = requestAnimationFrame(() => setTooltipPos(null));
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      return;
+      return () => cancelAnimationFrame(id);
     }
     const tick = () => {
       const pos = getTooltipPos();
@@ -112,7 +113,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
           }, 1500);
         }
         // 讓 dnd-kit 的 listener 也處理
-        listeners?.onPointerDown?.(e as any);
+        listeners?.onPointerDown?.(e as unknown as Event);
       }}
       onPointerUp={() => {
         if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
@@ -151,7 +152,6 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
           setHoveredGuest(guest.id);
         }
         // 立刻顯示 tooltip
-        const rect = el.getBoundingClientRect();
         setShowTooltip(true);
       }}
       onMouseLeave={(e) => {

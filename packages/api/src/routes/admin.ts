@@ -169,7 +169,7 @@ admin.patch('/events/:eventId', async (c) => {
     planNote?: string | null;
   }>();
 
-  const data: Record<string, any> = {};
+  const data: Record<string, string | Date | null> = {};
   if ('planType' in body) data.planType = body.planType || null;
   if ('planStatus' in body) data.planStatus = body.planStatus || null;
   if ('planExpiresAt' in body) data.planExpiresAt = body.planExpiresAt ? new Date(body.planExpiresAt) : null;

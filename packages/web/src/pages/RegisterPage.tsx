@@ -31,8 +31,8 @@ export default function RegisterPage() {
     try {
       await signUpWithEmail(email, password);
       setSuccess(true);
-    } catch (err: any) {
-      setError(err.message || '註冊失敗');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '註冊失敗');
     } finally {
       setLoading(false);
     }
