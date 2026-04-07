@@ -368,7 +368,7 @@ export default function ImportPage() {
 
       {/* preview 步驟：全版面 */}
       {step === 'preview' && parseResult && (
-        <div className="p-6 flex-1 flex flex-col min-h-0 max-w-[1440px] mx-auto w-full">
+        <div className={`max-w-[1440px] mx-auto w-full ${isMobile ? 'p-4 overflow-auto flex-1' : 'p-6 flex-1 flex flex-col min-h-0'}`}>
           <ImportPreview
             data={parseResult}
             onConfirm={handlePreviewConfirm}
