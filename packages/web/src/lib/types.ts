@@ -1,11 +1,27 @@
-/** 共用型別（主線程 + Web Worker 共用） */
+/**
+ * 前端型別（主線程 + Web Worker 共用）
+ *
+ * 從 @seatern/shared 引入原子型別，
+ * 再組合/擴展成前端 UI 需要的投射型別。
+ */
 
+export type {
+  RsvpStatus,
+  Subcategory,
+  AvoidPair,
+  SeatPreference,
+  CreatedGuest,
+} from '@seatern/shared';
+
+import type { RsvpStatus, SeatPreference, Subcategory } from '@seatern/shared';
+
+/** 前端賓客（從 API 投射，加上 UI 計算欄位） */
 export interface Guest {
   id: string
   name: string
   aliases: string[]
   category: string
-  rsvpStatus: 'confirmed' | 'declined'
+  rsvpStatus: RsvpStatus
   companionCount: number
   /** 佔座位數 = companionCount + 1 */
   seatCount: number
@@ -16,10 +32,11 @@ export interface Guest {
   seatIndex: number | null
   isOverflow: boolean
   isIsolated: boolean
-  seatPreferences: Array<{ preferredGuestId: string; rank: number }>
-  subcategory: { id: string; name: string } | null
+  seatPreferences: SeatPreference[]
+  subcategory: Pick<Subcategory, 'id' | 'name'> | null
 }
 
+/** 前端桌次（不含 eventId、guestIds） */
 export interface Table {
   id: string
   name: string
@@ -30,22 +47,6 @@ export interface Table {
   color: string | null
   note: string | null
 }
-
-export interface AvoidPair {
-  id: string
-  guestAId: string
-  guestBId: string
-  reason: string | null
-}
-
-export interface Subcategory {
-  id: string
-  name: string
-  category: string
-}
-
-/** API batch create 回傳的簡化賓客 */
-export type CreatedGuest = Pick<Guest, 'id' | 'name'>
 
 /** 空位預覽賓客 */
 export interface SeatPreviewGuest {
