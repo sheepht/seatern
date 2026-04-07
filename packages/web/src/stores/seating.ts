@@ -8,8 +8,8 @@ import { buildSlotArray, placeGuest, extractSeatIndices, type Slot } from '@/lib
 
 // ─── Types ──────────────────────────────────────────
 
-export type { Guest, Table, AvoidPair } from '@/lib/types';
-import type { Guest, Table, AvoidPair } from '@/lib/types';
+export type { Guest, Table, AvoidPair, Subcategory, SeatPreviewGuest } from '@/lib/types';
+import type { Guest, Table, AvoidPair, Subcategory, SeatPreviewGuest } from '@/lib/types';
 
 export interface SnapshotData {
   guests: Array<{ guestId: string; tableId: string; satisfactionScore: number; isOverflow: boolean }>
@@ -33,7 +33,7 @@ interface SeatingState {
   eventCategories: string[]
   guests: Guest[]
   tables: Table[]
-  subcategories: Array<{ id: string; name: string; category: string }>
+  subcategories: Subcategory[]
   avoidPairs: AvoidPair[]
   snapshots: SeatingSnapshot[]
 
@@ -65,7 +65,7 @@ interface SeatingState {
   /** 智慧推薦：最佳推薦的每位賓客預覽滿意度 */
   recommendationPreviewScores: Map<string, number>
   /** 空位 popover hover 預覽：顯示賓客預覽在指定空位 */
-  seatPreviewGuest: { tableId: string; seatIndex: number; guestId: string; predictedScore: number; category?: string; name: string; aliases: string[] } | null
+  seatPreviewGuest: SeatPreviewGuest | null
   /** 有更好位置的賓客 ID 集合（顯示💡圖示） */
   guestsWithRecommendations: Set<string>
   /** 長按換位：hover 中賓客的最佳推薦目標桌 ID */
@@ -270,7 +270,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         subcategory: g.subcategory || null,
       }));
       const tables = data.tables as Table[];
-      const subcategories = (data.subcategories || []) as Array<{ id: string; name: string; category: string }>;
+      const subcategories = (data.subcategories || []) as Subcategory[];
 
       // 初始滿意度計算
       const result = recalculateAll(guests, tables, data.avoidPairs || []);

@@ -13,6 +13,7 @@ import { detectColumns, normalizeGuest, type RawGuest } from './column-detector'
 import { matchAllPreferences } from './preference-matcher';
 import { authFetch } from './api';
 import { useSeatingStore } from '@/stores/seating';
+import type { CreatedGuest } from './types';
 
 /**
  * 為未登入的新使用者載入範例資料：
@@ -73,7 +74,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
   const validPrefs = prefMatches.filter((m) => m.selectedIndex !== null && m.selectedIndex >= 0);
   if (validPrefs.length > 0) {
     const nameToId = new Map<string, string>();
-    createdGuests.forEach((g: { id: string; name: string }) => nameToId.set(g.name.trim().toLowerCase(), g.id));
+    createdGuests.forEach((g: CreatedGuest) => nameToId.set(g.name.trim().toLowerCase(), g.id));
 
     const preferences = validPrefs
       .map((m) => {

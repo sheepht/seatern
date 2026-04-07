@@ -37,3 +37,23 @@ export interface AvoidPair {
   guestBId: string
   reason: string | null
 }
+
+export interface Subcategory {
+  id: string
+  name: string
+  category: string
+}
+
+/** API batch create 回傳的簡化賓客 */
+export type CreatedGuest = Pick<Guest, 'id' | 'name'>
+
+/** 空位預覽賓客 */
+export interface SeatPreviewGuest {
+  tableId: string
+  seatIndex: number
+  guestId: string
+  predictedScore: number
+  category?: string
+  name: string
+  aliases: string[]
+}
