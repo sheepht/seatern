@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
+import { SeaternLogo } from '@/components/SeaternLogo';
 import { authFetch } from '@/lib/api';
 
 async function ensureEventExists() {
@@ -11,7 +12,7 @@ async function ensureEventExists() {
     await authFetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: '我的婚禮', type: 'wedding' }),
+      body: JSON.stringify({ name: '我的排位' }),
     });
   }
 }
@@ -121,6 +122,7 @@ export default function LoginPage() {
         {/* Brand mark — shown on mobile */}
         {isMobile && (
           <div className="text-center mb-6">
+            <SeaternLogo className="w-16 h-16 mx-auto mb-2 text-[var(--accent)]" />
             <h1 className="text-[28px] font-extrabold font-[family-name:var(--font-display)] text-[var(--text-primary)]">
               排位鷗鷗
             </h1>
@@ -132,7 +134,10 @@ export default function LoginPage() {
 
         {/* Desktop: title only */}
         {!isMobile && (
-          <h1 className="text-2xl font-bold text-center mb-6 font-[family-name:var(--font-display)] text-[var(--text-primary)]">登入排位鷗鷗</h1>
+          <div className="text-center mb-6">
+            <SeaternLogo className="w-12 h-12 mx-auto mb-2 text-[var(--accent)]" />
+            <h1 className="text-2xl font-bold font-[family-name:var(--font-display)] text-[var(--text-primary)]">登入排位鷗鷗</h1>
+          </div>
         )}
 
         {error && (

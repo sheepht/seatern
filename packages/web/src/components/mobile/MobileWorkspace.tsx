@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Map as MapIcon, List, Search, X, Zap, Save, Pencil, Undo2, Redo2, Plus, Trash2, Shuffle, History, LayoutGrid, Dices } from 'lucide-react';
 import { useSeatingStore } from '@/stores/seating';
-import { getSatisfactionColor, recalculateAll, calculateSatisfaction, calculateTableAverage } from '@/lib/satisfaction';
+import { getSatisfactionColor, calculateSatisfaction, calculateTableAverage } from '@/lib/satisfaction';
 import { getTableRecommendations, getGuestRecommendations, type TableRecommendation } from '@/lib/recommend';
 import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors';
 import { findFreePosition, calculateGridLayout } from '@/lib/viewport';
@@ -867,48 +867,8 @@ export function MobileWorkspace() {
   }, [tables, autoArrangeTables]);
 
   const handleRandomAssign = useCallback(() => {
-    const { avoidPairs: ap, undoStack: us } = useSeatingStore.getState();
-    const allConfirmed = guests.filter((g) => g.rsvpStatus === 'confirmed');
-    const shuffled = [...allConfirmed];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    shuffled.length = Math.ceil(shuffled.length * 0.75);
-    const remaining = new Map<string, number>();
-    const nextSeat = new Map<string, number>();
-    for (const t of tables) { remaining.set(t.id, t.capacity); nextSeat.set(t.id, 0); }
-    const assignments = new Map<string, { tableId: string; seatIndex: number }>();
-    for (const g of shuffled) {
-      const avail = tables.find((t) => (remaining.get(t.id) || 0) >= g.seatCount);
-      if (avail) {
-        const seat = nextSeat.get(avail.id) || 0;
-        assignments.set(g.id, { tableId: avail.id, seatIndex: seat });
-        remaining.set(avail.id, (remaining.get(avail.id) || 0) - g.seatCount);
-        nextSeat.set(avail.id, seat + g.seatCount);
-      }
-    }
-    const updatedGuests = guests.map((g) => {
-      const a = assignments.get(g.id);
-      if (a) return { ...g, assignedTableId: a.tableId, seatIndex: a.seatIndex };
-      if (g.rsvpStatus === 'confirmed') return { ...g, assignedTableId: null, seatIndex: null };
-      return g;
-    });
-    const result = recalculateAll(updatedGuests, tables, ap);
-    const finalGuests = updatedGuests.map((g) => { const s = result.guests.find((gs) => gs.id === g.id); return s ? { ...g, satisfactionScore: s.satisfactionScore } : g; });
-    const finalTables = tables.map((t) => { const s = result.tables.find((ts) => ts.id === t.id); return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t; });
-    useSeatingStore.setState({
-      guests: finalGuests, tables: finalTables,
-      undoStack: [...us, { type: 'auto-assign' as const, assignments: allConfirmed.map((g) => ({ guestId: g.id, fromTableId: g.assignedTableId || null, fromSeatIndex: g.seatIndex })), createdTableIds: [] }],
-    });
-    if (eventId) {
-      const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed');
-      authFetch(`/api/events/${eventId}/guests/assign-batch`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignments: confirmed.map((g) => ({ guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null })) }),
-      }).catch(console.error);
-    }
-  }, [guests, tables, eventId]);
+    useSeatingStore.getState().randomAssignGuests();
+  }, []);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

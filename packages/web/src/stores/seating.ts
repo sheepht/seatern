@@ -75,6 +75,12 @@ interface SeatingState {
   flyingGuestIds: Set<string>
   /** 排位頁面：正在編輯的賓客 ID（開啟 GuestEditModal） */
   editingGuestId: string | null
+  /** 桌數上限（從 API 取得） */
+  tableLimit: number
+  /** 方案狀態 */
+  planStatus: string | null
+  /** 方案到期時間 */
+  planExpiresAt: string | null
   /** 桌數上限已達到（顯示 TableLimitModal） */
   tableLimitReached: boolean
   /** 用戶已點「稍後再說」關閉上限 modal */
@@ -149,6 +155,7 @@ interface SeatingState {
   checkAvoidViolation: (guestId: string, tableId: string) => AvoidPair | null
   autoArrangeTables: (positions: Array<{ tableId: string; x: number; y: number }>) => Promise<void>
   autoAssignGuests: (mode?: AutoAssignMode) => Promise<void>
+  randomAssignGuests: (ratio?: number) => void
   setEditingGuest: (guestId: string | null) => void
 
   // Guest CRUD (管理頁面用)
@@ -198,6 +205,9 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   lastResetAt: 0,
   isResetting: false,
   flyingGuestIds: new Set(),
+  tableLimit: 20,
+  planStatus: null,
+  planExpiresAt: null,
   tableLimitReached: false,
   tableLimitDismissed: false,
   autoAssignProgress: null,
@@ -216,7 +226,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         const createRes = await authFetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: '我的婚禮', type: 'wedding' }),
+          body: JSON.stringify({ name: '我的排位' }),
         });
         if (!createRes.ok) {
           set({ loading: false });
@@ -301,6 +311,9 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         subcategories,
         avoidPairs: data.avoidPairs || [],
         snapshots: data.snapshots || [],
+        tableLimit: data.tableLimit ?? 20,
+        planStatus: data.planStatus ?? null,
+        planExpiresAt: data.planExpiresAt ?? null,
         loading: false,
         selectedTableId: null,
         dragPreview: null,
@@ -1168,6 +1181,56 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         set({ guests: revertedGuests, undoStack: get().undoStack.slice(0, -1) });
         throw new Error('保存失敗，已恢復原排列');
       }
+    }
+  },
+
+  randomAssignGuests: (ratio = 0.75) => {
+    const { guests, tables, avoidPairs, eventId, undoStack } = get();
+    const allConfirmed = guests.filter((g) => g.rsvpStatus === 'confirmed');
+    if (allConfirmed.length === 0 || tables.length === 0) return;
+
+    const shuffled = [...allConfirmed];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    shuffled.length = Math.ceil(shuffled.length * ratio);
+
+    const remaining = new Map<string, number>();
+    const nextSeat = new Map<string, number>();
+    for (const t of tables) { remaining.set(t.id, t.capacity); nextSeat.set(t.id, 0); }
+    const assignments = new Map<string, { tableId: string; seatIndex: number }>();
+    for (const g of shuffled) {
+      const avail = tables.find((t) => (remaining.get(t.id) || 0) >= g.seatCount);
+      if (avail) {
+        const seat = nextSeat.get(avail.id) || 0;
+        assignments.set(g.id, { tableId: avail.id, seatIndex: seat });
+        remaining.set(avail.id, (remaining.get(avail.id) || 0) - g.seatCount);
+        nextSeat.set(avail.id, seat + g.seatCount);
+      }
+    }
+
+    const updatedGuests = guests.map((g) => {
+      const a = assignments.get(g.id);
+      if (a) return { ...g, assignedTableId: a.tableId, seatIndex: a.seatIndex };
+      if (g.rsvpStatus === 'confirmed') return { ...g, assignedTableId: null, seatIndex: null };
+      return g;
+    });
+    const result = recalculateAll(updatedGuests, tables, avoidPairs);
+    const finalGuests = updatedGuests.map((g) => { const s = result.guests.find((gs) => gs.id === g.id); return s ? { ...g, satisfactionScore: s.satisfactionScore } : g; });
+    const finalTables = tables.map((t) => { const s = result.tables.find((ts) => ts.id === t.id); return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t; });
+
+    set({
+      guests: finalGuests, tables: finalTables,
+      undoStack: [...undoStack, { type: 'auto-assign' as const, assignments: allConfirmed.map((g) => ({ guestId: g.id, fromTableId: g.assignedTableId || null, fromSeatIndex: g.seatIndex })), createdTableIds: [] }],
+    });
+
+    if (eventId) {
+      const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed');
+      authFetch(`/api/events/${eventId}/guests/assign-batch`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignments: confirmed.map((g) => ({ guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null })) }),
+      }).catch(console.error);
     }
   },
 

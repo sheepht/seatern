@@ -3,11 +3,12 @@ import { authFetch } from '@/lib/api';
 import { createPortal } from 'react-dom';
 import { useDroppable } from '@dnd-kit/core';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Wand2, Plus, Save, Undo2, Redo2, Shuffle, LayoutGrid, Trash2, Dices, History } from 'lucide-react';
+import { ChevronLeft, Wand2, Plus, Save, Undo2, Redo2, Shuffle, LayoutGrid, Trash2, Dices, History, FlaskConical } from 'lucide-react';
 import { useSeatingStore } from '@/stores/seating';
 import TableLimitBanner from './TableLimitBanner';
 import { estimateAutoAssignTimeInWorker } from '@/lib/auto-assign-client';
-import { getSatisfactionColor, recalculateAll } from '@/lib/satisfaction';
+import { getSatisfactionColor } from '@/lib/satisfaction';
+import { resetDemoFlag } from '@/lib/load-demo';
 import { computeSnapshotStats, computeCurrentStats } from '@/lib/snapshot-stats';
 import { findFreePosition, calculateGridLayout } from '@/lib/viewport';
 import { GuestChip } from './GuestChip';
@@ -117,50 +118,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
 
   const isDev = import.meta.env.DEV;
 
-  const handleRandomAssign = () => {
-    const { avoidPairs, undoStack } = useSeatingStore.getState();
-    const allConfirmed = guests.filter((g) => g.rsvpStatus === 'confirmed');
-    const shuffled = [...allConfirmed];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    shuffled.length = Math.ceil(shuffled.length * 0.75);
-    const remaining = new Map<string, number>();
-    const nextSeat = new Map<string, number>();
-    for (const t of tables) { remaining.set(t.id, t.capacity); nextSeat.set(t.id, 0); }
-    const assignments = new Map<string, { tableId: string; seatIndex: number }>();
-    for (const g of shuffled) {
-      const avail = tables.find((t) => (remaining.get(t.id) || 0) >= g.seatCount);
-      if (avail) {
-        const seat = nextSeat.get(avail.id) || 0;
-        assignments.set(g.id, { tableId: avail.id, seatIndex: seat });
-        remaining.set(avail.id, (remaining.get(avail.id) || 0) - g.seatCount);
-        nextSeat.set(avail.id, seat + g.seatCount);
-      }
-    }
-    const updatedGuests: typeof guests = guests.map((g) => {
-      const a = assignments.get(g.id);
-      if (a) return { ...g, assignedTableId: a.tableId, seatIndex: a.seatIndex };
-      if (g.rsvpStatus === 'confirmed') return { ...g, assignedTableId: null, seatIndex: null };
-      return g;
-    });
-    const result = recalculateAll(updatedGuests, tables, avoidPairs);
-    const finalGuests = updatedGuests.map((g) => { const s = result.guests.find((gs) => gs.id === g.id); return s ? { ...g, satisfactionScore: s.satisfactionScore } : g; });
-    const finalTables = tables.map((t) => { const s = result.tables.find((ts) => ts.id === t.id); return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t; });
-    useSeatingStore.setState({
-      guests: finalGuests, tables: finalTables,
-      undoStack: [...undoStack, { type: 'auto-assign' as const, assignments: allConfirmed.map((g) => ({ guestId: g.id, fromTableId: g.assignedTableId || null, fromSeatIndex: g.seatIndex })), createdTableIds: [] }],
-    });
-    const { eventId } = useSeatingStore.getState();
-    if (eventId) {
-      const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed');
-      authFetch(`/api/events/${eventId}/guests/assign-batch`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignments: confirmed.map((g) => ({ guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null })) }),
-      }).catch(console.error);
-    }
-  };
+  const handleRandomAssign = () => useSeatingStore.getState().randomAssignGuests();
 
   const handleDeleteEmptyTables = async () => {
     const eventId = useSeatingStore.getState().eventId;
@@ -559,6 +517,17 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
                 <Dices size={12} /> 隨機
               </button>
             )}
+            <button
+              onClick={async () => {
+                const eid = useSeatingStore.getState().eventId;
+                if (eid) await authFetch(`/api/events/${eid}/reset`, { method: 'DELETE' });
+                resetDemoFlag();
+                window.location.reload();
+              }}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] border border-[#F59E0B] cursor-pointer hover:bg-amber-50 text-[#B45309]"
+            >
+              <FlaskConical size={12} /> 模擬新用戶
+            </button>
           </div>
         )}
       </div>

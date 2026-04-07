@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Menu, Lock, Settings, LogOut } from 'lucide-react';
+import { Pencil, Menu, LogIn, Settings, LogOut } from 'lucide-react';
+import { SeaternLogo } from '@/components/SeaternLogo';
 import { useSeatingStore } from '@/stores/seating';
 import { useAuthStore } from '@/stores/auth';
 import { getSatisfactionColor } from '@/lib/satisfaction';
@@ -375,7 +376,7 @@ export function Toolbar({ onFitAll, page = 'workspace' }: ToolbarProps = {}) {
 
   const authUser = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
-  const tableLimit = authUser ? 20 : 10;
+  const tableLimit = useSeatingStore((s) => s.tableLimit);
   const tableCountPct = tables.length / tableLimit;
 
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed');
@@ -408,8 +409,9 @@ export function Toolbar({ onFitAll, page = 'workspace' }: ToolbarProps = {}) {
         {/* Left: Brand + Event name + stats */}
         <div className="flex items-center gap-3">
           <span
-            className="text-lg font-extrabold tracking-tight font-[family-name:var(--font-display)] text-[var(--accent)]"
+            className="flex items-center gap-1.5 text-lg font-extrabold tracking-tight font-[family-name:var(--font-display)] text-[var(--accent)]"
           >
+            <SeaternLogo className="w-7 h-7" />
             排位鷗鷗
           </span>
           <span className="text-[var(--border-strong)]">|</span>
@@ -441,7 +443,7 @@ export function Toolbar({ onFitAll, page = 'workspace' }: ToolbarProps = {}) {
                 color: tableCountPct >= 0.8 ? '#DC2626' : tableCountPct >= 0.6 ? '#CA8A04' : '#16A34A',
               }}>{tables.length}/{tableLimit} 桌</span>
               <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-full mt-2 whitespace-nowrap rounded-[var(--radius-sm)] bg-[var(--bg-elevated,#1f2937)] text-white text-xs px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50">
-                {authUser ? '付費版可解鎖更多桌數（即將推出）' : '登入後可使用最多 20 桌'}
+                {tableLimit > 20 ? `已升級 ${tableLimit} 桌方案` : authUser ? '到定價頁升級更多桌數' : '登入後可使用最多 20 桌'}
               </span>
             </span>
           </div>
@@ -544,7 +546,7 @@ export function Toolbar({ onFitAll, page = 'workspace' }: ToolbarProps = {}) {
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--accent-light)] text-[var(--accent)] font-[family-name:var(--font-body)]"
                       onClick={() => { setShowMenu(false); navigate('/login'); }}
                     >
-                      <Lock size={16} className="shrink-0" />
+                      <LogIn size={16} className="shrink-0" />
                       <span>登入</span>
                     </button>
                   )}
