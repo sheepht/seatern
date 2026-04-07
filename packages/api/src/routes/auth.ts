@@ -10,15 +10,20 @@ const auth = new Hono<SessionEnv>();
 const SESSION_COOKIE = 'seatern-session';
 const LINE_STATE_COOKIE = 'line-oauth-state';
 
-const LINE_CHANNEL_ID = process.env.LINE_CHANNEL_ID;
-const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET;
-const LINE_CALLBACK_URL = process.env.LINE_CALLBACK_URL;
+function getLineConfig() {
+  return {
+    channelId: process.env.LINE_CHANNEL_ID,
+    channelSecret: process.env.LINE_CHANNEL_SECRET,
+    callbackUrl: process.env.LINE_CALLBACK_URL,
+  };
+}
 
 // ─── LINE OAuth ──────────────────────────────────────
 
 // GET /auth/line — redirect to LINE Login
 auth.get('/line', (c) => {
-  if (!LINE_CHANNEL_ID || !LINE_CALLBACK_URL) {
+  const { channelId, callbackUrl } = getLineConfig();
+  if (!channelId || !callbackUrl) {
     return c.json({ error: 'LINE Login not configured' }, 500);
   }
 
@@ -33,8 +38,8 @@ auth.get('/line', (c) => {
 
   const params = new URLSearchParams({
     response_type: 'code',
-    client_id: LINE_CHANNEL_ID,
-    redirect_uri: LINE_CALLBACK_URL,
+    client_id: channelId,
+    redirect_uri: callbackUrl,
     state,
     scope: 'profile openid email',
   });
@@ -63,7 +68,8 @@ auth.get('/line/callback', async (c) => {
   const isLinkMode = state.startsWith('link:');
   const linkUserId = isLinkMode ? state.split(':')[1] : null;
 
-  if (!LINE_CHANNEL_ID || !LINE_CHANNEL_SECRET || !LINE_CALLBACK_URL) {
+  const { channelId, channelSecret, callbackUrl } = getLineConfig();
+  if (!channelId || !channelSecret || !callbackUrl) {
     return loginError('LINE Login 未設定');
   }
 
@@ -75,9 +81,9 @@ auth.get('/line/callback', async (c) => {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: LINE_CALLBACK_URL,
-        client_id: LINE_CHANNEL_ID,
-        client_secret: LINE_CHANNEL_SECRET,
+        redirect_uri: callbackUrl,
+        client_id: channelId,
+        client_secret: channelSecret,
       }),
     });
 
@@ -210,7 +216,8 @@ auth.get('/line/callback', async (c) => {
 
 // GET /auth/line/link — 發起 LINE OAuth，帶 link mode
 auth.get('/line/link', async (c) => {
-  if (!LINE_CHANNEL_ID || !LINE_CALLBACK_URL) {
+  const { channelId, callbackUrl } = getLineConfig();
+  if (!channelId || !callbackUrl) {
     return c.json({ error: 'LINE Login not configured' }, 500);
   }
 
@@ -241,8 +248,8 @@ auth.get('/line/link', async (c) => {
   // 回傳 LINE OAuth URL 讓前端 redirect（因為前端需要帶 auth header）
   const params = new URLSearchParams({
     response_type: 'code',
-    client_id: LINE_CHANNEL_ID,
-    redirect_uri: LINE_CALLBACK_URL,
+    client_id: channelId,
+    redirect_uri: callbackUrl,
     state,
     scope: 'profile openid email',
   });

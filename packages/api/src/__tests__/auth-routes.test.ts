@@ -1,8 +1,7 @@
 /**
  * Auth routes tests (routes/auth.ts)
  *
- * LINE OAuth redirect 測試跳過（env vars 在 module scope 讀取，無法在 test 中 mock）。
- * 測試 LINE unlink、claim-event 等不依賴 module-scope env 的路由。
+ * LINE OAuth、LINE link/unlink、claim-event
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -55,6 +54,85 @@ function buildApp(ownerId = 'anon-session-123', ownerType: 'user' | 'anonymous' 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.LINE_CHANNEL_ID = 'test-channel-id';
+  process.env.LINE_CHANNEL_SECRET = 'test-secret';
+  process.env.LINE_CALLBACK_URL = 'http://localhost:3001/api/auth/line/callback';
+  process.env.VITE_FRONTEND_URL = 'http://localhost:5173';
+});
+
+// ─── LINE OAuth Redirect ───
+
+describe('GET /auth/line', () => {
+  it('redirect 到 LINE 授權頁', async () => {
+    const app = buildApp();
+    const res = await app.request('/auth/line');
+    expect(res.status).toBe(302);
+    const location = res.headers.get('Location')!;
+    expect(location).toContain('access.line.me/oauth2/v2.1/authorize');
+    expect(location).toContain('client_id=test-channel-id');
+  });
+
+  it('LINE 未設定 → 500', async () => {
+    delete process.env.LINE_CHANNEL_ID;
+    const app = buildApp();
+    const res = await app.request('/auth/line');
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toContain('not configured');
+  });
+});
+
+describe('GET /auth/line/callback', () => {
+  it('LINE 授權取消 → redirect 帶 error', async () => {
+    const app = buildApp();
+    const res = await app.request('/auth/line/callback?error=access_denied');
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toContain('error=');
+  });
+
+  it('無 code → redirect 帶 error', async () => {
+    const app = buildApp();
+    const res = await app.request('/auth/line/callback?state=abc');
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toContain('error=');
+  });
+
+  it('state 不匹配 → redirect 帶 error', async () => {
+    const app = buildApp();
+    const res = await app.request('/auth/line/callback?code=abc&state=wrong');
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toContain('error=');
+  });
+});
+
+// ─── LINE Link ───
+
+describe('GET /auth/line/link', () => {
+  it('無 auth header → 401', async () => {
+    const app = buildApp();
+    const res = await app.request('/auth/line/link');
+    expect(res.status).toBe(401);
+  });
+
+  it('dev-bypass → 回傳 LINE OAuth URL', async () => {
+    const app = buildApp();
+    const res = await app.request('/auth/line/link', {
+      headers: { Authorization: 'Bearer dev-bypass-user123' },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.url).toContain('access.line.me');
+    expect(body.url).toContain('client_id=test-channel-id');
+  });
+
+  it('LINE 未設定 → 500', async () => {
+    delete process.env.LINE_CHANNEL_ID;
+    const app = buildApp();
+    const res = await app.request('/auth/line/link', {
+      headers: { Authorization: 'Bearer dev-bypass-user123' },
+    });
+    expect(res.status).toBe(500);
+  });
 });
 
 // ─── LINE Unlink ───
