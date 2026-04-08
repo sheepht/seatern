@@ -89,6 +89,7 @@ const mockEvent = {
   name: '我的排位',
   ownerId: 'test-owner',
   ownerType: 'anonymous',
+  date: null,
   categories: ['男方', '女方', '共同'],
   planType: null,
   planStatus: null,

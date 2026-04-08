@@ -70,7 +70,7 @@ describe('getTableRecommendations', () => {
     const table = makeTable({ id: 't1' });
     const seated = makeGuest({ id: 'g1', assignedTableId: 't1' });
     const unassigned = makeGuest({ id: 'g2' });
-    const avoidPairs: AvoidPair[] = [{ id: 'ap1', eventId: 'e1', guestAId: 'g1', guestBId: 'g2', reason: '' }];
+    const avoidPairs: AvoidPair[] = [{ id: 'ap1', guestAId: 'g1', guestBId: 'g2', reason: '' }];
 
     const result = getTableRecommendations([table], [seated, unassigned], avoidPairs, 0);
     const tableRec = result.find((r) => r.tableId === 't1');

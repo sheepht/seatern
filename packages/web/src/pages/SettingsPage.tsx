@@ -228,7 +228,7 @@ export default function SettingsPage() {
                 <div className="flex gap-2 flex-wrap">
                   <LinkPill icon={<GoogleIcon />} label="Google"
                     linked={!!linkedGoogle} loading={unlinking === 'google'} canUnlink={linkedCount > 1}
-                    onLink={handleLinkGoogle} onUnlink={() => handleUnlinkGoogle(linkedGoogle)} />
+                    onLink={handleLinkGoogle} onUnlink={() => linkedGoogle && handleUnlinkGoogle(linkedGoogle)} />
                   <LinkPill icon={<LineIcon />} label="LINE"
                     linked={linkedLine} loading={unlinking === 'line'} canUnlink={linkedCount > 1}
                     onLink={handleLinkLine} onUnlink={handleUnlinkLine} />

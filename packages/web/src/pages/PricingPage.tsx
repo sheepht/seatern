@@ -126,7 +126,7 @@ export default function PricingPage() {
                 <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-600 text-white whitespace-nowrap">
                   目前方案
                 </span>
-              ) : plan.recommended && !isActive ? (
+              ) : 'recommended' in plan && plan.recommended && !isActive ? (
                 <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-[var(--accent)] text-white whitespace-nowrap">
                   推薦
                 </span>

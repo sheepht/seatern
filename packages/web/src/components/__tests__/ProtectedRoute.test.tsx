@@ -28,7 +28,7 @@ describe('ProtectedRoute', () => {
         id: 'u1',
         email: 'test@test.com',
         user_metadata: { name: '測試用戶' },
-      } as ReturnType<typeof useAuthStore.getState>['user'],
+      } as unknown as ReturnType<typeof useAuthStore.getState>['user'],
       isLoading: false,
     });
     renderWithRouter(<ProtectedRoute><div>保護內容</div></ProtectedRoute>);
