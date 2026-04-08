@@ -1,7 +1,14 @@
 {
-  "buildCommand": "npm run build:shared && npm run build:db && npm run build:web",
+  "buildCommand": "npx prisma generate --schema=packages/db/prisma/schema.prisma && npm run build:shared && npm run build:db && npm run build:web",
   "outputDirectory": "packages/web/dist",
+  "functions": {
+    "api/**/*.ts": {
+      "memory": 256,
+      "maxDuration": 10
+    }
+  },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
