@@ -3,6 +3,10 @@ dist/
 *.tsbuildinfo
 .env
 .env.local
+.env.dev
+.env.prd
 packages/db/prisma/generated/
 .claude/skills/gstack/
 .gstack/
+.vercel
+.env*.local
