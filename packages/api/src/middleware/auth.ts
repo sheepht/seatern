@@ -1,5 +1,5 @@
 import { createMiddleware } from 'hono/factory';
-import { verifyToken, ensureUser } from '../lib/auth-utils';
+import { verifyToken, ensureUser } from '../lib/auth-utils.ts';
 
 export type AuthEnv = {
   Variables: {

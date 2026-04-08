@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { prisma } from '@seatern/db';
-import type { AuthEnv } from '../middleware/auth';
+import type { AuthEnv } from '../middleware/auth.ts';
 
 export const users = new Hono<AuthEnv>();
 

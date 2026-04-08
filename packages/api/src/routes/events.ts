@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { prisma } from '@seatern/db';
 
-import type { SessionEnv } from '../middleware/session';
+import type { SessionEnv } from '../middleware/session.ts';
 import type { CreateGuestPayload, CreateTablePayload, AssignSeatsBatchPayload, PreferenceBatchPayload, AvoidPairBatchPayload, SubcategoryBatchPayload } from '@seatern/shared';
 
 const events = new Hono<SessionEnv>();

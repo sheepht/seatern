@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { prisma } from '@seatern/db';
-import { supabaseAdmin } from '../lib/supabase-admin';
-import { verifyToken, ensureUser } from '../lib/auth-utils';
-import type { SessionEnv } from '../middleware/session';
+import { supabaseAdmin } from '../lib/supabase-admin.ts';
+import { verifyToken, ensureUser } from '../lib/auth-utils.ts';
+import type { SessionEnv } from '../middleware/session.ts';
 
 const auth = new Hono<SessionEnv>();
 

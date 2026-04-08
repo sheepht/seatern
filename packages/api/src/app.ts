@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { healthRoute } from './routes/health';
-import { events } from './routes/events';
-import { auth } from './routes/auth';
-import { users } from './routes/users';
-import { admin } from './routes/admin';
-import { sessionMiddleware } from './middleware/session';
-import { authMiddleware } from './middleware/auth';
+import { healthRoute } from './routes/health.ts';
+import { events } from './routes/events.ts';
+import { auth } from './routes/auth.ts';
+import { users } from './routes/users.ts';
+import { admin } from './routes/admin.ts';
+import { sessionMiddleware } from './middleware/session.ts';
+import { authMiddleware } from './middleware/auth.ts';
 
 const app = new Hono();
 

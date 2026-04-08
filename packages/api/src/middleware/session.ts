@@ -1,7 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import { getCookie, setCookie } from 'hono/cookie';
 import { randomUUID } from 'crypto';
-import { verifyToken, ensureUser } from '../lib/auth-utils';
+import { verifyToken, ensureUser } from '../lib/auth-utils.ts';
 
 /**
  * Session middleware：處理匿名 session 和登入用戶
