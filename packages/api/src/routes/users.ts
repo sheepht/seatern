@@ -83,7 +83,7 @@ users.get('/me/export', async (c) => {
       date: event.date,
       categories: event.categories,
     } : null,
-    guests: (event?.guests ?? []).map((g) => ({
+    guests: (event?.guests ?? []).map((g: Record<string, unknown> & { name: string; aliases: string[]; category: string | null; subcategory: { name: string } | null; rsvpStatus: string; companionCount: number; dietaryNote: string | null; specialNote: string | null; seatPreferences: Array<{ preferredGuest: { name: string } | null; rank: number }> }) => ({
       name: g.name,
       aliases: g.aliases,
       category: g.category,
@@ -92,14 +92,14 @@ users.get('/me/export', async (c) => {
       companionCount: g.companionCount,
       dietaryNote: g.dietaryNote,
       specialNote: g.specialNote,
-      seatPreferences: g.seatPreferences.map((sp) => ({
+      seatPreferences: g.seatPreferences.map((sp: { preferredGuest: { name: string } | null; rank: number }) => ({
         preferredGuestName: sp.preferredGuest?.name ?? '',
         rank: sp.rank,
       })),
     })),
     tables: event?.tables ?? [],
     subcategories: event?.subcategories ?? [],
-    avoidPairs: (event?.avoidPairs ?? []).map((ap) => ({
+    avoidPairs: (event?.avoidPairs ?? []).map((ap: { guestA: { name: string } | null; guestB: { name: string } | null; reason: string | null }) => ({
       guest1Name: ap.guestA?.name ?? '',
       guest2Name: ap.guestB?.name ?? '',
       reason: ap.reason,

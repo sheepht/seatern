@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { prisma } from '@seatern/db';
-import type { OwnerType, Prisma } from '@prisma/client';
+
 import type { SessionEnv } from '../middleware/session';
 import type { CreateGuestPayload, CreateTablePayload, AssignSeatsBatchPayload, PreferenceBatchPayload, AvoidPairBatchPayload, SubcategoryBatchPayload } from '@seatern/shared';
 
@@ -47,7 +47,7 @@ async function findEventWithDevFallback(
   ownerType: string,
 ) {
   const event = await prisma.event.findFirst({
-    where: { id: eventId, ownerId, ownerType: ownerType as OwnerType },
+    where: { id: eventId, ownerId, ownerType: ownerType as 'user' | 'anonymous' },
   });
   if (event) return event;
 
@@ -244,7 +244,7 @@ events.patch('/:eventId/guests/assign-batch', async (c) => {
       where: { id: { in: tableIds }, eventId },
       select: { id: true },
     });
-    const existingIds = new Set(existingTables.map((t) => t.id));
+    const existingIds = new Set(existingTables.map((t: { id: string }) => t.id));
     const missing = tableIds.filter((id) => !existingIds.has(id));
     if (missing.length > 0) {
       return c.json({ error: `Tables not found: ${missing.join(', ')}` }, 400);
@@ -468,11 +468,11 @@ events.delete('/:eventId/tables/empty', async (c) => {
   const occupiedTableIds = await prisma.guest.groupBy({
     by: ['assignedTableId'],
     where: { eventId, assignedTableId: { not: null }, rsvpStatus: 'confirmed' },
-  }).then(rows => rows.map(r => r.assignedTableId).filter(Boolean));
+  }).then((rows: { assignedTableId: string | null }[]) => rows.map((r) => r.assignedTableId).filter(Boolean));
 
   const emptyTableIds = allTables
-    .filter(t => !occupiedTableIds.includes(t.id))
-    .map(t => t.id);
+    .filter((t: { id: string }) => !occupiedTableIds.includes(t.id))
+    .map((t: { id: string }) => t.id);
 
   if (emptyTableIds.length === 0) return c.json({ deleted: 0 });
 
@@ -549,7 +549,7 @@ events.post('/:id/preferences/batch', async (c) => {
     where: { eventId },
     select: { id: true },
   });
-  const ids = guestIds.map((g) => g.id);
+  const ids = guestIds.map((g: { id: string }) => g.id);
   await prisma.seatPreference.deleteMany({
     where: { guestId: { in: ids } },
   });
@@ -732,7 +732,7 @@ events.post('/:id/snapshots', async (c) => {
   const expired = expiredResponse(event);
   if (expired) return c.json(expired, 403);
 
-  const body = await c.req.json<{ name: string; data: Prisma.InputJsonValue; averageSatisfaction: number }>();
+  const body = await c.req.json<{ name: string; data: Record<string, unknown>; averageSatisfaction: number }>();
 
   // 免費版限制 1 份快照
   const existing = await prisma.seatingSnapshot.count({ where: { eventId } });
@@ -748,7 +748,7 @@ events.post('/:id/snapshots', async (c) => {
     data: {
       eventId,
       name: body.name,
-      data: body.data,
+      data: body.data as object,
       averageSatisfaction: body.averageSatisfaction,
     },
   });
