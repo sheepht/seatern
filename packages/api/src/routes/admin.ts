@@ -40,7 +40,7 @@ admin.get('/pending-plans', async (c) => {
 
   // 查出每個活動的 owner email/name
   const results = await Promise.all(
-    events.map(async (event) => {
+    events.map(async (event: (typeof events)[number]) => {
       let ownerName = '匿名用戶';
       let ownerEmail = '';
       if (event.ownerType === 'user') {
@@ -83,7 +83,7 @@ admin.get('/all-plans', async (c) => {
   });
 
   const results = await Promise.all(
-    events.map(async (event) => {
+    events.map(async (event: (typeof events)[number]) => {
       let ownerName = '匿名用戶';
       let ownerEmail = '';
       if (event.ownerType === 'user') {
