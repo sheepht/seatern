@@ -60,7 +60,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
     dietaryNote: g.dietaryNote || undefined,
     specialNote: g.specialNote || undefined,
   }));
-  const guestRes = await api.post(`/api/events/${eventId}/guests/batch`, { guests: payload });
+  const guestRes = await api.post(`/events/${eventId}/guests/batch`, { guests: payload });
   const { guests: createdGuests } = guestRes.data;
 
   // 4. 建立座位偏好
@@ -81,7 +81,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
       .filter((p): p is NonNullable<typeof p> => p !== null);
 
     if (preferences.length > 0) {
-      await api.post(`/api/events/${eventId}/preferences/batch`, { preferences });
+      await api.post(`/events/${eventId}/preferences/batch`, { preferences });
     }
   }
 
@@ -94,7 +94,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
     subcatAssignments.push({ guestId, subcategoryName: g.rawSubcategory, category: g.category });
   });
   if (subcatAssignments.length > 0) {
-    await api.post(`/api/events/${eventId}/subcategories/batch`, { assignments: subcatAssignments });
+    await api.post(`/events/${eventId}/subcategories/batch`, { assignments: subcatAssignments });
   }
 
   // 6. 建立避免同桌
@@ -116,7 +116,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
     }
   });
   if (avoidPairs.length > 0) {
-    await api.post(`/api/events/${eventId}/avoid-pairs/batch`, { pairs: avoidPairs });
+    await api.post(`/events/${eventId}/avoid-pairs/batch`, { pairs: avoidPairs });
   }
 
   // 7. 自動補桌次
@@ -126,7 +126,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
   for (let i = 0; i < tableCount; i++) {
     const row = Math.floor(i / cols);
     const col = i % cols;
-    await api.post(`/api/events/${eventId}/tables`, {
+    await api.post(`/events/${eventId}/tables`, {
       name: `第${i + 1}桌`,
       capacity: 10,
       positionX: 200 + col * 350,

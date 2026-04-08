@@ -981,7 +981,7 @@ export function MobileWorkspace() {
                     const eid = useSeatingStore.getState().eventId;
                     if (!eid) return;
                     try {
-                      await api.delete(`/api/events/${eid}/tables/empty`);
+                      await api.delete(`/events/${eid}/tables/empty`);
                       await useSeatingStore.getState().loadEvent();
                     } catch { /* ignore */ }
                   }}
@@ -1060,7 +1060,7 @@ export function MobileWorkspace() {
                   const eid = useSeatingStore.getState().eventId;
                   if (!eid) return;
                   try {
-                    await api.delete(`/api/events/${eid}/tables/empty`);
+                    await api.delete(`/events/${eid}/tables/empty`);
                     await useSeatingStore.getState().loadEvent();
                   } catch { /* ignore */ }
                 }}

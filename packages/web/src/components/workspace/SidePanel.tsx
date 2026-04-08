@@ -124,7 +124,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
     const eventId = useSeatingStore.getState().eventId;
     if (!eventId) return;
     try {
-      await api.delete(`/api/events/${eventId}/tables/empty`);
+      await api.delete(`/events/${eventId}/tables/empty`);
       const { loadEvent } = useSeatingStore.getState();
       await loadEvent();
     } catch { /* ignore */ }
@@ -520,7 +520,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
             <button
               onClick={async () => {
                 const eid = useSeatingStore.getState().eventId;
-                if (eid) await api.delete(`/api/events/${eid}/reset`);
+                if (eid) await api.delete(`/events/${eid}/reset`);
                 resetDemoFlag();
                 window.location.reload();
               }}
