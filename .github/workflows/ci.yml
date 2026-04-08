@@ -50,6 +50,9 @@ jobs:
       - run: npx prisma generate --schema=packages/db/prisma/schema.prisma
       - name: Deploy to Vercel (Staging)
         run: npx vercel --token ${{ secrets.VERCEL_TOKEN }} --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
   deploy-production:
     name: Deploy to Production
@@ -66,3 +69,6 @@ jobs:
       - run: npx prisma generate --schema=packages/db/prisma/schema.prisma
       - name: Deploy to Vercel (Production)
         run: npx vercel --token ${{ secrets.VERCEL_TOKEN }} --prod --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
