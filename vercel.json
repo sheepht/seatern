@@ -1,6 +1,7 @@
 {
   "outputDirectory": "packages/web/dist",
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/[...path]" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
