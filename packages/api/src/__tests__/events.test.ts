@@ -11,6 +11,7 @@ vi.mock('@seatern/db', () => ({
   prisma: {
     event: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
@@ -58,8 +59,8 @@ vi.mock('@seatern/db', () => ({
     $transaction: vi.fn().mockImplementation((input: unknown) =>
       Array.isArray(input) ? Promise.all(input) : Promise.resolve(input),
     ),
-    $queryRawUnsafe: vi.fn(),
-    $executeRawUnsafe: vi.fn(),
+    $queryRawUnsafe: vi.fn().mockResolvedValue([]),
+    $executeRawUnsafe: vi.fn().mockResolvedValue(0),
   },
 }));
 
@@ -98,6 +99,7 @@ const mockEvent = {
   planExpiresAt: null,
   planCreatedAt: null,
   planNote: null,
+  cachedFullData: null,
   tableLimit: 10,
   guests: [],
   tables: [],
@@ -114,11 +116,32 @@ beforeEach(() => {
 });
 
 describe('GET /events/mine', () => {
-  it('有活動 → 回傳活動資料', async () => {
+  it('有活動（快取命中）→ 回傳活動資料', async () => {
     const app = buildApp();
-    // findFirst 回傳 event ID（輕量 query）
-    vi.mocked(prisma.event.findFirst).mockResolvedValue({ id: mockEvent.id } as ReturnType<typeof prisma.event.findFirst> extends Promise<infer T> ? T : never);
-    // $queryRawUnsafe 回傳 loadEventFull 的結果
+    // findFirst 回傳 event ID
+    vi.mocked(prisma.event.findFirst).mockResolvedValue({ id: mockEvent.id } as never);
+    // findUnique 回傳快取的資料
+    const cachedData = { ...mockEvent, guests: [], tables: [], subcategories: [], edges: [], avoidPairs: [], snapshots: [] };
+    vi.mocked(prisma.event.findUnique).mockResolvedValue({
+      cachedFullData: cachedData,
+      planType: null, planExpiresAt: null, planStatus: null, ownerType: 'anonymous',
+    } as never);
+
+    const res = await app.request('/events/mine');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.name).toBe('我的排位');
+  });
+
+  it('有活動（快取 miss）→ 跑 CTE 後回傳', async () => {
+    const app = buildApp();
+    vi.mocked(prisma.event.findFirst).mockResolvedValue({ id: mockEvent.id } as never);
+    // findUnique 回傳無快取
+    vi.mocked(prisma.event.findUnique).mockResolvedValue({
+      cachedFullData: null,
+      planType: null, planExpiresAt: null, planStatus: null, ownerType: 'anonymous',
+    } as never);
+    // $queryRawUnsafe 回傳 CTE 結果
     vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([{
       ...mockEvent,
       _guests: JSON.stringify([]),
@@ -128,6 +151,7 @@ describe('GET /events/mine', () => {
       _avoidPairs: JSON.stringify([]),
       _snapshots: JSON.stringify([]),
     }]);
+    vi.mocked(prisma.event.update).mockResolvedValue(mockEvent as never);
 
     const res = await app.request('/events/mine');
     expect(res.status).toBe(200);
@@ -147,7 +171,7 @@ describe('GET /events/mine', () => {
 describe('POST /events', () => {
   it('建立新活動', async () => {
     const app = buildApp();
-    vi.mocked(prisma.event.create).mockResolvedValue(mockEvent as ReturnType<typeof prisma.event.create> extends Promise<infer T> ? T : never);
+    vi.mocked(prisma.event.create).mockResolvedValue(mockEvent as never);
 
     const res = await app.request('/events', {
       method: 'POST',
@@ -162,7 +186,7 @@ describe('POST /events', () => {
 describe('POST /events/:id/guests/batch', () => {
   it('批次建立賓客', async () => {
     const app = buildApp();
-    vi.mocked(prisma.event.findFirst).mockResolvedValue(mockEvent as ReturnType<typeof prisma.event.findFirst> extends Promise<infer T> ? T : never);
+    vi.mocked(prisma.event.findFirst).mockResolvedValue(mockEvent as never);
     const createdGuests = [
       { id: 'g1', name: '周杰倫' },
       { id: 'g2', name: '蕭敬騰' },
@@ -190,12 +214,12 @@ describe('POST /events/:id/tables', () => {
   it('建立桌次', async () => {
     const app = buildApp();
     const event = { ...mockEvent };
-    vi.mocked(prisma.event.findFirst).mockResolvedValue(event as ReturnType<typeof prisma.event.findFirst> extends Promise<infer T> ? T : never);
+    vi.mocked(prisma.event.findFirst).mockResolvedValue(event as never);
     vi.mocked(prisma.table.count).mockResolvedValue(0);
     vi.mocked(prisma.table.create).mockResolvedValue({
       id: 't1', eventId: 'evt-1', name: '第1桌', capacity: 10,
       positionX: 200, positionY: 200, createdAt: new Date(), updatedAt: new Date(),
-    } as ReturnType<typeof prisma.table.create> extends Promise<infer T> ? T : never);
+    } as never);
 
     const res = await app.request('/events/evt-1/tables', {
       method: 'POST',
@@ -207,7 +231,7 @@ describe('POST /events/:id/tables', () => {
 
   it('超過桌數上限 → 403 TABLE_LIMIT_REACHED', async () => {
     const app = buildApp();
-    vi.mocked(prisma.event.findFirst).mockResolvedValue(mockEvent as ReturnType<typeof prisma.event.findFirst> extends Promise<infer T> ? T : never);
+    vi.mocked(prisma.event.findFirst).mockResolvedValue(mockEvent as never);
     vi.mocked(prisma.table.count).mockResolvedValue(10); // 已達上限
 
     const res = await app.request('/events/evt-1/tables', {
@@ -224,7 +248,7 @@ describe('POST /events/:id/tables', () => {
 describe('DELETE /events/:id/reset', () => {
   it('清空活動資料', async () => {
     const app = buildApp();
-    vi.mocked(prisma.event.findFirst).mockResolvedValue(mockEvent as ReturnType<typeof prisma.event.findFirst> extends Promise<infer T> ? T : never);
+    vi.mocked(prisma.event.findFirst).mockResolvedValue(mockEvent as never);
     vi.mocked(prisma.$transaction).mockResolvedValue(undefined);
 
     const res = await app.request('/events/evt-1/reset', { method: 'DELETE' });

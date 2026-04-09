@@ -6,6 +6,17 @@ import type { CreateGuestPayload, CreateTablePayload, AssignSeatsBatchPayload, P
 
 const events = new Hono<SessionEnv>();
 
+// ─── 快取 invalidation middleware ────────────────────
+// 任何非 GET 請求成功後，自動清除該 event 的 cachedFullData
+events.use('/:id{.+}', async (c, next) => {
+  await next();
+  if (c.req.method === 'GET' || !c.res.ok) return;
+  const eventId = c.req.param('eventId') ?? c.req.param('id');
+  if (eventId && eventId !== 'mine') {
+    await prisma.$executeRawUnsafe(`UPDATE "Event" SET "cachedFullData" = NULL WHERE id = '${eventId}'`).catch(() => {});
+  }
+});
+
 // ─── 方案桌數對照表 ─────────────────────────────────
 //
 //   planType   桌數上限   有效期
@@ -78,12 +89,27 @@ events.get('/', async (c) => {
 });
 
 /**
- * 單一 SQL 載入 event + 所有子表資料。
- * 用 CTE 預先 aggregate seatPreferences 和 subcategory，
- * 避免 per-guest correlated subquery（80人→1000人不會線性變慢）。
- * 回傳格式與原本 Prisma include 相同，前端不用改。
+ * 載入 event + 所有子表資料。
+ * 快取策略：先檢查 Event.cachedFullData，有就直接回傳（1 query）。
+ * 沒有就跑 CTE 組合後存入 cachedFullData（2 queries）。
+ * 寫入操作透過 middleware 自動 invalidate。
  */
 async function loadEventFull(eventId: string) {
+  // 快取快速路徑：1 個 SELECT 就完成
+  const cached = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: {
+      cachedFullData: true,
+      planType: true, planExpiresAt: true, planStatus: true, ownerType: true,
+    },
+  });
+  if (!cached) return null;
+  if (cached.cachedFullData) {
+    const data = cached.cachedFullData as Record<string, unknown>;
+    return { ...data, tableLimit: getTableLimit(cached) };
+  }
+
+  // 快取 miss：跑 CTE 組合
   const rows = await prisma.$queryRawUnsafe<Array<{
     id: string; name: string; date: string | null; categories: string[];
     ownerType: string; ownerId: string;
@@ -194,7 +220,7 @@ async function loadEventFull(eventId: string) {
 
   if (rows.length === 0) return null;
   const row = rows[0];
-  return {
+  const result = {
     ...row,
     guests: typeof row._guests === 'string' ? JSON.parse(row._guests) : row._guests,
     tables: typeof row._tables === 'string' ? JSON.parse(row._tables) : row._tables,
@@ -204,8 +230,15 @@ async function loadEventFull(eventId: string) {
     snapshots: typeof row._snapshots === 'string' ? JSON.parse(row._snapshots) : row._snapshots,
     _guests: undefined, _tables: undefined, _subcategories: undefined,
     _edges: undefined, _avoidPairs: undefined, _snapshots: undefined,
-    tableLimit: getTableLimit(row),
   };
+
+  // 存入快取（不 await，不 block 回應）
+  prisma.event.update({
+    where: { id: eventId },
+    data: { cachedFullData: result as object },
+  }).catch(() => {});
+
+  return { ...result, tableLimit: getTableLimit(row) };
 }
 
 // GET /events/mine — 取得當前 session 的唯一活動（含賓客、桌次等）

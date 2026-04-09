@@ -60,6 +60,8 @@ vi.mock('@seatern/db', () => ({
     $transaction: vi.fn().mockImplementation((input: unknown) =>
       Array.isArray(input) ? Promise.all(input) : Promise.resolve(input),
     ),
+    $queryRawUnsafe: vi.fn().mockResolvedValue([]),
+    $executeRawUnsafe: vi.fn().mockResolvedValue(0),
   },
 }));
 
@@ -96,6 +98,7 @@ const mockEvent = {
   planExpiresAt: null,
   planCreatedAt: null,
   planNote: null,
+  cachedFullData: null,
   tableLimit: 10,
   guests: [],
   tables: [],
