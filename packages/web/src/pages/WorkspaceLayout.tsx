@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, Outlet } from 'react-router-dom';
 import { useSeatingStore } from '@/stores/seating';
 import { useAuthStore } from '@/stores/auth';
@@ -17,6 +17,7 @@ export default function WorkspaceLayout() {
   const user = useAuthStore((s) => s.user);
   const isMobile = useIsMobile();
   const demoLoaded = useRef(false);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   const page = location.pathname.endsWith('/import') ? 'import' as const
     : location.pathname.endsWith('/guests') ? 'guests' as const
@@ -30,19 +31,24 @@ export default function WorkspaceLayout() {
   // 未登入 + 無賓客 → 自動載入範例資料
   useEffect(() => {
     if (!eventId || loading || demoLoaded.current) return;
-    if (user) return; // 已登入用戶不載入範例
-    if (guests.length > 0) return; // 已有資料
-    if (hasDemoLoaded()) return; // 已載入過，不重複灌入
+    if (user) return;
+    if (guests.length > 0) return;
+    if (hasDemoLoaded()) return;
     demoLoaded.current = true;
-    loadDemoData(eventId);
+    setDemoLoading(true);
+    loadDemoData(eventId).finally(() => setDemoLoading(false));
   }, [eventId, loading, user, guests.length]);
 
-  if (loading) {
+  const showLoading = loading || demoLoading;
+
+  if (showLoading) {
     return (
       <div className="h-dvh flex flex-col bg-[var(--bg-primary)]">
         {!isMobile && <Toolbar page={page} />}
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-[var(--text-muted)] font-[family-name:var(--font-body)]">載入中...</p>
+          <p className="text-[var(--text-muted)] font-[family-name:var(--font-body)]">
+            {demoLoading ? '載入展示用賓客...' : '載入中...'}
+          </p>
         </div>
         {isMobile && <MobileBottomNav />}
       </div>
