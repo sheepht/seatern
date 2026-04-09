@@ -79,7 +79,8 @@ events.get('/', async (c) => {
 
 /**
  * 單一 SQL 載入 event + 所有子表資料。
- * 用 lateral subquery + json_agg 避免 Prisma 的 N+1 include 問題。
+ * 用 CTE 預先 aggregate seatPreferences 和 subcategory，
+ * 避免 per-guest correlated subquery（80人→1000人不會線性變慢）。
  * 回傳格式與原本 Prisma include 相同，前端不用改。
  */
 async function loadEventFull(eventId: string) {
@@ -92,8 +93,26 @@ async function loadEventFull(eventId: string) {
     _guests: string; _tables: string; _subcategories: string;
     _edges: string; _avoidPairs: string; _snapshots: string;
   }>>(`
-    SELECT e.*,
-      (SELECT COALESCE(json_agg(
+    WITH
+    -- 預先 aggregate seatPreferences per guest（1 次 scan，不是 N 次 correlated subquery）
+    pref_agg AS (
+      SELECT sp."guestId",
+        json_agg(json_build_object(
+          'id', sp.id, 'guestId', sp."guestId",
+          'preferredGuestId', sp."preferredGuestId", 'rank', sp.rank
+        ) ORDER BY sp.rank) AS prefs
+      FROM "SeatPreference" sp
+      JOIN "Guest" g ON sp."guestId" = g.id AND g."eventId" = '${eventId}'
+      GROUP BY sp."guestId"
+    ),
+    -- 預先載入 subcategories（1 次 scan）
+    subcat_map AS (
+      SELECT sc.id, json_build_object('id', sc.id, 'name', sc.name, 'category', sc.category) AS obj
+      FROM "Subcategory" sc WHERE sc."eventId" = '${eventId}'
+    ),
+    -- guests + prefs + subcategory 一次 JOIN aggregate
+    guests_agg AS (
+      SELECT COALESCE(json_agg(
         json_build_object(
           'id', g.id, 'eventId', g."eventId", 'name', g.name, 'aliases', g.aliases,
           'category', g.category, 'subcategoryId', g."subcategoryId",
@@ -104,22 +123,17 @@ async function loadEventFull(eventId: string) {
           'assignedTableId', g."assignedTableId", 'seatIndex', g."seatIndex",
           'isOverflow', g."isOverflow", 'isIsolated', g."isIsolated",
           'createdAt', g."createdAt", 'updatedAt', g."updatedAt",
-          'seatPreferences', COALESCE((
-            SELECT json_agg(json_build_object(
-              'id', sp.id, 'guestId', sp."guestId",
-              'preferredGuestId', sp."preferredGuestId", 'rank', sp.rank
-            ) ORDER BY sp.rank)
-            FROM "SeatPreference" sp WHERE sp."guestId" = g.id
-          ), '[]'::json),
-          'subcategory', (
-            SELECT json_build_object('id', sc.id, 'name', sc.name, 'category', sc.category)
-            FROM "Subcategory" sc WHERE sc.id = g."subcategoryId"
-          )
+          'seatPreferences', COALESCE(pa.prefs, '[]'::json),
+          'subcategory', sm.obj
         ) ORDER BY g.name
-      ), '[]'::json)
-      FROM "Guest" g WHERE g."eventId" = e.id
-      ) AS "_guests",
-      (SELECT COALESCE(json_agg(
+      ), '[]'::json) AS val
+      FROM "Guest" g
+      LEFT JOIN pref_agg pa ON pa."guestId" = g.id
+      LEFT JOIN subcat_map sm ON sm.id = g."subcategoryId"
+      WHERE g."eventId" = '${eventId}'
+    ),
+    tables_agg AS (
+      SELECT COALESCE(json_agg(
         json_build_object(
           'id', t.id, 'eventId', t."eventId", 'name', t.name, 'capacity', t.capacity,
           'positionX', t."positionX", 'positionY', t."positionY",
@@ -127,41 +141,52 @@ async function loadEventFull(eventId: string) {
           'color', t.color, 'note', t.note,
           'createdAt', t."createdAt", 'updatedAt', t."updatedAt"
         ) ORDER BY t.name
-      ), '[]'::json)
-      FROM "Table" t WHERE t."eventId" = e.id
-      ) AS "_tables",
-      (SELECT COALESCE(json_agg(
+      ), '[]'::json) AS val
+      FROM "Table" t WHERE t."eventId" = '${eventId}'
+    ),
+    subcats_agg AS (
+      SELECT COALESCE(json_agg(
         json_build_object('id', sc.id, 'eventId', sc."eventId", 'name', sc.name, 'category', sc.category)
         ORDER BY sc.name
-      ), '[]'::json)
-      FROM "Subcategory" sc WHERE sc."eventId" = e.id
-      ) AS "_subcategories",
-      (SELECT COALESCE(json_agg(
+      ), '[]'::json) AS val
+      FROM "Subcategory" sc WHERE sc."eventId" = '${eventId}'
+    ),
+    edges_agg AS (
+      SELECT COALESCE(json_agg(
         json_build_object(
           'id', ed.id, 'eventId', ed."eventId",
           'fromGuestId', ed."fromGuestId", 'toGuestId', ed."toGuestId",
           'weight', ed.weight, 'type', ed.type
         )
-      ), '[]'::json)
-      FROM "Edge" ed WHERE ed."eventId" = e.id
-      ) AS "_edges",
-      (SELECT COALESCE(json_agg(
+      ), '[]'::json) AS val
+      FROM "Edge" ed WHERE ed."eventId" = '${eventId}'
+    ),
+    avoids_agg AS (
+      SELECT COALESCE(json_agg(
         json_build_object(
           'id', ap.id, 'eventId', ap."eventId",
           'guestAId', ap."guestAId", 'guestBId', ap."guestBId", 'reason', ap.reason
         )
-      ), '[]'::json)
-      FROM "AvoidPair" ap WHERE ap."eventId" = e.id
-      ) AS "_avoidPairs",
-      (SELECT COALESCE(json_agg(
+      ), '[]'::json) AS val
+      FROM "AvoidPair" ap WHERE ap."eventId" = '${eventId}'
+    ),
+    snaps_agg AS (
+      SELECT COALESCE(json_agg(
         json_build_object(
           'id', sn.id, 'eventId', sn."eventId", 'name', sn.name,
           'data', sn.data, 'averageSatisfaction', sn."averageSatisfaction",
           'createdAt', sn."createdAt"
         ) ORDER BY sn."createdAt" DESC
-      ), '[]'::json)
-      FROM "SeatingSnapshot" sn WHERE sn."eventId" = e.id
-      ) AS "_snapshots"
+      ), '[]'::json) AS val
+      FROM "SeatingSnapshot" sn WHERE sn."eventId" = '${eventId}'
+    )
+    SELECT e.*,
+      (SELECT val FROM guests_agg) AS "_guests",
+      (SELECT val FROM tables_agg) AS "_tables",
+      (SELECT val FROM subcats_agg) AS "_subcategories",
+      (SELECT val FROM edges_agg) AS "_edges",
+      (SELECT val FROM avoids_agg) AS "_avoidPairs",
+      (SELECT val FROM snaps_agg) AS "_snapshots"
     FROM "Event" e
     WHERE e.id = '${eventId}'
     LIMIT 1
