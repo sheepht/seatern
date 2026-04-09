@@ -99,7 +99,6 @@ const mockEvent = {
   planExpiresAt: null,
   planCreatedAt: null,
   planNote: null,
-  cachedFullData: null,
   tableLimit: 10,
   guests: [],
   tables: [],
@@ -116,31 +115,9 @@ beforeEach(() => {
 });
 
 describe('GET /events/mine', () => {
-  it('有活動（快取命中）→ 回傳活動資料', async () => {
-    const app = buildApp();
-    // findFirst 回傳 event ID
-    vi.mocked(prisma.event.findFirst).mockResolvedValue({ id: mockEvent.id } as never);
-    // findUnique 回傳快取的資料
-    const cachedData = { ...mockEvent, guests: [], tables: [], subcategories: [], edges: [], avoidPairs: [], snapshots: [] };
-    vi.mocked(prisma.event.findUnique).mockResolvedValue({
-      cachedFullData: cachedData,
-      planType: null, planExpiresAt: null, planStatus: null, ownerType: 'anonymous',
-    } as never);
-
-    const res = await app.request('/events/mine');
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.name).toBe('我的排位');
-  });
-
-  it('有活動（快取 miss）→ 跑 CTE 後回傳', async () => {
+  it('有活動 → 跑 CTE 回傳活動資料', async () => {
     const app = buildApp();
     vi.mocked(prisma.event.findFirst).mockResolvedValue({ id: mockEvent.id } as never);
-    // findUnique 回傳無快取
-    vi.mocked(prisma.event.findUnique).mockResolvedValue({
-      cachedFullData: null,
-      planType: null, planExpiresAt: null, planStatus: null, ownerType: 'anonymous',
-    } as never);
     // $queryRawUnsafe 回傳 CTE 結果
     vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([{
       ...mockEvent,
@@ -151,7 +128,6 @@ describe('GET /events/mine', () => {
       _avoidPairs: JSON.stringify([]),
       _snapshots: JSON.stringify([]),
     }]);
-    vi.mocked(prisma.event.update).mockResolvedValue(mockEvent as never);
 
     const res = await app.request('/events/mine');
     expect(res.status).toBe(200);

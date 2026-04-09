@@ -98,7 +98,6 @@ const mockEvent = {
   planExpiresAt: null,
   planCreatedAt: null,
   planNote: null,
-  cachedFullData: null,
   tableLimit: 10,
   guests: [],
   tables: [],

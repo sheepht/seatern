@@ -39,9 +39,6 @@ model Event {
   planNote      String?   // 管理備註
   planCreatedAt DateTime? // 訂單建立時間（用戶按通知已匯款的時間）
 
-  // 快取：loadEventFull() 的完整 JSON 結果，寫入操作時清為 NULL
-  cachedFullData Json?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

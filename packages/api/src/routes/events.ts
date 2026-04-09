@@ -6,17 +6,6 @@ import type { CreateGuestPayload, CreateTablePayload, AssignSeatsBatchPayload, P
 
 const events = new Hono<SessionEnv>();
 
-// ─── 快取 invalidation middleware ────────────────────
-// 任何非 GET 請求成功後，自動清除該 event 的 cachedFullData
-events.use('/:id{.+}', async (c, next) => {
-  await next();
-  if (c.req.method === 'GET' || !c.res.ok) return;
-  const eventId = c.req.param('eventId') ?? c.req.param('id');
-  if (eventId && eventId !== 'mine') {
-    await prisma.$executeRawUnsafe(`UPDATE "Event" SET "cachedFullData" = NULL WHERE id = '${eventId}'`).catch(() => {});
-  }
-});
-
 // ─── 方案桌數對照表 ─────────────────────────────────
 //
 //   planType   桌數上限   有效期
@@ -89,27 +78,10 @@ events.get('/', async (c) => {
 });
 
 /**
- * 載入 event + 所有子表資料。
- * 快取策略：先檢查 Event.cachedFullData，有就直接回傳（1 query）。
- * 沒有就跑 CTE 組合後存入 cachedFullData（2 queries）。
- * 寫入操作透過 middleware 自動 invalidate。
+ * 載入 event + 所有子表資料（CTE 單一 query）。
+ * 前端會將結果快取在 localStorage，日常使用不會頻繁呼叫此 API。
  */
 async function loadEventFull(eventId: string) {
-  // 快取快速路徑：1 個 SELECT 就完成
-  const cached = await prisma.event.findUnique({
-    where: { id: eventId },
-    select: {
-      cachedFullData: true,
-      planType: true, planExpiresAt: true, planStatus: true, ownerType: true,
-    },
-  });
-  if (!cached) return null;
-  if (cached.cachedFullData) {
-    const data = cached.cachedFullData as Record<string, unknown>;
-    return { ...data, tableLimit: getTableLimit(cached) };
-  }
-
-  // 快取 miss：跑 CTE 組合
   const rows = await prisma.$queryRawUnsafe<Array<{
     id: string; name: string; date: string | null; categories: string[];
     ownerType: string; ownerId: string;
@@ -231,12 +203,6 @@ async function loadEventFull(eventId: string) {
     _guests: undefined, _tables: undefined, _subcategories: undefined,
     _edges: undefined, _avoidPairs: undefined, _snapshots: undefined,
   };
-
-  // 存入快取（不 await，不 block 回應）
-  prisma.event.update({
-    where: { id: eventId },
-    data: { cachedFullData: result as object },
-  }).catch(() => {});
 
   return { ...result, tableLimit: getTableLimit(row) };
 }
@@ -1235,12 +1201,11 @@ events.put('/:eventId/workspace-state', async (c) => {
   const incomingTableIds = new Set(body.tables.map((t) => t.id));
 
   await prisma.$transaction(async (tx) => {
-    // 1. 更新活動名稱 + 清除快取
+    // 1. 更新活動名稱
     await tx.event.update({
       where: { id: eventId },
       data: { name: body.eventName },
     });
-    await tx.$executeRawUnsafe(`UPDATE "Event" SET "cachedFullData" = NULL WHERE id = '${eventId}'`);
 
     // 2. 取得現有桌子
     const existingTables = await tx.table.findMany({
