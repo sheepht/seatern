@@ -1072,6 +1072,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     // 存 DB（批次一次寫入）
     if (eventId) {
+      set({ isBatchSaving: true });
       try {
         await api.patch(`/events/${eventId}/guests/assign-batch`, {
           assignments: assignments.map((a) => {
@@ -1092,6 +1093,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         });
         set({ guests: revertedGuests, undoStack: get().undoStack.slice(0, -1) });
         throw new Error('保存失敗，已恢復原排列');
+      } finally {
+        set({ isBatchSaving: false });
       }
     }
   },
