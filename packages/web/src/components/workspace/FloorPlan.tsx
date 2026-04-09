@@ -51,6 +51,7 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
   const activeDragGuestId = useSeatingStore((s) => s.activeDragGuestId);
   const flyingGuestIds = useSeatingStore((s) => s.flyingGuestIds);
   const isResetting = useSeatingStore((s) => s.isResetting);
+  const isBatchSaving = useSeatingStore((s) => s.isBatchSaving);
   const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress);
   const longPressActive = useSeatingStore((s) => s.longPressActive);
   const bestSwapTableId = useSeatingStore((s) => s.bestSwapTableId);
@@ -1388,6 +1389,15 @@ export const FloorPlan = forwardRef<FloorPlanHandle>(function FloorPlan(_props, 
             if (t) setTimeout(() => panToPoint(t.positionX, t.positionY), 50);
           }}
         />
+      )}
+
+      {/* 批次座位寫入中的半透明遮罩 */}
+      {isBatchSaving && (
+        <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-50 pointer-events-none">
+          <div className="bg-[var(--bg-surface)] px-4 py-2 rounded-lg shadow-md border border-[var(--border)] pointer-events-none">
+            <p className="text-sm text-[var(--text-secondary)] font-[family-name:var(--font-ui)]">儲存中...</p>
+          </div>
+        </div>
       )}
     </div>
   );

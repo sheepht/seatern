@@ -85,6 +85,8 @@ interface SeatingState {
   tableLimitReached: boolean
   /** 用戶已點「稍後再說」關閉上限 modal */
   tableLimitDismissed: boolean
+  /** 批次座位寫入中（自動分配/重排後等待後端回應） */
+  isBatchSaving: boolean
   /** 自動分配進度（null = 未執行） */
   autoAssignProgress: AutoAssignProgress | null
   /** 自動分配取消控制器 */
@@ -204,6 +206,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   undoStack: [],
   lastResetAt: 0,
   isResetting: false,
+  isBatchSaving: false,
   flyingGuestIds: new Set(),
   tableLimit: 20,
   planStatus: null,
@@ -820,9 +823,10 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
 
     // 批次清除後端座位分配（一次寫入）
     if (eventId) {
+      set({ isBatchSaving: true });
       api.patch(`/events/${eventId}/guests/assign-batch`, {
         assignments: assigned.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
-      }).catch(console.error);
+      }).catch(console.error).finally(() => set({ isBatchSaving: false }));
     }
   },
 
@@ -1134,10 +1138,11 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     });
 
     if (eventId) {
+      set({ isBatchSaving: true });
       const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed');
       api.patch(`/events/${eventId}/guests/assign-batch`, {
         assignments: confirmed.map((g) => ({ guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null })),
-      }).catch(console.error);
+      }).catch(console.error).finally(() => set({ isBatchSaving: false }));
     }
   },
 

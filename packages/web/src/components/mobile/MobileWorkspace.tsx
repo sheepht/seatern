@@ -778,6 +778,7 @@ export function MobileWorkspace() {
   const restoreSnapshot = useSeatingStore((s) => s.restoreSnapshot);
   const addTable = useSeatingStore((s) => s.addTable);
   const resetAllSeats = useSeatingStore((s) => s.resetAllSeats);
+  const isBatchSaving = useSeatingStore((s) => s.isBatchSaving);
   const autoArrangeTables = useSeatingStore((s) => s.autoArrangeTables);
   const [adding, setAdding] = useState(false);
   const [arranging, setArranging] = useState(false);
@@ -1132,6 +1133,15 @@ export function MobileWorkspace() {
       {/* Guided assign (無腦排位) */}
       {guidedAssign && (
         <GuidedAssign onClose={() => setGuidedAssign(false)} />
+      )}
+
+      {/* 批次座位寫入中的半透明遮罩 */}
+      {isBatchSaving && (
+        <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-50 pointer-events-none">
+          <div className="bg-[var(--bg-surface)] px-4 py-2 rounded-lg shadow-md border border-[var(--border)]">
+            <p className="text-sm text-[var(--text-secondary)] font-[family-name:var(--font-ui)]">儲存中...</p>
+          </div>
+        </div>
       )}
     </div>
   );
