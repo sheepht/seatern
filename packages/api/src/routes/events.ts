@@ -862,12 +862,22 @@ events.post('/:id/seed', async (c) => {
 
   console.log(`[SEED] Starting seed for event ${eventId}: ${body.guests.length} guests, ${body.tables.length} tables`);
 
+  // Fixture 裡的 UUID 是 build-time 固定的，多個使用者會衝突。
+  // 後端重新生成所有 ID，用 old→new mapping 維持引用關係。
+  const { randomUUID } = await import('node:crypto');
+  const idMap = new Map<string, string>();
+  const remap = (oldId: string) => {
+    let newId = idMap.get(oldId);
+    if (!newId) { newId = randomUUID(); idMap.set(oldId, newId); }
+    return newId;
+  };
+
   await prisma.$transaction(async (tx) => {
     // 1. 建立子分類
     if (body.subcategories.length > 0) {
       await tx.subcategory.createMany({
         data: body.subcategories.map((s) => ({
-          id: s.id,
+          id: remap(s.id),
           eventId,
           name: s.name,
           category: s.category,
@@ -879,7 +889,7 @@ events.post('/:id/seed', async (c) => {
     if (body.tables.length > 0) {
       await tx.table.createMany({
         data: body.tables.map((t) => ({
-          id: t.id,
+          id: remap(t.id),
           eventId,
           name: t.name,
           capacity: t.capacity,
@@ -892,7 +902,7 @@ events.post('/:id/seed', async (c) => {
     // 3. 建立賓客（含 subcategoryId + assignedTableId + seatIndex）
     await tx.guest.createMany({
       data: body.guests.map((g) => ({
-        id: g.id,
+        id: remap(g.id),
         eventId,
         name: g.name,
         aliases: g.aliases,
@@ -901,8 +911,8 @@ events.post('/:id/seed', async (c) => {
         companionCount: g.companionCount ?? 0,
         dietaryNote: g.dietaryNote,
         specialNote: g.specialNote,
-        subcategoryId: g.subcategoryId,
-        assignedTableId: g.assignedTableId,
+        subcategoryId: g.subcategoryId ? remap(g.subcategoryId) : null,
+        assignedTableId: g.assignedTableId ? remap(g.assignedTableId) : null,
         seatIndex: g.seatIndex ?? null,
       })),
     });
@@ -911,8 +921,8 @@ events.post('/:id/seed', async (c) => {
     if (body.preferences.length > 0) {
       await tx.seatPreference.createMany({
         data: body.preferences.map((p) => ({
-          guestId: p.guestId,
-          preferredGuestId: p.preferredGuestId,
+          guestId: remap(p.guestId),
+          preferredGuestId: remap(p.preferredGuestId),
           rank: p.rank,
         })),
       });
@@ -923,8 +933,8 @@ events.post('/:id/seed', async (c) => {
       await tx.avoidPair.createMany({
         data: body.avoidPairs.map((p) => ({
           eventId,
-          guestAId: p.guestAId,
-          guestBId: p.guestBId,
+          guestAId: remap(p.guestAId),
+          guestBId: remap(p.guestBId),
         })),
       });
     }
