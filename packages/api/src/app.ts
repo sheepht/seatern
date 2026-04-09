@@ -24,12 +24,6 @@ app.use(
 app.route('/api/health', healthRoute);
 app.get('/', (c) => c.json({ name: 'Seatern API', version: '0.1.0' }));
 
-// Debug: test POST body through Hono
-app.post('/api/debug-post', async (c) => {
-  const body = await c.req.json();
-  return c.json({ received: body });
-});
-
 // Auth routes（LINE OAuth + claim-event）
 app.use('/api/auth/*', sessionMiddleware);
 app.route('/api/auth', auth);

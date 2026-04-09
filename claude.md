@@ -900,6 +900,14 @@ interface SeatingSnapshot {
 3. 用螢幕座標（getBoundingClientRect + getScreenCTM）而非 SVG 座標
 4. 設 `pointer-events: none`
 
+### Vercel 部署注意事項
+- 前後端同一個 Vercel project：前端是 `packages/web/dist` 靜態檔，後端是 `api/[...path].ts` Serverless Function
+- API function 用 `@hono/node-server/vercel` adapter
+- **必須**在 Vercel 環境變數設 `NODEJS_HELPERS=0`，否則 Hono 的 POST body parsing 會 hang 住
+- `DATABASE_URL` 要用 Supabase connection pooler（`pooler.supabase.com`），並加 `?pgbouncer=true&connection_limit=1`
+- `packages/api/src/` 內所有相對 import 必須帶 `.ts` 副檔名（讓 tsc 輸出 `.js` 副檔名，ESM 需要）
+- root `package.json` 必須有 `"type": "module"`（Vercel 編譯 TS→JS 後 Node.js 才認 ESM）
+
 ## Design System
 Always read DESIGN.md before making any visual or UI decisions.
 All font choices, colors, spacing, and aesthetic direction are defined there.
