@@ -263,7 +263,7 @@ events.patch('/:eventId/guests/assign-batch', async (c) => {
     const values = normalized.map((a) => {
       const tableId = a.tableId ? `'${a.tableId}'` : 'NULL';
       const seatIndex = a.tableId === null ? 'NULL' : (a.seatIndex ?? 'NULL');
-      return `('${a.guestId}', ${tableId}, ${seatIndex === 'NULL' ? 'NULL' : Number(seatIndex)}::int)`;
+      return `('${a.guestId}', ${tableId}, ${seatIndex === 'NULL' ? 'NULL' : Number(seatIndex)})`;
     }).join(', ');
 
     await prisma.$executeRawUnsafe(`
@@ -271,7 +271,7 @@ events.patch('/:eventId/guests/assign-batch', async (c) => {
       SET "assignedTableId" = v.table_id,
           "seatIndex" = v.seat_index,
           "updatedAt" = NOW()
-      FROM (VALUES ${values}) AS v(guest_id text, table_id text, seat_index int)
+      FROM (VALUES ${values}) AS v(guest_id, table_id, seat_index)
       WHERE g.id = v.guest_id
     `);
   }
