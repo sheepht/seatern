@@ -1187,4 +1187,130 @@ events.post('/:id/seed', async (c) => {
   return c.json({ success: true, guests: body.guests.length, tables: body.tables.length }, 201);
 });
 
+// PUT /events/:eventId/workspace-state — 一次性存回排位工作區狀態
+events.put('/:eventId/workspace-state', async (c) => {
+  const ownerId = c.get('ownerId');
+  const ownerType = c.get('ownerType');
+  const { eventId } = c.req.param();
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
+  if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
+
+  const body = await c.req.json<{
+    eventName: string;
+    tables: Array<{
+      id: string;
+      name: string;
+      capacity: number;
+      positionX: number;
+      positionY: number;
+      color?: string | null;
+      note?: string | null;
+    }>;
+    assignments: Array<{
+      guestId: string;
+      tableId: string | null;
+      seatIndex: number | null;
+    }>;
+  }>();
+
+  // 驗證 UUID 格式
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  for (const t of body.tables) {
+    if (!uuidRe.test(t.id)) return c.json({ error: 'Invalid table ID format' }, 400);
+  }
+  for (const a of body.assignments) {
+    if (!uuidRe.test(a.guestId)) return c.json({ error: 'Invalid guest ID format' }, 400);
+    if (a.tableId && !uuidRe.test(a.tableId)) return c.json({ error: 'Invalid table ID format' }, 400);
+  }
+
+  // 桌數上限檢查
+  const tableLimit = getTableLimit(event);
+  if (body.tables.length > tableLimit) {
+    return c.json({ code: 'TABLE_LIMIT_REACHED', message: `桌數上限 ${tableLimit}` }, 403);
+  }
+
+  const incomingTableIds = new Set(body.tables.map((t) => t.id));
+
+  await prisma.$transaction(async (tx) => {
+    // 1. 更新活動名稱 + 清除快取
+    await tx.event.update({
+      where: { id: eventId },
+      data: { name: body.eventName },
+    });
+    await tx.$executeRawUnsafe(`UPDATE "Event" SET "cachedFullData" = NULL WHERE id = '${eventId}'`);
+
+    // 2. 取得現有桌子
+    const existingTables = await tx.table.findMany({
+      where: { eventId },
+      select: { id: true },
+    });
+    const existingTableIds = new Set(existingTables.map((t: { id: string }) => t.id));
+
+    // 3a. 刪除不在新 list 中的桌子（先清掉賓客的 assignedTableId）
+    const toDelete = [...existingTableIds].filter((id) => !incomingTableIds.has(id));
+    if (toDelete.length > 0) {
+      await tx.guest.updateMany({
+        where: { eventId, assignedTableId: { in: toDelete } },
+        data: { assignedTableId: null, seatIndex: null },
+      });
+      await tx.table.deleteMany({
+        where: { id: { in: toDelete }, eventId },
+      });
+    }
+
+    // 3b. Upsert 桌子
+    for (const t of body.tables) {
+      if (existingTableIds.has(t.id)) {
+        await tx.table.update({
+          where: { id: t.id },
+          data: {
+            name: t.name,
+            capacity: t.capacity,
+            positionX: t.positionX,
+            positionY: t.positionY,
+            color: t.color ?? null,
+            note: t.note ?? null,
+          },
+        });
+      } else {
+        await tx.table.create({
+          data: {
+            id: t.id,
+            eventId,
+            name: t.name,
+            capacity: t.capacity,
+            positionX: t.positionX,
+            positionY: t.positionY,
+            color: t.color ?? null,
+            note: t.note ?? null,
+          },
+        });
+      }
+    }
+
+    // 4. 批次更新賓客 assignments（用 raw SQL 一次寫入）
+    if (body.assignments.length > 0) {
+      const values = body.assignments.map((a) => {
+        const tableId = a.tableId ? `'${a.tableId}'` : 'NULL';
+        const seatIdx = (a.tableId === null || a.seatIndex == null) ? 'NULL' : `'${Number(a.seatIndex)}'`;
+        return `('${a.guestId}', ${tableId}, ${seatIdx})`;
+      }).join(', ');
+
+      await tx.$executeRawUnsafe(`
+        UPDATE "Guest" AS g
+        SET "assignedTableId" = v.table_id,
+            "seatIndex" = v.seat_index::int,
+            "updatedAt" = NOW()
+        FROM (VALUES ${values}) AS v(guest_id, table_id, seat_index)
+        WHERE g.id = v.guest_id
+      `);
+    }
+  });
+
+  return c.json({ success: true });
+});
+
 export { events };

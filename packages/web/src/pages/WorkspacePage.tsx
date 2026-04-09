@@ -76,9 +76,43 @@ export default function WorkspacePage() {
   const addAvoidPair = useSeatingStore((s) => s.addAvoidPair);
   const removeAvoidPair = useSeatingStore((s) => s.removeAvoidPair);
 
+  const isDirty = useSeatingStore((s) => s.isDirty);
+  const saveAll = useSeatingStore((s) => s.saveAll);
+  const showRecoveryPrompt = useSeatingStore((s) => s.showRecoveryPrompt);
+  const restoreFromBackup = useSeatingStore((s) => s.restoreFromBackup);
+  const dismissBackup = useSeatingStore((s) => s.dismissBackup);
+
   const [activeGuest, setActiveGuest] = useState<Guest | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const floorPlanRef = useRef<FloorPlanHandle>(null);
+
+  // Auto-save：idle 30 秒後自動存檔
+  useEffect(() => {
+    if (!isDirty) return;
+    let timer = setTimeout(() => saveAll(), 30_000);
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => saveAll(), 30_000);
+    };
+    window.addEventListener('mousemove', reset);
+    window.addEventListener('keydown', reset);
+    window.addEventListener('pointerdown', reset);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('mousemove', reset);
+      window.removeEventListener('keydown', reset);
+      window.removeEventListener('pointerdown', reset);
+    };
+  }, [isDirty, saveAll]);
+
+  // beforeunload 警告
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty) e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
 
   // GuestFormModal 需要的衍生資料
   const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId]);
@@ -259,6 +293,22 @@ export default function WorkspacePage() {
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+      {/* localStorage 備份恢復提示 */}
+      {showRecoveryPrompt && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between text-sm">
+          <span className="text-amber-800">發現上次未儲存的排位變更，要恢復嗎？</span>
+          <div className="flex gap-2">
+            <button
+              onClick={restoreFromBackup}
+              className="px-3 py-1 rounded-md text-xs font-medium bg-amber-500 text-white cursor-pointer hover:bg-amber-600"
+            >恢復</button>
+            <button
+              onClick={dismissBackup}
+              className="px-3 py-1 rounded-md text-xs font-medium border border-amber-300 text-amber-700 bg-transparent cursor-pointer hover:bg-amber-100"
+            >捨棄</button>
+          </div>
+        </div>
+      )}
       <div className="flex-1 flex overflow-hidden">
           {/* 折疊時的展開條（永遠渲染，寬度跟側邊欄同步動畫） */}
           <ExpandButton collapsed={sidebarCollapsed} onClick={() => setSidebarCollapsed(false)} />

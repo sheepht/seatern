@@ -19,6 +19,239 @@ export interface SeatingSnapshot {
   createdAt: string
 }
 
+// ─── Event Cache (localStorage) ────────────────────
+// loadEvent 成功後快取整個 event state，下次載入直接用，省掉 API round trip
+export interface EventCache {
+  ts: number
+  eventId: string
+  eventName: string
+  eventCategories: string[]
+  guests: Guest[]
+  tables: Table[]
+  subcategories: Subcategory[]
+  avoidPairs: AvoidPair[]
+  snapshots: SeatingSnapshot[]
+  tableLimit: number
+  planStatus: string | null
+  planExpiresAt: string | null
+}
+
+const EVENT_CACHE_KEY = 'seatern-event-cache';
+
+function saveEventCache(state: EventCache) {
+  try {
+    localStorage.setItem(EVENT_CACHE_KEY, JSON.stringify(state));
+  } catch { /* localStorage full or unavailable */ }
+}
+
+function loadEventCache(): EventCache | null {
+  try {
+    const raw = localStorage.getItem(EVENT_CACHE_KEY);
+    if (!raw) return null;
+    const cache = JSON.parse(raw) as EventCache;
+    if (!cache.eventId || !cache.ts) return null;
+    return cache;
+  } catch { return null; }
+}
+
+function clearEventCache() {
+  try { localStorage.removeItem(EVENT_CACHE_KEY); } catch { /* ok */ }
+}
+
+// ─── Workspace Backup (localStorage) ───────────────
+export interface WorkspaceBackup {
+  ts: number
+  eventName: string
+  tables: Table[]
+  guestAssignments: Array<{ id: string; assignedTableId: string | null; seatIndex: number | null }>
+}
+
+// ─── localStorage 備份 debounce ────────────────────
+let _backupTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleBackup(eventId: string, state: { eventName: string; tables: Table[]; guests: Guest[] }) {
+  if (_backupTimer) clearTimeout(_backupTimer);
+  _backupTimer = setTimeout(() => {
+    try {
+      const backup: WorkspaceBackup = {
+        ts: Date.now(),
+        eventName: state.eventName,
+        tables: state.tables,
+        guestAssignments: state.guests.map((g) => ({
+          id: g.id,
+          assignedTableId: g.assignedTableId,
+          seatIndex: g.seatIndex,
+        })),
+      };
+      localStorage.setItem(`seatern-backup-${eventId}`, JSON.stringify(backup));
+    } catch { /* localStorage full or unavailable */ }
+  }, 500);
+}
+
+// ─── Helpers: fetch & apply event data ─────────────
+
+type SetFn = (partial: Partial<SeatingState> | ((state: SeatingState) => Partial<SeatingState>)) => void;
+type GetFn = () => SeatingState;
+
+/** 從 API 抓取 event 資料，處理後套用到 store + 寫入快取 */
+async function fetchAndApplyEvent(set: SetFn, get: GetFn) {
+  let res;
+  try {
+    res = await api.get('/events/mine');
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'response' in err && (err as { response?: { status?: number } }).response?.status === 404) {
+      try {
+        await api.post('/events', { name: '我的排位' });
+      } catch {
+        set({ loading: false });
+        window.location.href = '/';
+        return;
+      }
+      res = await api.get('/events/mine');
+    } else {
+      throw err;
+    }
+  }
+  const data = res.data;
+
+  interface ApiGuest {
+    id: string; name: string; aliases: string[]; category: string | null;
+    rsvpStatus: Guest['rsvpStatus']; companionCount: number;
+    dietaryNote: string | null; specialNote: string | null;
+    assignedTableId: string | null; seatIndex: number | null;
+    isOverflow: boolean; isIsolated: boolean;
+    seatPreferences: Guest['seatPreferences']; subcategory: Guest['subcategory'];
+  }
+  const guests = data.guests.map((g: ApiGuest) => ({
+    id: g.id,
+    name: g.name,
+    aliases: g.aliases || [],
+    category: g.category || '',
+    rsvpStatus: g.rsvpStatus,
+    companionCount: g.companionCount,
+    seatCount: g.companionCount + 1,
+    dietaryNote: g.dietaryNote || '',
+    specialNote: g.specialNote || '',
+    satisfactionScore: 0,
+    assignedTableId: g.assignedTableId,
+    seatIndex: g.seatIndex ?? null,
+    isOverflow: g.isOverflow,
+    isIsolated: g.isIsolated,
+    seatPreferences: g.seatPreferences || [],
+    subcategory: g.subcategory || null,
+  }));
+  const tables = data.tables as Table[];
+  const subcategories = (data.subcategories || []) as Subcategory[];
+  const avoidPairs = data.avoidPairs || [];
+  const snapshots = data.snapshots || [];
+
+  // 初始滿意度計算
+  const result = recalculateAll(guests, tables, avoidPairs);
+  for (const gs of result.guests) {
+    const g = guests.find((gg: Guest) => gg.id === gs.id);
+    if (g) g.satisfactionScore = gs.satisfactionScore;
+  }
+  for (const ts of result.tables) {
+    const t = tables.find((tt: Table) => tt.id === ts.id);
+    if (t) t.averageSatisfaction = ts.averageSatisfaction;
+  }
+
+  // 為沒有 seatIndex 的賓客自動分配座位索引
+  for (const t of tables) {
+    const tableGuests = guests.filter(
+      (g: Guest) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed',
+    );
+    const needsIndex = tableGuests.filter((g: Guest) => g.seatIndex === null);
+    if (needsIndex.length > 0) {
+      const usedIndices = new Set(
+        tableGuests.filter((g: Guest) => g.seatIndex !== null).map((g: Guest) => g.seatIndex!),
+      );
+      for (const g of tableGuests) {
+        if (g.seatIndex !== null) {
+          for (let c = 1; c < g.seatCount; c++) {
+            usedIndices.add((g.seatIndex + c) % t.capacity);
+          }
+        }
+      }
+      let nextFree = 0;
+      for (const g of needsIndex) {
+        while (usedIndices.has(nextFree)) nextFree++;
+        g.seatIndex = nextFree;
+        usedIndices.add(nextFree);
+        for (let c = 1; c < g.seatCount; c++) {
+          usedIndices.add(nextFree + c);
+        }
+        nextFree++;
+      }
+    }
+  }
+
+  // 組合成 EventCache 格式，套用到 store + 寫入快取
+  const eventData: EventCache = {
+    ts: Date.now(),
+    eventId: data.id,
+    eventName: data.name,
+    eventCategories: data.categories || ['男方', '女方', '共同'],
+    guests,
+    tables,
+    subcategories,
+    avoidPairs,
+    snapshots,
+    tableLimit: data.tableLimit ?? 20,
+    planStatus: data.planStatus ?? null,
+    planExpiresAt: data.planExpiresAt ?? null,
+  };
+
+  applyEventData(set, get, eventData);
+  saveEventCache(eventData);
+}
+
+/** 將 EventCache 資料套用到 store（從 API 或 localStorage 載入都走這裡） */
+function applyEventData(set: SetFn, _get: GetFn, data: EventCache) {
+  // 從快取載入時需要重算滿意度（快取可能不含最新的 satisfactionScore）
+  const result = recalculateAll(data.guests, data.tables, data.avoidPairs);
+  const guests = data.guests.map((g) => {
+    const s = result.guests.find((gs) => gs.id === g.id);
+    return s ? { ...g, satisfactionScore: s.satisfactionScore } : g;
+  });
+  const tables = data.tables.map((t) => {
+    const s = result.tables.find((ts) => ts.id === t.id);
+    return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t;
+  });
+
+  // 檢查 localStorage 備份（未存的排位變更）
+  let recoveryState: { showRecoveryPrompt: boolean; backupData: WorkspaceBackup | null } = { showRecoveryPrompt: false, backupData: null };
+  try {
+    const raw = localStorage.getItem(`seatern-backup-${data.eventId}`);
+    if (raw) {
+      const backup = JSON.parse(raw) as WorkspaceBackup;
+      if (backup.ts && backup.guestAssignments?.length > 0) {
+        recoveryState = { showRecoveryPrompt: true, backupData: backup };
+      }
+    }
+  } catch { /* localStorage parse error, ignore */ }
+
+  set({
+    eventId: data.eventId,
+    eventName: data.eventName,
+    eventCategories: data.eventCategories,
+    guests,
+    tables,
+    subcategories: data.subcategories,
+    avoidPairs: data.avoidPairs,
+    snapshots: data.snapshots,
+    tableLimit: data.tableLimit,
+    planStatus: data.planStatus,
+    planExpiresAt: data.planExpiresAt,
+    loading: false,
+    isDirty: false,
+    isSaving: false,
+    selectedTableId: null,
+    dragPreview: null,
+    undoStack: [],
+    ...recoveryState,
+  });
+}
+
 // ─── Store ──────────────────────────────────────────
 
 interface SeatingState {
@@ -89,6 +322,16 @@ interface SeatingState {
   demoLoading: boolean
   /** 批次座位寫入中（自動分配/重排後等待後端回應） */
   isBatchSaving: boolean
+  /** 有未存的 workspace 變更 */
+  isDirty: boolean
+  /** saveAll 進行中 */
+  isSaving: boolean
+  /** 上次存檔時間戳 */
+  lastSavedAt: number | null
+  /** localStorage 備份恢復提示 */
+  showRecoveryPrompt: boolean
+  /** localStorage 備份資料 */
+  backupData: WorkspaceBackup | null
   /** 自動分配進度（null = 未執行） */
   autoAssignProgress: AutoAssignProgress | null
   /** 自動分配取消控制器 */
@@ -136,6 +379,8 @@ interface SeatingState {
 
   // Actions
   loadEvent: () => Promise<void>
+  /** 強制從 API 重新載入（忽略 localStorage 快取） */
+  reloadEvent: () => Promise<void>
   setSelectedTable: (tableId: string | null) => void
   setHoveredGuest: (guestId: string | null, screenY?: number | null) => void
   setActiveDragGuest: (guestId: string | null) => void
@@ -146,8 +391,8 @@ interface SeatingState {
   clearTable: (tableId: string) => void
   resetAllSeats: () => void
   updateEventName: (name: string) => void
-  addTable: (name: string, positionX: number, positionY: number) => Promise<void>
-  removeTable: (tableId: string) => Promise<void>
+  addTable: (name: string, positionX: number, positionY: number) => void
+  removeTable: (tableId: string) => void
   updateTableName: (tableId: string, name: string) => void
   updateTableCapacity: (tableId: string, capacity: number) => void
   updateTablePosition: (tableId: string, x: number, y: number) => void
@@ -157,10 +402,13 @@ interface SeatingState {
   addAvoidPair: (guestAId: string, guestBId: string, reason?: string) => Promise<void>
   removeAvoidPair: (pairId: string) => Promise<void>
   checkAvoidViolation: (guestId: string, tableId: string) => AvoidPair | null
-  autoArrangeTables: (positions: Array<{ tableId: string; x: number; y: number }>) => Promise<void>
+  autoArrangeTables: (positions: Array<{ tableId: string; x: number; y: number }>) => void
   autoAssignGuests: (mode?: AutoAssignMode) => Promise<void>
   randomAssignGuests: (ratio?: number) => void
   setEditingGuest: (guestId: string | null) => void
+  saveAll: () => Promise<void>
+  restoreFromBackup: () => void
+  dismissBackup: () => void
 
   // Guest CRUD (管理頁面用)
   updateGuest: (guestId: string, patch: Partial<Guest>) => Promise<boolean>
@@ -210,6 +458,11 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   isResetting: false,
   demoLoading: false,
   isBatchSaving: false,
+  isDirty: false,
+  isSaving: false,
+  lastSavedAt: null,
+  showRecoveryPrompt: false,
+  backupData: null,
   flyingGuestIds: new Set(),
   tableLimit: 20,
   planStatus: null,
@@ -226,117 +479,29 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   loadEvent: async () => {
     set({ loading: true });
     try {
-      let res;
-      try {
-        res = await api.get('/events/mine');
-      } catch (err: unknown) {
-        if (err && typeof err === 'object' && 'response' in err && (err as { response?: { status?: number } }).response?.status === 404) {
-          // 沒有活動，自動建立一個
-          try {
-            await api.post('/events', { name: '我的排位' });
-          } catch {
-            set({ loading: false });
-            window.location.href = '/';
-            return;
-          }
-          res = await api.get('/events/mine');
-        } else {
-          throw err;
-        }
-      }
-      const data = res.data;
-
-      interface ApiGuest {
-        id: string; name: string; aliases: string[]; category: string | null;
-        rsvpStatus: Guest['rsvpStatus']; companionCount: number;
-        dietaryNote: string | null; specialNote: string | null;
-        assignedTableId: string | null; seatIndex: number | null;
-        isOverflow: boolean; isIsolated: boolean;
-        seatPreferences: Guest['seatPreferences']; subcategory: Guest['subcategory'];
-      }
-      const guests = data.guests.map((g: ApiGuest) => ({
-        id: g.id,
-        name: g.name,
-        aliases: g.aliases || [],
-        category: g.category || '',
-        rsvpStatus: g.rsvpStatus,
-        companionCount: g.companionCount,
-        seatCount: g.companionCount + 1,
-        dietaryNote: g.dietaryNote || '',
-        specialNote: g.specialNote || '',
-        satisfactionScore: 0,
-        assignedTableId: g.assignedTableId,
-        seatIndex: g.seatIndex ?? null,
-        isOverflow: g.isOverflow,
-        isIsolated: g.isIsolated,
-        seatPreferences: g.seatPreferences || [],
-        subcategory: g.subcategory || null,
-      }));
-      const tables = data.tables as Table[];
-      const subcategories = (data.subcategories || []) as Subcategory[];
-
-      // 初始滿意度計算
-      const result = recalculateAll(guests, tables, data.avoidPairs || []);
-      for (const gs of result.guests) {
-        const g = guests.find((gg: Guest) => gg.id === gs.id);
-        if (g) g.satisfactionScore = gs.satisfactionScore;
-      }
-      for (const ts of result.tables) {
-        const t = tables.find((tt: Table) => tt.id === ts.id);
-        if (t) t.averageSatisfaction = ts.averageSatisfaction;
+      // 1. 嘗試從 localStorage 快取載入（省掉 API round trip）
+      const cache = loadEventCache();
+      if (cache) {
+        // 快取存在 — 直接套用，不打 API
+        applyEventData(set, get, cache);
+        return;
       }
 
-      // 為沒有 seatIndex 的賓客自動分配座位索引
-      for (const t of tables) {
-        const tableGuests = guests.filter(
-          (g: Guest) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed',
-        );
-        const needsIndex = tableGuests.filter((g: Guest) => g.seatIndex === null);
-        if (needsIndex.length > 0) {
-          // 找出已使用的座位索引
-          const usedIndices = new Set(
-            tableGuests.filter((g: Guest) => g.seatIndex !== null).map((g: Guest) => g.seatIndex!),
-          );
-          // 也要考慮眷屬佔的位子
-          for (const g of tableGuests) {
-            if (g.seatIndex !== null) {
-              for (let c = 1; c < g.seatCount; c++) {
-                usedIndices.add((g.seatIndex + c) % t.capacity);
-              }
-            }
-          }
-          let nextFree = 0;
-          for (const g of needsIndex) {
-            while (usedIndices.has(nextFree)) nextFree++;
-            g.seatIndex = nextFree;
-            usedIndices.add(nextFree);
-            for (let c = 1; c < g.seatCount; c++) {
-              usedIndices.add(nextFree + c);
-            }
-            nextFree++;
-          }
-        }
-      }
-
-      set({
-        eventId: data.id,
-        eventName: data.name,
-        eventCategories: data.categories || ['男方', '女方', '共同'],
-        guests,
-        tables,
-        subcategories,
-        avoidPairs: data.avoidPairs || [],
-        snapshots: data.snapshots || [],
-        tableLimit: data.tableLimit ?? 20,
-        planStatus: data.planStatus ?? null,
-        planExpiresAt: data.planExpiresAt ?? null,
-        loading: false,
-        selectedTableId: null,
-        dragPreview: null,
-        undoStack: [],
-      });
+      // 2. 沒有快取 — 從 API 載入
+      await fetchAndApplyEvent(set, get);
     } catch (err) {
       console.error('Failed to load event:', err);
+      set({ loading: false });
+    }
+  },
+
+  reloadEvent: async () => {
+    set({ loading: true });
+    clearEventCache();
+    try {
+      await fetchAndApplyEvent(set, get);
+    } catch (err) {
+      console.error('Failed to reload event:', err);
       set({ loading: false });
     }
   },
@@ -383,14 +548,12 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       guests: finalGuests,
       tables: finalTables,
       dragPreview: null,
+      isDirty: true,
       undoStack: [...undoStack, { guestId, fromTableId, toTableId, prevSeatIndices }],
     });
 
-    // 非同步存到後端（不 block UI）
     const { eventId } = get();
-    if (eventId) {
-      api.patch(`/events/${eventId}/guests/${guestId}/table`, { tableId: toTableId, seatIndex: toTableId === null ? null : guest.seatIndex }).catch(console.error);
-    }
+    if (eventId) scheduleBackup(eventId, get());
   },
 
   moveGuestToSeat: (guestId, tableId, seatIndex, cursorBias) => {
@@ -452,25 +615,12 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       guests: finalGuests,
       tables: finalTables,
       dragPreview: null,
+      isDirty: true,
       undoStack: [...undoStack, { guestId, fromTableId, toTableId: tableId, prevSeatIndices }],
     });
 
-    // 非同步存到後端 — 所有受影響的賓客
     const { eventId } = get();
-    if (eventId) {
-      // 被拖的賓客
-      api.patch(`/events/${eventId}/guests/${guestId}/table`, { tableId, seatIndex: newIndices.get(guestId) ?? seatIndex }).catch(console.error);
-
-      // 被位移的同桌賓客
-      for (const [id, newIdx] of newIndices) {
-        if (id !== guestId) {
-          const prev = prevSeatIndices.get(id);
-          if (prev !== newIdx) {
-            api.patch(`/events/${eventId}/guests/${id}/table`, { tableId, seatIndex: newIdx }).catch(console.error);
-          }
-        }
-      }
-    }
+    if (eventId) scheduleBackup(eventId, get());
   },
 
   setDragPreview: (tableId, seatIndex, draggedGuestId, cursorBias) => {
@@ -552,7 +702,6 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     // ─── 還原「新增桌」：刪掉該桌 ───
     if (last.type === 'add-table') {
       const tableId = last.tableId;
-      const tableGuests = guests.filter((g) => g.assignedTableId === tableId);
       const updatedGuests = guests.map((g) =>
         g.assignedTableId === tableId ? { ...g, assignedTableId: null as string | null, seatIndex: null } : g,
       );
@@ -560,16 +709,10 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         tables: tables.filter((t) => t.id !== tableId),
         guests: updatedGuests,
         undoStack: undoStack.slice(0, -1),
+        isDirty: true,
         selectedTableId: get().selectedTableId === tableId ? null : get().selectedTableId,
       });
-      if (eventId) {
-        if (tableGuests.length > 0) {
-          api.patch(`/events/${eventId}/guests/assign-batch`, {
-            assignments: tableGuests.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
-          }).catch(console.error);
-        }
-        api.delete(`/events/${eventId}/tables/${tableId}`).catch(console.error);
-      }
+      if (eventId) scheduleBackup(eventId, get());
       return;
     }
 
@@ -579,10 +722,9 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       set({
         tables: tables.map((t) => t.id === tableId ? { ...t, positionX: fromX, positionY: fromY } : t),
         undoStack: undoStack.slice(0, -1),
+        isDirty: true,
       });
-      if (eventId) {
-        api.patch(`/events/${eventId}/tables/${tableId}`, { positionX: fromX, positionY: fromY }).catch(console.error);
-      }
+      if (eventId) scheduleBackup(eventId, get());
       return;
     }
 
@@ -592,10 +734,9 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       set({
         tables: tables.map((t) => t.id === tableId ? { ...t, name: oldName } : t),
         undoStack: undoStack.slice(0, -1),
+        isDirty: true,
       });
-      if (eventId) {
-        api.patch(`/events/${eventId}/tables/${tableId}`, { name: oldName }).catch(console.error);
-      }
+      if (eventId) scheduleBackup(eventId, get());
       return;
     }
 
@@ -605,12 +746,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         const prev = last.positions.get(t.id);
         return prev ? { ...t, positionX: prev.fromX, positionY: prev.fromY } : t;
       });
-      set({ tables: updatedTables, undoStack: undoStack.slice(0, -1) });
-      if (eventId) {
-        for (const [tableId, { fromX, fromY }] of last.positions) {
-          api.patch(`/events/${eventId}/tables/${tableId}`, { positionX: fromX, positionY: fromY }).catch(console.error);
-        }
-      }
+      set({ tables: updatedTables, undoStack: undoStack.slice(0, -1), isDirty: true });
+      if (eventId) scheduleBackup(eventId, get());
       return;
     }
 
@@ -632,18 +769,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         const score = result.tables.find((ts) => ts.id === t.id);
         return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t;
       });
-      set({ guests: finalGuests, tables: finalTables, undoStack: undoStack.slice(0, -1) });
-      if (eventId) {
-        api.patch(`/events/${eventId}/guests/assign-batch`, {
-          assignments: last.assignments.map((a) => ({
-            guestId: a.guestId, tableId: a.fromTableId, seatIndex: a.fromSeatIndex ?? null,
-          })),
-        }).catch(console.error);
-        // 刪除自動新增的桌子
-        for (const tableId of last.createdTableIds) {
-          api.delete(`/events/${eventId}/tables/${tableId}`).catch(console.error);
-        }
-      }
+      set({ guests: finalGuests, tables: finalTables, undoStack: undoStack.slice(0, -1), isDirty: true });
+      if (eventId) scheduleBackup(eventId, get());
       return;
     }
 
@@ -688,79 +815,55 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       guests: finalGuests,
       tables: finalTables,
       undoStack: remainingStack,
+      isDirty: true,
     });
 
-    // 後端同步：批次還原所有受影響的賓客
-    if (eventId) {
-      const synced = new Set<string>();
-      const batchAssignments: Array<{ guestId: string; tableId: string | null; seatIndex: number | null }> = [];
-      for (const entry of entriesToUndo) {
-        // 被拖的賓客
-        if (!synced.has(entry.guestId)) {
-          synced.add(entry.guestId);
-          batchAssignments.push({ guestId: entry.guestId, tableId: entry.fromTableId, seatIndex: entry.prevSeatIndices.get(entry.guestId) ?? null });
-        }
-        // 其他被位移的賓客
-        for (const [id, idx] of entry.prevSeatIndices) {
-          if (id !== entry.guestId && !synced.has(id)) {
-            synced.add(id);
-            const currentGuest = guests.find((g) => g.id === id);
-            if (currentGuest && currentGuest.seatIndex !== idx) {
-              batchAssignments.push({ guestId: id, tableId: currentGuest.assignedTableId ?? null, seatIndex: idx });
-            }
-          }
-        }
-      }
-      if (batchAssignments.length > 0) {
-        api.patch(`/events/${eventId}/guests/assign-batch`, { assignments: batchAssignments }).catch(console.error);
-      }
-    }
+    if (eventId) scheduleBackup(eventId, get());
   },
 
-  removeTable: async (tableId) => {
+  removeTable: (tableId) => {
     const { eventId, tables, guests, selectedTableId } = get();
-    if (!eventId) return;
 
-    // 先把所有桌上的賓客移回未安排
-    const tableGuests = guests.filter((g) => g.assignedTableId === tableId);
     const updatedGuests = guests.map((g) =>
-      g.assignedTableId === tableId ? { ...g, assignedTableId: null } : g,
+      g.assignedTableId === tableId ? { ...g, assignedTableId: null as string | null, seatIndex: null } : g,
     );
 
     set({
       tables: tables.filter((t) => t.id !== tableId),
       guests: updatedGuests,
       selectedTableId: selectedTableId === tableId ? null : selectedTableId,
+      isDirty: true,
     });
 
-    // 回寫 API：移除桌上賓客
-    await Promise.all(
-      tableGuests.map((g) =>
-        api.delete(`/events/${eventId}/guests/${g.id}/seat`).catch(console.error),
-      ),
-    );
-
-    await api.delete(`/events/${eventId}/tables/${tableId}`).catch(console.error);
+    if (eventId) scheduleBackup(eventId, get());
   },
 
-  addTable: async (name, positionX, positionY) => {
-    const { eventId, tables } = get();
+  addTable: (name, positionX, positionY) => {
+    const { eventId, tables, tableLimit } = get();
     if (!eventId) return;
 
-    let table;
-    try {
-      const res = await api.post(`/events/${eventId}/tables`, { name, positionX, positionY });
-      table = res.data;
-    } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'response' in err) {
-        const axiosErr = err as { response?: { status?: number; data?: { code?: string } } };
-        if (axiosErr.response?.status === 403 && axiosErr.response?.data?.code === 'TABLE_LIMIT_REACHED') {
-          set({ tableLimitReached: true });
-        }
-      }
+    // 前端檢查桌數上限
+    if (tables.length >= tableLimit) {
+      set({ tableLimitReached: true });
       return;
     }
-    set({ tables: [...tables, table], undoStack: [...get().undoStack, { type: 'add-table' as const, tableId: table.id }] });
+
+    const table: Table = {
+      id: crypto.randomUUID(),
+      name,
+      capacity: 10,
+      positionX,
+      positionY,
+      averageSatisfaction: 0,
+      color: null,
+      note: null,
+    };
+    set({
+      tables: [...tables, table],
+      isDirty: true,
+      undoStack: [...get().undoStack, { type: 'add-table' as const, tableId: table.id }],
+    });
+    scheduleBackup(eventId, get());
   },
 
   clearTable: (tableId) => {
@@ -790,13 +893,9 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t;
     });
 
-    set({ guests: finalGuests, tables: finalTables, undoStack: [...undoStack, ...undoEntries] });
+    set({ guests: finalGuests, tables: finalTables, isDirty: true, undoStack: [...undoStack, ...undoEntries] });
 
-    if (eventId && tableGuests.length > 0) {
-      api.patch(`/events/${eventId}/guests/assign-batch`, {
-        assignments: tableGuests.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
-      }).catch(console.error);
-    }
+    if (eventId) scheduleBackup(eventId, get());
   },
 
   resetAllSeats: () => {
@@ -822,22 +921,15 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     }));
     const updatedTables = tables.map((t) => ({ ...t, averageSatisfaction: 0 }));
 
-    set({ guests: updatedGuests, tables: updatedTables, selectedTableId: null, undoStack: [...undoStack, ...undoEntries], lastResetAt: Date.now(), isResetting: false });
+    set({ guests: updatedGuests, tables: updatedTables, selectedTableId: null, isDirty: true, undoStack: [...undoStack, ...undoEntries], lastResetAt: Date.now(), isResetting: false });
 
-    // 批次清除後端座位分配（一次寫入）
-    if (eventId) {
-      set({ isBatchSaving: true });
-      api.patch(`/events/${eventId}/guests/assign-batch`, {
-        assignments: assigned.map((g) => ({ guestId: g.id, tableId: null, seatIndex: null })),
-      }).catch(console.error).finally(() => set({ isBatchSaving: false }));
-    }
+    if (eventId) scheduleBackup(eventId, get());
   },
 
   updateEventName: (name) => {
     const { eventId } = get();
-    set({ eventName: name });
-    if (!eventId) return;
-    api.patch(`/events/${eventId}`, { name }).catch(console.error);
+    set({ eventName: name, isDirty: true });
+    if (eventId) scheduleBackup(eventId, get());
   },
 
   updateTableName: (tableId, name) => {
@@ -845,12 +937,12 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const oldName = tables.find((t) => t.id === tableId)?.name;
     set({
       tables: tables.map((t) => t.id === tableId ? { ...t, name } : t),
+      isDirty: true,
       undoStack: oldName !== undefined && oldName !== name
         ? [...undoStack, { type: 'rename-table' as const, tableId, oldName, newName: name }]
         : undoStack,
     });
-    if (!eventId) return;
-    api.patch(`/events/${eventId}/tables/${tableId}`, { name }).catch(console.error);
+    if (eventId) scheduleBackup(eventId, get());
   },
 
   updateTableCapacity: (tableId, capacity) => {
@@ -866,9 +958,9 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         const s = result.guests.find((gs) => gs.id === g.id);
         return s ? { ...g, satisfactionScore: s.satisfactionScore } : g;
       }),
+      isDirty: true,
     });
-    if (!eventId) return;
-    api.patch(`/events/${eventId}/tables/${tableId}`, { capacity }).catch(console.error);
+    if (eventId) scheduleBackup(eventId, get());
   },
 
   updateTablePosition: (tableId, x, y) => {
@@ -916,10 +1008,11 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       }),
     });
 
-    api.patch(`/events/${eventId}/tables/${tableId}`, { positionX: table.positionX, positionY: table.positionY }).catch(console.error);
+    set({ isDirty: true });
+    scheduleBackup(eventId, get());
   },
 
-  autoArrangeTables: async (positions) => {
+  autoArrangeTables: (positions) => {
     const { tables, eventId, undoStack } = get();
     // 記錄原始位置（undo 用）
     const prevPositions = new Map<string, { fromX: number; fromY: number }>();
@@ -932,27 +1025,11 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     });
     set({
       tables: updatedTables,
+      isDirty: true,
       undoStack: [...undoStack, { type: 'auto-arrange' as const, positions: prevPositions }],
     });
 
-    // 批次存 DB
-    if (eventId) {
-      try {
-        await Promise.all(
-          positions.map((p) =>
-            api.patch(`/events/${eventId}/tables/${p.tableId}`, { positionX: p.x, positionY: p.y }),
-          ),
-        );
-      } catch {
-        // 失敗 → 自動 revert
-        const reverted = get().tables.map((t) => {
-          const prev = prevPositions.get(t.id);
-          return prev ? { ...t, positionX: prev.fromX, positionY: prev.fromY } : t;
-        });
-        set({ tables: reverted, undoStack: get().undoStack.slice(0, -1) });
-        throw new Error('保存失敗，已恢復原排列');
-      }
-    }
+    if (eventId) scheduleBackup(eventId, get());
   },
 
   autoAssignGuests: async (mode: AutoAssignMode = 'balanced') => {
@@ -982,7 +1059,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
         const pos = findFreePosition(currentTbls);
         const name = `第${num}桌`;
 
-        await get().addTable(name, pos.x, pos.y);
+        get().addTable(name, pos.x, pos.y);
         const latestTables = get().tables;
         const newTable = latestTables.find((t) => t.name === name);
         if (newTable) newTableIds.push(newTable.id);
@@ -1070,36 +1147,11 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     set({
       guests: finalGuests,
       tables: finalTables,
+      isDirty: true,
       undoStack: [...currentStack, { type: 'auto-assign' as const, assignments: undoData, createdTableIds: newTableIds }],
     });
 
-    // 存 DB（批次一次寫入）
-    if (eventId) {
-      set({ isBatchSaving: true });
-      try {
-        await api.patch(`/events/${eventId}/guests/assign-batch`, {
-          assignments: assignments.map((a) => {
-            const guest = finalGuests.find((g) => g.id === a.guestId);
-            return { guestId: a.guestId, tableId: a.tableId, seatIndex: guest?.seatIndex ?? null };
-          }),
-        });
-      } catch {
-        // 失敗 → 自動 revert
-        const reverted = get().guests.map((g) => {
-          const orig = undoData.find((u) => u.guestId === g.id);
-          return orig ? { ...g, assignedTableId: orig.fromTableId } : g;
-        });
-        const revertResult = recalculateAll(reverted, tables, avoidPairs);
-        const revertedGuests = reverted.map((g) => {
-          const score = revertResult.guests.find((gs) => gs.id === g.id);
-          return score ? { ...g, satisfactionScore: score.satisfactionScore } : g;
-        });
-        set({ guests: revertedGuests, undoStack: get().undoStack.slice(0, -1) });
-        throw new Error('保存失敗，已恢復原排列');
-      } finally {
-        set({ isBatchSaving: false });
-      }
-    }
+    if (eventId) scheduleBackup(eventId, get());
   },
 
   randomAssignGuests: (ratio = 0.75) => {
@@ -1139,17 +1191,11 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const finalTables = tables.map((t) => { const s = result.tables.find((ts) => ts.id === t.id); return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t; });
 
     set({
-      guests: finalGuests, tables: finalTables,
+      guests: finalGuests, tables: finalTables, isDirty: true,
       undoStack: [...undoStack, { type: 'auto-assign' as const, assignments: allConfirmed.map((g) => ({ guestId: g.id, fromTableId: g.assignedTableId || null, fromSeatIndex: g.seatIndex })), createdTableIds: [] }],
     });
 
-    if (eventId) {
-      set({ isBatchSaving: true });
-      const confirmed = finalGuests.filter((g) => g.rsvpStatus === 'confirmed');
-      api.patch(`/events/${eventId}/guests/assign-batch`, {
-        assignments: confirmed.map((g) => ({ guestId: g.id, tableId: g.assignedTableId ?? null, seatIndex: g.seatIndex ?? null })),
-      }).catch(console.error).finally(() => set({ isBatchSaving: false }));
-    }
+    if (eventId) scheduleBackup(eventId, get());
   },
 
   saveSnapshot: async (name) => {
@@ -1222,10 +1268,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     // 快照裡有但目前不存在 → 需要重建
     const missingSnapTables = snapData.tables.filter((st) => !currentTableIds.has(st.tableId));
 
-    // 快照後新增、需要刪除的桌
-    const extraTableIds = tables.filter((t) => !snapshotTableIds.has(t.id)).map((t) => t.id);
-
-    // 先用快照資料建立 placeholder（後端會重建真正的桌）
+    // 先用快照資料建立 placeholder
     const placeholderTables: typeof tables = missingSnapTables.map((st) => ({
       id: st.tableId,
       name: st.name || '桌',
@@ -1250,30 +1293,10 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       return score ? { ...t, averageSatisfaction: score.averageSatisfaction } : t;
     });
 
-    set({ guests: finalGuests, tables: finalTables, undoStack: [] });
+    set({ guests: finalGuests, tables: finalTables, undoStack: [], isDirty: true });
 
-    // 後端同步
     const { eventId } = get();
-    if (eventId) {
-      // 重建被刪除的桌（必須先完成，再還原賓客座位）
-      if (missingSnapTables.length > 0) {
-        await Promise.all(
-          missingSnapTables.map((st) =>
-            api.post(`/events/${eventId}/tables`, { id: st.tableId, name: st.name || '桌', positionX: st.positionX, positionY: st.positionY }).catch(console.error)
-          )
-        );
-      }
-      // 還原賓客座位（批次一次寫入，桌子已確保存在）
-      if (snapData.guests.length > 0) {
-        api.patch(`/events/${eventId}/guests/assign-batch`, {
-          assignments: snapData.guests.map((sg) => ({ guestId: sg.guestId, tableId: sg.tableId, seatIndex: sg.seatIndex ?? null })),
-        }).catch(console.error);
-      }
-      // 刪除快照後新增的桌
-      for (const tableId of extraTableIds) {
-        api.delete(`/events/${eventId}/tables/${tableId}`).catch(console.error);
-      }
-    }
+    if (eventId) scheduleBackup(eventId, get());
   },
 
   addAvoidPair: async (guestAId, guestBId, reason) => {
@@ -1541,6 +1564,99 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       return true;
     } catch {
       return false;
+    }
+  },
+
+  // ─── Workspace Save / Backup ──────────────────────────
+
+  saveAll: async () => {
+    const { eventId, guests, tables, isDirty, eventName } = get();
+    if (!eventId || !isDirty) return;
+    set({ isSaving: true });
+    try {
+      await api.put(`/events/${eventId}/workspace-state`, {
+        eventName,
+        tables: tables.map((t) => ({
+          id: t.id,
+          name: t.name,
+          capacity: t.capacity,
+          positionX: t.positionX,
+          positionY: t.positionY,
+          color: t.color ?? null,
+          note: t.note ?? null,
+        })),
+        assignments: guests
+          .filter((g) => g.rsvpStatus === 'confirmed')
+          .map((g) => ({
+            guestId: g.id,
+            tableId: g.assignedTableId,
+            seatIndex: g.seatIndex,
+          })),
+      });
+      set({ isDirty: false, isSaving: false, lastSavedAt: Date.now() });
+      try { localStorage.removeItem(`seatern-backup-${eventId}`); } catch { /* ok */ }
+      // 更新 event cache，讓下次載入用最新狀態
+      const s = get();
+      saveEventCache({
+        ts: Date.now(),
+        eventId,
+        eventName: s.eventName,
+        eventCategories: s.eventCategories,
+        guests: s.guests,
+        tables: s.tables,
+        subcategories: s.subcategories,
+        avoidPairs: s.avoidPairs,
+        snapshots: s.snapshots,
+        tableLimit: s.tableLimit,
+        planStatus: s.planStatus,
+        planExpiresAt: s.planExpiresAt,
+      });
+    } catch (err) {
+      console.error('Save failed:', err);
+      set({ isSaving: false });
+    }
+  },
+
+  restoreFromBackup: () => {
+    const { backupData, guests, avoidPairs, eventId } = get();
+    if (!backupData) return;
+
+    // 還原 tables
+    const restoredTables = backupData.tables;
+
+    // 還原 guest assignments
+    const restoredGuests = guests.map((g) => {
+      const backup = backupData.guestAssignments.find((ba) => ba.id === g.id);
+      return backup ? { ...g, assignedTableId: backup.assignedTableId, seatIndex: backup.seatIndex } : g;
+    });
+
+    const result = recalculateAll(restoredGuests, restoredTables, avoidPairs);
+    const finalGuests = restoredGuests.map((g) => {
+      const s = result.guests.find((gs) => gs.id === g.id);
+      return s ? { ...g, satisfactionScore: s.satisfactionScore } : g;
+    });
+    const finalTables = restoredTables.map((t) => {
+      const s = result.tables.find((ts) => ts.id === t.id);
+      return s ? { ...t, averageSatisfaction: s.averageSatisfaction } : t;
+    });
+
+    set({
+      eventName: backupData.eventName,
+      guests: finalGuests,
+      tables: finalTables,
+      isDirty: true,
+      showRecoveryPrompt: false,
+      backupData: null,
+    });
+
+    if (eventId) scheduleBackup(eventId, get());
+  },
+
+  dismissBackup: () => {
+    const { eventId } = get();
+    set({ showRecoveryPrompt: false, backupData: null });
+    if (eventId) {
+      try { localStorage.removeItem(`seatern-backup-${eventId}`); } catch { /* ok */ }
     }
   },
 

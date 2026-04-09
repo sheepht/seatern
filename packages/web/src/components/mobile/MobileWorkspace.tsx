@@ -769,7 +769,9 @@ function GuidedAssign({ onClose }: { onClose: () => void }) {
 export function MobileWorkspace() {
   const tables = useSeatingStore((s) => s.tables);
   const guests = useSeatingStore((s) => s.guests);
-  const saveSnapshot = useSeatingStore((s) => s.saveSnapshot);
+  const saveAll = useSeatingStore((s) => s.saveAll);
+  const isDirty = useSeatingStore((s) => s.isDirty);
+  const isSavingAll = useSeatingStore((s) => s.isSaving);
   const autoAssignGuests = useSeatingStore((s) => s.autoAssignGuests);
   const autoAssignProgress = useSeatingStore((s) => s.autoAssignProgress);
   const undo = useSeatingStore((s) => s.undo);
@@ -800,7 +802,6 @@ export function MobileWorkspace() {
   const [mode, setMode] = useState<'list' | 'map'>('list');
   const [addingToTable, setAddingToTable] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ guest: Guest; tableId: string } | null>(null);
-  const [saving, setSaving] = useState(false);
   const [showAutoMenu, setShowAutoMenu] = useState(false);
   const [guidedAssign, setGuidedAssign] = useState(false);
   const floorPlanRef = useRef<FloorPlanHandle>(null);
@@ -826,13 +827,8 @@ export function MobileWorkspace() {
   }, [mode]);
 
   const handleSave = useCallback(async () => {
-    setSaving(true);
-    try {
-      await saveSnapshot('手動儲存');
-    } finally {
-      setSaving(false);
-    }
-  }, [saveSnapshot]);
+    await saveAll();
+  }, [saveAll]);
 
   const handleAutoAssign = useCallback(async () => {
     await autoAssignGuests('balanced');
@@ -860,7 +856,7 @@ export function MobileWorkspace() {
       } else {
         positions = calculateGridLayout(tables);
       }
-      await autoArrangeTables(positions);
+      autoArrangeTables(positions);
     } finally {
       setArranging(false);
     }
@@ -947,8 +943,8 @@ export function MobileWorkspace() {
               </button>
               {/* 儲存/讀取 */}
               <div className="flex shrink-0 rounded-[var(--radius-sm,4px)] border border-[var(--border)] overflow-hidden">
-                <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-50 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] border-r border-[var(--border)] text-xs whitespace-nowrap">
-                  <Save size={13} /> {saving ? '儲存中...' : '儲存'}
+                <button onClick={handleSave} disabled={isSavingAll || !isDirty} className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-50 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] border-r border-[var(--border)] text-xs whitespace-nowrap">
+                  <Save size={13} /> {isSavingAll ? '儲存中...' : isDirty ? '儲存' : '已存'}
                 </button>
                 <button onClick={() => { if (snapshots.length > 0) restoreSnapshot(snapshots[0].id); }} disabled={snapshots.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap">
                   <History size={13} /> 讀取
@@ -969,7 +965,7 @@ export function MobileWorkspace() {
                   onClick={async () => {
                     setAdding(true);
                     const pos = findFreePosition(tables);
-                    await addTable(`第${tables.length + 1}桌`, pos.x, pos.y);
+                    addTable(`第${tables.length + 1}桌`, pos.x, pos.y);
                     setAdding(false);
                   }}
                   disabled={adding}
@@ -1025,8 +1021,8 @@ export function MobileWorkspace() {
           <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-t border-[var(--border)] bg-[var(--bg-surface)] overflow-x-auto">
             {/* 儲存/讀取 */}
             <div className="flex shrink-0 rounded-[var(--radius-sm,4px)] border border-[var(--border)] overflow-hidden">
-              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-50 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] border-r border-[var(--border)] text-xs whitespace-nowrap">
-                <Save size={13} /> {saving ? '儲存中...' : '儲存'}
+              <button onClick={handleSave} disabled={isSavingAll || !isDirty} className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-50 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] border-r border-[var(--border)] text-xs whitespace-nowrap">
+                <Save size={13} /> {isSavingAll ? '儲存中...' : isDirty ? '儲存' : '已存'}
               </button>
               <button onClick={() => { if (snapshots.length > 0) restoreSnapshot(snapshots[0].id); }} disabled={snapshots.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 cursor-pointer disabled:opacity-30 text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-xs whitespace-nowrap">
                 <History size={13} /> 讀取
@@ -1047,7 +1043,7 @@ export function MobileWorkspace() {
                 onClick={async () => {
                   setAdding(true);
                   const pos = findFreePosition(tables);
-                  await addTable(`第${tables.length + 1}桌`, pos.x, pos.y);
+                  addTable(`第${tables.length + 1}桌`, pos.x, pos.y);
                   floorPlanRef.current?.panToPoint(pos.x, pos.y);
                   setAdding(false);
                 }}

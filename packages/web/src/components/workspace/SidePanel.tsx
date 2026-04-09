@@ -78,7 +78,9 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
   const addTable = useSeatingStore((s) => s.addTable);
   const undo = useSeatingStore((s) => s.undo);
   const undoStack = useSeatingStore((s) => s.undoStack);
-  const saveSnapshot = useSeatingStore((s) => s.saveSnapshot);
+  const saveAll = useSeatingStore((s) => s.saveAll);
+  const isDirty = useSeatingStore((s) => s.isDirty);
+  const isSaving = useSeatingStore((s) => s.isSaving);
   const snapshots = useSeatingStore((s) => s.snapshots);
   const resetAllSeats = useSeatingStore((s) => s.resetAllSeats);
   const autoArrangeTables = useSeatingStore((s) => s.autoArrangeTables);
@@ -91,7 +93,6 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
   const [assigning, setAssigning] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
   const [estimatedTime, setEstimatedTime] = useState<number | null>(null);
-  const [saving, setSaving] = useState(false);
   const [showAvoidModal, setShowAvoidModal] = useState(false);
   const [_showResetConfirm, _setShowResetConfirm] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
@@ -99,21 +100,17 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
   const [arranging, setArranging] = useState(false);
   const [adding, setAdding] = useState(false);
 
-  const handleAddTable = async () => {
+  const handleAddTable = () => {
     setAdding(true);
     const num = tables.length + 1;
     const pos = findFreePosition(tables);
-    await addTable(`第${num}桌`, pos.x, pos.y);
+    addTable(`第${num}桌`, pos.x, pos.y);
     onPanToTable?.(pos.x, pos.y);
     setAdding(false);
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    const now = new Date();
-    const name = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    await saveSnapshot(name);
-    setSaving(false);
+    await saveAll();
   };
 
   const isDev = import.meta.env.DEV;
@@ -153,7 +150,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
       } else {
         positions = calculateGridLayout(tables);
       }
-      await autoArrangeTables(positions);
+      autoArrangeTables(positions);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : '保存失敗，已恢復原排列');
     } finally {
@@ -468,8 +465,8 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
         {/* 第一列：儲存/讀取 + 還原/重做 */}
         <div className="flex gap-2 mb-2">
           <div className="flex rounded-[var(--radius-sm)] border border-[var(--border)] overflow-hidden">
-            <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)] text-[var(--text-secondary)] font-[family-name:var(--font-ui)] border-r border-[var(--border)] text-sm">
-              <Save size={14} /> {saving ? '儲存中...' : '儲存'}
+            <button onClick={handleSave} disabled={isSaving || !isDirty} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-50 hover:bg-[var(--accent-light)] text-[var(--text-secondary)] font-[family-name:var(--font-ui)] border-r border-[var(--border)] text-sm">
+              <Save size={14} /> {isSaving ? '儲存中...' : isDirty ? '儲存' : '已存'}
             </button>
             <button onClick={() => setShowRestoreConfirm(true)} disabled={snapshots.length === 0} className="flex items-center gap-1 px-2.5 py-1.5 font-medium cursor-pointer disabled:opacity-40 hover:bg-[var(--accent-light)] text-[var(--text-secondary)] font-[family-name:var(--font-ui)] text-sm">
               <History size={14} /> 讀取
