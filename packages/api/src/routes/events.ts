@@ -843,6 +843,7 @@ events.post('/:id/approve-plan', async (c) => {
 const TEMPLATE_OWNER_ID = '__demo_template__';
 
 // POST /events/:id/clone-demo — 從 DB 中的 template event 複製 demo 資料
+// 用純 SQL INSERT...SELECT + gen_random_uuid() 一次完成，最少 DB round-trips
 events.post('/:id/clone-demo', async (c) => {
   const ownerId = c.get('ownerId');
   const ownerType = c.get('ownerType');
@@ -867,62 +868,65 @@ events.post('/:id/clone-demo', async (c) => {
 
   console.log(`[CLONE-DEMO] Cloning template "${template.name}" to event ${eventId}`);
 
-  // 讀取 template 的所有資料
-  const [tSubcats, tTables, tGuests, tPrefs, tAvoids] = await Promise.all([
-    prisma.subcategory.findMany({ where: { eventId: template.id } }),
-    prisma.table.findMany({ where: { eventId: template.id } }),
-    prisma.guest.findMany({ where: { eventId: template.id } }),
-    prisma.seatPreference.findMany({ where: { guest: { eventId: template.id } } }),
-    prisma.avoidPair.findMany({ where: { eventId: template.id } }),
-  ]);
+  // 純 SQL：用 temp table 做 ID mapping，INSERT...SELECT 一次複製
+  // 所有 copy + UUID 生成都在 PostgreSQL server 端完成
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    DECLARE
+      _tmpl_id text := '${template.id}';
+      _new_event text := '${eventId}';
+    BEGIN
+      -- ID mapping tables
+      CREATE TEMP TABLE _smap (old_id text, new_id text) ON COMMIT DROP;
+      CREATE TEMP TABLE _tmap (old_id text, new_id text) ON COMMIT DROP;
+      CREATE TEMP TABLE _gmap (old_id text, new_id text) ON COMMIT DROP;
 
-  // 建立 old → new ID mapping
-  const { randomUUID } = await import('node:crypto');
-  const idMap = new Map<string, string>();
-  const remap = (oldId: string) => {
-    let newId = idMap.get(oldId);
-    if (!newId) { newId = randomUUID(); idMap.set(oldId, newId); }
-    return newId;
-  };
+      -- 1. Subcategories
+      INSERT INTO _smap SELECT id, gen_random_uuid()::text FROM "Subcategory" WHERE "eventId" = _tmpl_id;
+      INSERT INTO "Subcategory" (id, "eventId", name, category)
+      SELECT m.new_id, _new_event, s.name, s.category
+      FROM "Subcategory" s JOIN _smap m ON s.id = m.old_id;
 
-  await prisma.$transaction(async (tx) => {
-    if (tSubcats.length > 0) {
-      await tx.subcategory.createMany({
-        data: tSubcats.map((s) => ({ id: remap(s.id), eventId, name: s.name, category: s.category })),
-      });
-    }
-    if (tTables.length > 0) {
-      await tx.table.createMany({
-        data: tTables.map((t) => ({
-          id: remap(t.id), eventId, name: t.name, capacity: t.capacity,
-          positionX: t.positionX, positionY: t.positionY,
-        })),
-      });
-    }
-    await tx.guest.createMany({
-      data: tGuests.map((g) => ({
-        id: remap(g.id), eventId, name: g.name, aliases: g.aliases,
-        category: g.category, rsvpStatus: g.rsvpStatus,
-        companionCount: g.companionCount, dietaryNote: g.dietaryNote, specialNote: g.specialNote,
-        subcategoryId: g.subcategoryId ? remap(g.subcategoryId) : null,
-        assignedTableId: g.assignedTableId ? remap(g.assignedTableId) : null,
-        seatIndex: g.seatIndex,
-      })),
-    });
-    if (tPrefs.length > 0) {
-      await tx.seatPreference.createMany({
-        data: tPrefs.map((p) => ({ guestId: remap(p.guestId), preferredGuestId: remap(p.preferredGuestId), rank: p.rank })),
-      });
-    }
-    if (tAvoids.length > 0) {
-      await tx.avoidPair.createMany({
-        data: tAvoids.map((p) => ({ eventId, guestAId: remap(p.guestAId), guestBId: remap(p.guestBId), reason: p.reason })),
-      });
-    }
-  });
+      -- 2. Tables
+      INSERT INTO _tmap SELECT id, gen_random_uuid()::text FROM "Table" WHERE "eventId" = _tmpl_id;
+      INSERT INTO "Table" (id, "eventId", name, capacity, "positionX", "positionY", "createdAt", "updatedAt")
+      SELECT m.new_id, _new_event, t.name, t.capacity, t."positionX", t."positionY", NOW(), NOW()
+      FROM "Table" t JOIN _tmap m ON t.id = m.old_id;
 
-  console.log(`[CLONE-DEMO] Done: ${tGuests.length} guests, ${tTables.length} tables`);
-  return c.json({ success: true, guests: tGuests.length, tables: tTables.length, template: template.name }, 201);
+      -- 3. Guests
+      INSERT INTO _gmap SELECT id, gen_random_uuid()::text FROM "Guest" WHERE "eventId" = _tmpl_id;
+      INSERT INTO "Guest" (id, "eventId", name, aliases, category, "rsvpStatus", "companionCount",
+                           "dietaryNote", "specialNote", "subcategoryId", "assignedTableId", "seatIndex",
+                           "satisfactionScore", "isOverflow", "isIsolated", "relationScore", "createdAt", "updatedAt")
+      SELECT gm.new_id, _new_event, g.name, g.aliases, g.category, g."rsvpStatus", g."companionCount",
+             g."dietaryNote", g."specialNote",
+             sm.new_id, tm.new_id, g."seatIndex",
+             0, false, false, g."relationScore", NOW(), NOW()
+      FROM "Guest" g
+      JOIN _gmap gm ON g.id = gm.old_id
+      LEFT JOIN _smap sm ON g."subcategoryId" = sm.old_id
+      LEFT JOIN _tmap tm ON g."assignedTableId" = tm.old_id;
+
+      -- 4. Seat preferences
+      INSERT INTO "SeatPreference" (id, "guestId", "preferredGuestId", rank)
+      SELECT gen_random_uuid()::text, gm1.new_id, gm2.new_id, sp.rank
+      FROM "SeatPreference" sp
+      JOIN _gmap gm1 ON sp."guestId" = gm1.old_id
+      JOIN _gmap gm2 ON sp."preferredGuestId" = gm2.old_id;
+
+      -- 5. Avoid pairs
+      INSERT INTO "AvoidPair" (id, "eventId", "guestAId", "guestBId", reason)
+      SELECT gen_random_uuid()::text, _new_event, gm1.new_id, gm2.new_id, ap.reason
+      FROM "AvoidPair" ap
+      JOIN _gmap gm1 ON ap."guestAId" = gm1.old_id
+      JOIN _gmap gm2 ON ap."guestBId" = gm2.old_id
+      WHERE ap."eventId" = _tmpl_id;
+    END $$;
+  `);
+
+  const guestCount = await prisma.guest.count({ where: { eventId } });
+  console.log(`[CLONE-DEMO] Done: ${guestCount} guests cloned from "${template.name}"`);
+  return c.json({ success: true, guests: guestCount, template: template.name }, 201);
 });
 
 // ─── Demo Seed (legacy — JSON fixture 上傳) ─────────
