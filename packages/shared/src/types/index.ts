@@ -93,6 +93,46 @@ export interface SubcategoryBatchPayload {
   }>
 }
 
+// ─── Demo Seed ────────────────────────────────────
+
+/** 一次性匯入 demo 資料的 payload（build-time 預算，所有 ID 已預生成） */
+export interface SeedPayload {
+  subcategories: Array<{
+    id: string
+    name: string
+    category: string
+  }>
+  tables: Array<{
+    id: string
+    name: string
+    capacity: number
+    positionX: number
+    positionY: number
+  }>
+  guests: Array<{
+    id: string
+    name: string
+    aliases: string[]
+    category?: string
+    rsvpStatus: string
+    companionCount: number
+    dietaryNote?: string
+    specialNote?: string
+    subcategoryId?: string
+    assignedTableId?: string
+    seatIndex?: number | null
+  }>
+  preferences: Array<{
+    guestId: string
+    preferredGuestId: string
+    rank: number
+  }>
+  avoidPairs: Array<{
+    guestAId: string
+    guestBId: string
+  }>
+}
+
 // ─── 快照 ──────────────────────────────────────────
 
 export interface SnapshotGuestEntry {

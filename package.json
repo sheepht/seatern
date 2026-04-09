@@ -22,6 +22,7 @@
     "db:migrate": "prisma migrate dev --schema packages/db/prisma/schema.prisma",
     "db:push": "prisma db push --schema packages/db/prisma/schema.prisma",
     "db:seed": "tsx packages/db/prisma/seed.ts",
+    "generate:demo": "tsx packages/web/scripts/generate-demo-fixtures.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest",

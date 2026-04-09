@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { prisma } from '@seatern/db';
 
 import type { SessionEnv } from '../middleware/session.ts';
-import type { CreateGuestPayload, CreateTablePayload, AssignSeatsBatchPayload, PreferenceBatchPayload, AvoidPairBatchPayload, SubcategoryBatchPayload } from '@seatern/shared';
+import type { CreateGuestPayload, CreateTablePayload, AssignSeatsBatchPayload, PreferenceBatchPayload, AvoidPairBatchPayload, SubcategoryBatchPayload, SeedPayload } from '@seatern/shared';
 
 const events = new Hono<SessionEnv>();
 
@@ -822,6 +822,102 @@ events.post('/:id/approve-plan', async (c) => {
   console.log(`[PAYMENT] 核准活動 ${eventId} 的 ${event.planType} 桌方案，到期 ${expiresAt.toISOString()}`);
 
   return c.json({ status: 'active', expiresAt: expiresAt.toISOString() });
+});
+
+// ─── Demo Seed ──────────────────────────────────────
+
+// POST /events/:id/seed — 一次性匯入 demo 資料（build-time 預算的 JSON fixture）
+events.post('/:id/seed', async (c) => {
+  const ownerId = c.get('ownerId');
+  const ownerType = c.get('ownerType');
+  const eventId = c.req.param('id');
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
+  if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
+
+  // Guard: 已有賓客就拒絕 seed
+  const existingCount = await prisma.guest.count({ where: { eventId } });
+  if (existingCount > 0) return c.json({ error: 'Event already has guests' }, 400);
+
+  const body = await c.req.json<SeedPayload>();
+
+  // Guard: 賓客數量上限
+  if (body.guests.length > 200) return c.json({ error: 'Too many guests (max 200)' }, 400);
+
+  console.log(`[SEED] Starting seed for event ${eventId}: ${body.guests.length} guests, ${body.tables.length} tables`);
+
+  await prisma.$transaction(async (tx) => {
+    // 1. 建立子分類
+    if (body.subcategories.length > 0) {
+      await tx.subcategory.createMany({
+        data: body.subcategories.map((s) => ({
+          id: s.id,
+          eventId,
+          name: s.name,
+          category: s.category,
+        })),
+      });
+    }
+
+    // 2. 建立桌次
+    if (body.tables.length > 0) {
+      await tx.table.createMany({
+        data: body.tables.map((t) => ({
+          id: t.id,
+          eventId,
+          name: t.name,
+          capacity: t.capacity,
+          positionX: t.positionX,
+          positionY: t.positionY,
+        })),
+      });
+    }
+
+    // 3. 建立賓客（含 subcategoryId + assignedTableId + seatIndex）
+    await tx.guest.createMany({
+      data: body.guests.map((g) => ({
+        id: g.id,
+        eventId,
+        name: g.name,
+        aliases: g.aliases,
+        category: g.category,
+        rsvpStatus: (g.rsvpStatus === 'confirmed' || g.rsvpStatus === 'declined') ? g.rsvpStatus : 'confirmed',
+        companionCount: g.companionCount ?? 0,
+        dietaryNote: g.dietaryNote,
+        specialNote: g.specialNote,
+        subcategoryId: g.subcategoryId,
+        assignedTableId: g.assignedTableId,
+        seatIndex: g.seatIndex ?? null,
+      })),
+    });
+
+    // 4. 建立座位偏好
+    if (body.preferences.length > 0) {
+      await tx.seatPreference.createMany({
+        data: body.preferences.map((p) => ({
+          guestId: p.guestId,
+          preferredGuestId: p.preferredGuestId,
+          rank: p.rank,
+        })),
+      });
+    }
+
+    // 5. 建立避免同桌
+    if (body.avoidPairs.length > 0) {
+      await tx.avoidPair.createMany({
+        data: body.avoidPairs.map((p) => ({
+          eventId,
+          guestAId: p.guestAId,
+          guestBId: p.guestBId,
+        })),
+      });
+    }
+  });
+
+  console.log(`[SEED] Completed seed for event ${eventId}`);
+  return c.json({ success: true, guests: body.guests.length, tables: body.tables.length }, 201);
 });
 
 export { events };
