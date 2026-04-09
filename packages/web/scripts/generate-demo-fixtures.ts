@@ -237,7 +237,7 @@ for (const csvFile of CSV_FILES) {
 
   // 3. Generate guests with UUIDs + subcategoryId
   const guestIds: string[] = [];
-  const seedGuests: SeedPayload['guests'] = guests.map((g, i) => {
+  const seedGuests: SeedPayload['guests'] = guests.map((g) => {
     const id = randomUUID();
     guestIds.push(id);
     const subcat = g.rawSubcategory ? subcatMap.get(g.rawSubcategory) : undefined;
