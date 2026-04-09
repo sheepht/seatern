@@ -1280,22 +1280,35 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     const { eventId, avoidPairs } = get();
     if (!eventId) return;
 
-    let pair;
+    // Optimistic: add a temporary pair immediately
+    const tempId = `temp-${Date.now()}`;
+    const tempPair = { id: tempId, eventId, guestAId, guestBId, reason: reason || null };
+    set({ avoidPairs: [...avoidPairs, tempPair] });
+
     try {
       const res = await api.post(`/events/${eventId}/avoid-pairs`, { guestAId, guestBId, reason });
-      pair = res.data;
+      // Replace temp with real pair
+      set({ avoidPairs: get().avoidPairs.map((ap) => (ap.id === tempId ? res.data : ap)) });
     } catch {
-      return;
+      // Rollback
+      set({ avoidPairs: get().avoidPairs.filter((ap) => ap.id !== tempId) });
     }
-    set({ avoidPairs: [...avoidPairs, pair] });
   },
 
   removeAvoidPair: async (pairId) => {
     const { eventId, avoidPairs } = get();
     if (!eventId) return;
 
-    await api.delete(`/events/${eventId}/avoid-pairs/${pairId}`);
+    // Optimistic: remove immediately
+    const removed = avoidPairs.find((ap) => ap.id === pairId);
     set({ avoidPairs: avoidPairs.filter((ap) => ap.id !== pairId) });
+
+    try {
+      await api.delete(`/events/${eventId}/avoid-pairs/${pairId}`);
+    } catch {
+      // Rollback
+      if (removed) set({ avoidPairs: [...get().avoidPairs, removed] });
+    }
   },
 
   checkAvoidViolation: (guestId, tableId) => {
@@ -1474,37 +1487,36 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   // ─── Per-guest preference & tag management ─────────
 
   updateGuestPreferences: async (guestId, preferences) => {
-    const { eventId, guests } = get();
+    const { eventId, guests, tables, avoidPairs } = get();
     if (!eventId) return false;
 
     // Enforce max 3 preferences
     const clamped = preferences.slice(0, 3);
 
-    // Optimistic update
+    // Optimistic update + immediate recalculation
     const prevGuests = guests;
+    const prevTables = tables;
     const idx = guests.findIndex((g) => g.id === guestId);
     if (idx < 0) return false;
     const nextGuests = [...guests];
     nextGuests[idx] = { ...nextGuests[idx], seatPreferences: clamped };
-    set({ guests: nextGuests });
+
+    const result = recalculateAll(nextGuests, tables, avoidPairs);
+    const recalcedGuests = nextGuests.map((g) => {
+      const s = result.guests.find((gs) => gs.id === g.id);
+      return s ? { ...g, satisfactionScore: s.satisfactionScore } : g;
+    });
+    const recalcedTables = tables.map((t) => {
+      const ts = result.tables.find((ts) => ts.id === t.id);
+      return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t;
+    });
+    set({ guests: recalcedGuests, tables: recalcedTables });
 
     try {
       await api.put(`/events/${eventId}/guests/${guestId}/preferences`, { preferences: clamped });
-      // Recalculate since preferences affect satisfaction scores
-      const latest = get();
-      const result = recalculateAll(latest.guests, latest.tables, latest.avoidPairs);
-      const recalcedGuests = latest.guests.map((g) => {
-        const s = result.guests.find((gs) => gs.id === g.id);
-        return s ? { ...g, satisfactionScore: s.satisfactionScore } : g;
-      });
-      const recalcedTables = latest.tables.map((t) => {
-        const ts = result.tables.find((ts) => ts.id === t.id);
-        return ts ? { ...t, averageSatisfaction: ts.averageSatisfaction } : t;
-      });
-      set({ guests: recalcedGuests, tables: recalcedTables });
       return true;
     } catch {
-      set({ guests: prevGuests });
+      set({ guests: prevGuests, tables: prevTables });
       return false;
     }
   },

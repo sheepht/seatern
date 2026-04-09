@@ -312,7 +312,8 @@ export default function WorkspacePage() {
           subcategories={subcategories}
           categoryColors={categoryColors}
           onSubmit={async (data) => {
-            await updateGuest(editGuest.id, {
+            // 1. Optimistic local updates (instant)
+            updateGuest(editGuest.id, {
               name: data.name,
               aliases: data.aliases,
               category: data.category,
@@ -325,27 +326,44 @@ export default function WorkspacePage() {
               moveGuest(editGuest.id, data.assignedTableId);
             }
             const prefs = data.preferredGuestIds.map((gid, i) => ({ preferredGuestId: gid, rank: i + 1 }));
-            await updateGuestPreferences(editGuest.id, prefs);
+            updateGuestPreferences(editGuest.id, prefs);
+
+            // Avoid pairs — optimistic add/remove
             const oldAvoidIds = avoidPairs
               .filter((ap) => ap.guestAId === editGuest.id || ap.guestBId === editGuest.id)
               .map((ap) => ({ pairId: ap.id, otherId: ap.guestAId === editGuest.id ? ap.guestBId : ap.guestAId }));
             for (const old of oldAvoidIds) {
-              if (!data.avoidGuestIds.includes(old.otherId)) await removeAvoidPair(old.pairId);
+              if (!data.avoidGuestIds.includes(old.otherId)) removeAvoidPair(old.pairId);
             }
             for (const gid of data.avoidGuestIds) {
-              if (!oldAvoidIds.some((o) => o.otherId === gid)) await addAvoidPair(editGuest.id, gid);
+              if (!oldAvoidIds.some((o) => o.otherId === gid)) addAvoidPair(editGuest.id, gid);
             }
+
+            // Subcategory — optimistic local update + fire-and-forget API
             if (data.subcategoryName) {
-              try {
-                await api.post(`/events/${eventId}/subcategories/batch`, {
-                  assignments: [{ guestId: editGuest.id, subcategoryName: data.subcategoryName, category: data.category }],
-                });
-              } catch { /* no-op */ }
+              // Find or create subcategory locally
+              const { subcategories } = useSeatingStore.getState();
+              const existing = subcategories.find(
+                (sc) => sc.name === data.subcategoryName && sc.category === data.category,
+              );
+              if (existing) {
+                // Optimistically set subcategory on guest
+                const { guests } = useSeatingStore.getState();
+                const gIdx = guests.findIndex((g) => g.id === editGuest.id);
+                if (gIdx >= 0) {
+                  const next = [...guests];
+                  next[gIdx] = { ...next[gIdx], subcategory: existing };
+                  useSeatingStore.setState({ guests: next });
+                }
+              }
+              api.post(`/events/${eventId}/subcategories/batch`, {
+                assignments: [{ guestId: editGuest.id, subcategoryName: data.subcategoryName, category: data.category }],
+              }).catch(() => {});
             } else if (editGuest.subcategory) {
-              await setGuestSubcategory(editGuest.id, null);
+              setGuestSubcategory(editGuest.id, null);
             }
-            const { loadEvent } = useSeatingStore.getState();
-            if (eventId) await loadEvent();
+
+            // 2. Close modal immediately — no loadEvent() needed
             setEditingGuest(null);
           }}
           onDelete={(gid) => { setEditingGuest(null); deleteGuest(gid); }}
