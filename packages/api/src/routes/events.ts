@@ -251,17 +251,30 @@ events.patch('/:eventId/guests/assign-batch', async (c) => {
     }
   }
 
-  await prisma.$transaction(
-    normalized.map((a) =>
-      prisma.guest.update({
-        where: { id: a.guestId },
-        data: {
-          assignedTableId: a.tableId,
-          seatIndex: a.tableId === null ? null : (a.seatIndex ?? null),
-        },
-      })
-    )
-  );
+  // 批次 UPDATE：用單一 SQL 取代 N 個個別 update（80 guests = 80 SQL → 1 SQL）
+  // 先驗證所有 guestId 都是合法 UUID 格式，防止 SQL injection
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  for (const a of normalized) {
+    if (!uuidRe.test(a.guestId)) return c.json({ error: 'Invalid guestId format' }, 400);
+    if (a.tableId && !uuidRe.test(a.tableId)) return c.json({ error: 'Invalid tableId format' }, 400);
+  }
+
+  if (normalized.length > 0) {
+    const values = normalized.map((a) => {
+      const tableId = a.tableId ? `'${a.tableId}'::uuid` : 'NULL';
+      const seatIndex = a.tableId === null ? 'NULL' : (a.seatIndex ?? 'NULL');
+      return `('${a.guestId}'::uuid, ${tableId}, ${seatIndex === 'NULL' ? 'NULL' : Number(seatIndex)}::int)`;
+    }).join(', ');
+
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Guest" AS g
+      SET "assignedTableId" = v.table_id,
+          "seatIndex" = v.seat_index,
+          "updatedAt" = NOW()
+      FROM (VALUES ${values}) AS v(guest_id, table_id, seat_index)
+      WHERE g.id = v.guest_id
+    `);
+  }
 
   return c.json({ count: normalized.length });
 });
