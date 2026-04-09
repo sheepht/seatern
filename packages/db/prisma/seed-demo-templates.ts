@@ -4,11 +4,13 @@
  *
  * Usage: npx tsx packages/db/prisma/seed-demo-templates.ts
  * 冪等：每次執行會先刪除舊 template 再重建。
+ * 所有 ID 重新生成，避免與已存在的 seed 資料衝突。
  */
 
 import { PrismaClient } from '@prisma/client';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 const prisma = new PrismaClient();
 
@@ -29,7 +31,7 @@ async function main() {
     select: { id: true },
   });
   for (const e of oldEvents) {
-    await prisma.event.delete({ where: { id: e.id } }); // cascade deletes all children
+    await prisma.event.delete({ where: { id: e.id } });
   }
   console.log(`Deleted ${oldEvents.length} old templates.`);
 
@@ -38,7 +40,14 @@ async function main() {
     const data = JSON.parse(raw);
     const templateName = file.replace('seatern-demo-', '').replace('.json', '');
 
-    // Create template event
+    // 每個 fixture 都重新生成 ID，避免與 DB 中已存在的資料衝突
+    const idMap = new Map<string, string>();
+    const remap = (oldId: string) => {
+      let newId = idMap.get(oldId);
+      if (!newId) { newId = randomUUID(); idMap.set(oldId, newId); }
+      return newId;
+    };
+
     const event = await prisma.event.create({
       data: {
         name: `__template:${templateName}`,
@@ -48,53 +57,48 @@ async function main() {
       },
     });
 
-    // Subcategories
     if (data.subcategories.length > 0) {
       await prisma.subcategory.createMany({
         data: data.subcategories.map((s: { id: string; name: string; category: string }) => ({
-          id: s.id, eventId: event.id, name: s.name, category: s.category,
+          id: remap(s.id), eventId: event.id, name: s.name, category: s.category,
         })),
       });
     }
 
-    // Tables
     if (data.tables.length > 0) {
       await prisma.table.createMany({
         data: data.tables.map((t: { id: string; name: string; capacity: number; positionX: number; positionY: number }) => ({
-          id: t.id, eventId: event.id, name: t.name, capacity: t.capacity,
+          id: remap(t.id), eventId: event.id, name: t.name, capacity: t.capacity,
           positionX: t.positionX, positionY: t.positionY,
         })),
       });
     }
 
-    // Guests
     await prisma.guest.createMany({
       data: data.guests.map((g: { id: string; name: string; aliases: string[]; category?: string; rsvpStatus: string; companionCount: number; dietaryNote?: string; specialNote?: string; subcategoryId?: string; assignedTableId?: string; seatIndex?: number | null }) => ({
-        id: g.id, eventId: event.id, name: g.name, aliases: g.aliases,
+        id: remap(g.id), eventId: event.id, name: g.name, aliases: g.aliases,
         category: g.category,
         rsvpStatus: (g.rsvpStatus === 'confirmed' || g.rsvpStatus === 'declined') ? g.rsvpStatus : 'confirmed',
         companionCount: g.companionCount ?? 0,
         dietaryNote: g.dietaryNote, specialNote: g.specialNote,
-        subcategoryId: g.subcategoryId || null,
-        assignedTableId: g.assignedTableId || null,
+        subcategoryId: g.subcategoryId ? remap(g.subcategoryId) : null,
+        assignedTableId: g.assignedTableId ? remap(g.assignedTableId) : null,
         seatIndex: g.seatIndex ?? null,
       })),
     });
 
-    // Preferences
     if (data.preferences.length > 0) {
       await prisma.seatPreference.createMany({
         data: data.preferences.map((p: { guestId: string; preferredGuestId: string; rank: number }) => ({
-          guestId: p.guestId, preferredGuestId: p.preferredGuestId, rank: p.rank,
+          guestId: remap(p.guestId), preferredGuestId: remap(p.preferredGuestId), rank: p.rank,
         })),
       });
     }
 
-    // Avoid pairs
     if (data.avoidPairs.length > 0) {
       await prisma.avoidPair.createMany({
         data: data.avoidPairs.map((p: { guestAId: string; guestBId: string }) => ({
-          eventId: event.id, guestAId: p.guestAId, guestBId: p.guestBId,
+          eventId: event.id, guestAId: remap(p.guestAId), guestBId: remap(p.guestBId),
         })),
       });
     }
