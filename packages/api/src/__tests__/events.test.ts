@@ -58,6 +58,8 @@ vi.mock('@seatern/db', () => ({
     $transaction: vi.fn().mockImplementation((input: unknown) =>
       Array.isArray(input) ? Promise.all(input) : Promise.resolve(input),
     ),
+    $queryRawUnsafe: vi.fn(),
+    $executeRawUnsafe: vi.fn(),
   },
 }));
 
@@ -114,7 +116,18 @@ beforeEach(() => {
 describe('GET /events/mine', () => {
   it('有活動 → 回傳活動資料', async () => {
     const app = buildApp();
-    vi.mocked(prisma.event.findFirst).mockResolvedValue(mockEvent as ReturnType<typeof prisma.event.findFirst> extends Promise<infer T> ? T : never);
+    // findFirst 回傳 event ID（輕量 query）
+    vi.mocked(prisma.event.findFirst).mockResolvedValue({ id: mockEvent.id } as ReturnType<typeof prisma.event.findFirst> extends Promise<infer T> ? T : never);
+    // $queryRawUnsafe 回傳 loadEventFull 的結果
+    vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([{
+      ...mockEvent,
+      _guests: JSON.stringify([]),
+      _tables: JSON.stringify([]),
+      _subcategories: JSON.stringify([]),
+      _edges: JSON.stringify([]),
+      _avoidPairs: JSON.stringify([]),
+      _snapshots: JSON.stringify([]),
+    }]);
 
     const res = await app.request('/events/mine');
     expect(res.status).toBe(200);

@@ -77,34 +77,129 @@ events.get('/', async (c) => {
   return c.json(list);
 });
 
+/**
+ * 單一 SQL 載入 event + 所有子表資料。
+ * 用 lateral subquery + json_agg 避免 Prisma 的 N+1 include 問題。
+ * 回傳格式與原本 Prisma include 相同，前端不用改。
+ */
+async function loadEventFull(eventId: string) {
+  const rows = await prisma.$queryRawUnsafe<Array<{
+    id: string; name: string; date: string | null; categories: string[];
+    ownerType: string; ownerId: string;
+    planType: string | null; planExpiresAt: Date | null; planStatus: string | null;
+    planNote: string | null; planCreatedAt: Date | null;
+    createdAt: Date; updatedAt: Date;
+    _guests: string; _tables: string; _subcategories: string;
+    _edges: string; _avoidPairs: string; _snapshots: string;
+  }>>(`
+    SELECT e.*,
+      (SELECT COALESCE(json_agg(
+        json_build_object(
+          'id', g.id, 'eventId', g."eventId", 'name', g.name, 'aliases', g.aliases,
+          'category', g.category, 'subcategoryId', g."subcategoryId",
+          'relationScore', g."relationScore",
+          'rsvpStatus', g."rsvpStatus", 'companionCount', g."companionCount",
+          'dietaryNote', g."dietaryNote", 'specialNote', g."specialNote",
+          'satisfactionScore', g."satisfactionScore",
+          'assignedTableId', g."assignedTableId", 'seatIndex', g."seatIndex",
+          'isOverflow', g."isOverflow", 'isIsolated', g."isIsolated",
+          'createdAt', g."createdAt", 'updatedAt', g."updatedAt",
+          'seatPreferences', COALESCE((
+            SELECT json_agg(json_build_object(
+              'id', sp.id, 'guestId', sp."guestId",
+              'preferredGuestId', sp."preferredGuestId", 'rank', sp.rank
+            ) ORDER BY sp.rank)
+            FROM "SeatPreference" sp WHERE sp."guestId" = g.id
+          ), '[]'::json),
+          'subcategory', (
+            SELECT json_build_object('id', sc.id, 'name', sc.name, 'category', sc.category)
+            FROM "Subcategory" sc WHERE sc.id = g."subcategoryId"
+          )
+        ) ORDER BY g.name
+      ), '[]'::json)
+      FROM "Guest" g WHERE g."eventId" = e.id
+      ) AS "_guests",
+      (SELECT COALESCE(json_agg(
+        json_build_object(
+          'id', t.id, 'eventId', t."eventId", 'name', t.name, 'capacity', t.capacity,
+          'positionX', t."positionX", 'positionY', t."positionY",
+          'averageSatisfaction', t."averageSatisfaction",
+          'color', t.color, 'note', t.note,
+          'createdAt', t."createdAt", 'updatedAt', t."updatedAt"
+        ) ORDER BY t.name
+      ), '[]'::json)
+      FROM "Table" t WHERE t."eventId" = e.id
+      ) AS "_tables",
+      (SELECT COALESCE(json_agg(
+        json_build_object('id', sc.id, 'eventId', sc."eventId", 'name', sc.name, 'category', sc.category)
+        ORDER BY sc.name
+      ), '[]'::json)
+      FROM "Subcategory" sc WHERE sc."eventId" = e.id
+      ) AS "_subcategories",
+      (SELECT COALESCE(json_agg(
+        json_build_object(
+          'id', ed.id, 'eventId', ed."eventId",
+          'fromGuestId', ed."fromGuestId", 'toGuestId', ed."toGuestId",
+          'weight', ed.weight, 'type', ed.type
+        )
+      ), '[]'::json)
+      FROM "Edge" ed WHERE ed."eventId" = e.id
+      ) AS "_edges",
+      (SELECT COALESCE(json_agg(
+        json_build_object(
+          'id', ap.id, 'eventId', ap."eventId",
+          'guestAId', ap."guestAId", 'guestBId', ap."guestBId", 'reason', ap.reason
+        )
+      ), '[]'::json)
+      FROM "AvoidPair" ap WHERE ap."eventId" = e.id
+      ) AS "_avoidPairs",
+      (SELECT COALESCE(json_agg(
+        json_build_object(
+          'id', sn.id, 'eventId', sn."eventId", 'name', sn.name,
+          'data', sn.data, 'averageSatisfaction', sn."averageSatisfaction",
+          'createdAt', sn."createdAt"
+        ) ORDER BY sn."createdAt" DESC
+      ), '[]'::json)
+      FROM "SeatingSnapshot" sn WHERE sn."eventId" = e.id
+      ) AS "_snapshots"
+    FROM "Event" e
+    WHERE e.id = '${eventId}'
+    LIMIT 1
+  `);
+
+  if (rows.length === 0) return null;
+  const row = rows[0];
+  return {
+    ...row,
+    guests: typeof row._guests === 'string' ? JSON.parse(row._guests) : row._guests,
+    tables: typeof row._tables === 'string' ? JSON.parse(row._tables) : row._tables,
+    subcategories: typeof row._subcategories === 'string' ? JSON.parse(row._subcategories) : row._subcategories,
+    edges: typeof row._edges === 'string' ? JSON.parse(row._edges) : row._edges,
+    avoidPairs: typeof row._avoidPairs === 'string' ? JSON.parse(row._avoidPairs) : row._avoidPairs,
+    snapshots: typeof row._snapshots === 'string' ? JSON.parse(row._snapshots) : row._snapshots,
+    _guests: undefined, _tables: undefined, _subcategories: undefined,
+    _edges: undefined, _avoidPairs: undefined, _snapshots: undefined,
+    tableLimit: getTableLimit(row),
+  };
+}
+
 // GET /events/mine — 取得當前 session 的唯一活動（含賓客、桌次等）
 events.get('/mine', async (c) => {
   const ownerId = c.get('ownerId');
   const ownerType = c.get('ownerType');
 
-  const include = {
-    guests: {
-      include: {
-        seatPreferences: true,
-        subcategory: true,
-      },
-      orderBy: { name: 'asc' } as const,
-    },
-    tables: { orderBy: { name: 'asc' } as const },
-    subcategories: { orderBy: { name: 'asc' } as const },
-    edges: true,
-    avoidPairs: true,
-    snapshots: { orderBy: { createdAt: 'desc' } as const },
-  };
-
-  const event = await prisma.event.findFirst({
-    where: { ownerId, ownerType },
-    include,
+  // 先找到 event ID（輕量 query）
+  const eventBase = await prisma.event.findFirst({
+    where: { ownerId, ownerType: ownerType as 'user' | 'anonymous' },
+    select: { id: true },
     orderBy: { updatedAt: 'desc' },
   });
 
+  if (!eventBase) return c.json({ error: 'No event found' }, 404);
+
+  const event = await loadEventFull(eventBase.id);
   if (!event) return c.json({ error: 'No event found' }, 404);
-  return c.json({ ...event, tableLimit: getTableLimit(event) });
+  return c.json(event);
 });
 
 // GET /events/:id — 取得單一活動（含賓客、桌次、標籤）
@@ -113,29 +208,12 @@ events.get('/:id', async (c) => {
   const ownerType = c.get('ownerType');
   const id = c.req.param('id');
 
-  const include = {
-    guests: {
-      include: {
-        seatPreferences: true,
-        subcategory: true,
-      },
-      orderBy: { name: 'asc' } as const,
-    },
-    tables: { orderBy: { name: 'asc' } as const },
-    subcategories: { orderBy: { name: 'asc' } as const },
-    edges: true,
-    avoidPairs: true,
-    snapshots: { orderBy: { createdAt: 'desc' } as const },
-  };
-
-  // 先用 owner 過濾，dev 模式 fallback 到 ID 查
   const eventBase = await findEventWithDevFallback(id, ownerId, ownerType);
-  const event = eventBase
-    ? await prisma.event.findUnique({ where: { id: eventBase.id }, include })
-    : null;
+  if (!eventBase) return c.json({ error: 'Event not found' }, 404);
 
+  const event = await loadEventFull(eventBase.id);
   if (!event) return c.json({ error: 'Event not found' }, 404);
-  return c.json({ ...event, tableLimit: getTableLimit(event) });
+  return c.json(event);
 });
 
 // POST /events — 建立新活動（同一 owner 已有活動時直接回傳，防重複建立）
