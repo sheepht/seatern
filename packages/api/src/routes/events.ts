@@ -838,7 +838,94 @@ events.post('/:id/approve-plan', async (c) => {
   return c.json({ status: 'active', expiresAt: expiresAt.toISOString() });
 });
 
-// ─── Demo Seed ──────────────────────────────────────
+// ─── Demo Clone ─────────────────────────────────────
+
+const TEMPLATE_OWNER_ID = '__demo_template__';
+
+// POST /events/:id/clone-demo — 從 DB 中的 template event 複製 demo 資料
+events.post('/:id/clone-demo', async (c) => {
+  const ownerId = c.get('ownerId');
+  const ownerType = c.get('ownerType');
+  const eventId = c.req.param('id');
+
+  const event = await findEventWithDevFallback(eventId, ownerId, ownerType);
+  if (!event) return c.json({ error: 'Event not found' }, 404);
+  const expired = expiredResponse(event);
+  if (expired) return c.json(expired, 403);
+
+  // Guard: 已有賓客就拒絕
+  const existingCount = await prisma.guest.count({ where: { eventId } });
+  if (existingCount > 0) return c.json({ error: 'Event already has guests' }, 400);
+
+  // 隨機挑一個 template event
+  const templates = await prisma.event.findMany({
+    where: { ownerId: TEMPLATE_OWNER_ID },
+    select: { id: true, name: true },
+  });
+  if (templates.length === 0) return c.json({ error: 'No demo templates found' }, 500);
+  const template = templates[Math.floor(Math.random() * templates.length)];
+
+  console.log(`[CLONE-DEMO] Cloning template "${template.name}" to event ${eventId}`);
+
+  // 讀取 template 的所有資料
+  const [tSubcats, tTables, tGuests, tPrefs, tAvoids] = await Promise.all([
+    prisma.subcategory.findMany({ where: { eventId: template.id } }),
+    prisma.table.findMany({ where: { eventId: template.id } }),
+    prisma.guest.findMany({ where: { eventId: template.id } }),
+    prisma.seatPreference.findMany({ where: { guest: { eventId: template.id } } }),
+    prisma.avoidPair.findMany({ where: { eventId: template.id } }),
+  ]);
+
+  // 建立 old → new ID mapping
+  const { randomUUID } = await import('node:crypto');
+  const idMap = new Map<string, string>();
+  const remap = (oldId: string) => {
+    let newId = idMap.get(oldId);
+    if (!newId) { newId = randomUUID(); idMap.set(oldId, newId); }
+    return newId;
+  };
+
+  await prisma.$transaction(async (tx) => {
+    if (tSubcats.length > 0) {
+      await tx.subcategory.createMany({
+        data: tSubcats.map((s) => ({ id: remap(s.id), eventId, name: s.name, category: s.category })),
+      });
+    }
+    if (tTables.length > 0) {
+      await tx.table.createMany({
+        data: tTables.map((t) => ({
+          id: remap(t.id), eventId, name: t.name, capacity: t.capacity,
+          positionX: t.positionX, positionY: t.positionY,
+        })),
+      });
+    }
+    await tx.guest.createMany({
+      data: tGuests.map((g) => ({
+        id: remap(g.id), eventId, name: g.name, aliases: g.aliases,
+        category: g.category, rsvpStatus: g.rsvpStatus,
+        companionCount: g.companionCount, dietaryNote: g.dietaryNote, specialNote: g.specialNote,
+        subcategoryId: g.subcategoryId ? remap(g.subcategoryId) : null,
+        assignedTableId: g.assignedTableId ? remap(g.assignedTableId) : null,
+        seatIndex: g.seatIndex,
+      })),
+    });
+    if (tPrefs.length > 0) {
+      await tx.seatPreference.createMany({
+        data: tPrefs.map((p) => ({ guestId: remap(p.guestId), preferredGuestId: remap(p.preferredGuestId), rank: p.rank })),
+      });
+    }
+    if (tAvoids.length > 0) {
+      await tx.avoidPair.createMany({
+        data: tAvoids.map((p) => ({ eventId, guestAId: remap(p.guestAId), guestBId: remap(p.guestBId), reason: p.reason })),
+      });
+    }
+  });
+
+  console.log(`[CLONE-DEMO] Done: ${tGuests.length} guests, ${tTables.length} tables`);
+  return c.json({ success: true, guests: tGuests.length, tables: tTables.length, template: template.name }, 201);
+});
+
+// ─── Demo Seed (legacy — JSON fixture 上傳) ─────────
 
 // POST /events/:id/seed — 一次性匯入 demo 資料（build-time 預算的 JSON fixture）
 events.post('/:id/seed', async (c) => {
