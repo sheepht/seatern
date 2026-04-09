@@ -260,16 +260,17 @@ events.patch('/:eventId/guests/assign-batch', async (c) => {
   }
 
   if (normalized.length > 0) {
+    // 所有值統一用 text literal，在 SET/WHERE 做 explicit cast
     const values = normalized.map((a) => {
       const tableId = a.tableId ? `'${a.tableId}'` : 'NULL';
-      const seatIndex = a.tableId === null ? 'NULL' : (a.seatIndex ?? 'NULL');
-      return `('${a.guestId}', ${tableId}, ${seatIndex === 'NULL' ? 'NULL' : Number(seatIndex)})`;
+      const seatIdx = (a.tableId === null || a.seatIndex == null) ? 'NULL' : `'${Number(a.seatIndex)}'`;
+      return `('${a.guestId}', ${tableId}, ${seatIdx})`;
     }).join(', ');
 
     await prisma.$executeRawUnsafe(`
       UPDATE "Guest" AS g
       SET "assignedTableId" = v.table_id,
-          "seatIndex" = v.seat_index,
+          "seatIndex" = v.seat_index::int,
           "updatedAt" = NOW()
       FROM (VALUES ${values}) AS v(guest_id, table_id, seat_index)
       WHERE g.id = v.guest_id
