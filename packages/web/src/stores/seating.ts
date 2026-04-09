@@ -85,6 +85,8 @@ interface SeatingState {
   tableLimitReached: boolean
   /** 用戶已點「稍後再說」關閉上限 modal */
   tableLimitDismissed: boolean
+  /** Demo 資料載入中 */
+  demoLoading: boolean
   /** 批次座位寫入中（自動分配/重排後等待後端回應） */
   isBatchSaving: boolean
   /** 自動分配進度（null = 未執行） */
@@ -206,6 +208,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   undoStack: [],
   lastResetAt: 0,
   isResetting: false,
+  demoLoading: false,
   isBatchSaving: false,
   flyingGuestIds: new Set(),
   tableLimit: 20,

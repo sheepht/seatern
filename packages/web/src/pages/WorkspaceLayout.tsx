@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation, Outlet } from 'react-router-dom';
 import { useSeatingStore } from '@/stores/seating';
 import { useAuthStore } from '@/stores/auth';
@@ -14,10 +14,10 @@ export default function WorkspaceLayout() {
   const loading = useSeatingStore((s) => s.loading);
   const eventId = useSeatingStore((s) => s.eventId);
   const guests = useSeatingStore((s) => s.guests);
+  const demoLoading = useSeatingStore((s) => s.demoLoading);
   const user = useAuthStore((s) => s.user);
   const isMobile = useIsMobile();
   const demoLoaded = useRef(false);
-  const [demoLoading, setDemoLoading] = useState(false);
 
   const page = location.pathname.endsWith('/import') ? 'import' as const
     : location.pathname.endsWith('/guests') ? 'guests' as const
@@ -35,8 +35,7 @@ export default function WorkspaceLayout() {
     if (guests.length > 0) return;
     if (hasDemoLoaded()) return;
     demoLoaded.current = true;
-    setDemoLoading(true);
-    loadDemoData(eventId).finally(() => setDemoLoading(false));
+    loadDemoData(eventId);
   }, [eventId, loading, user, guests.length]);
 
   const showLoading = loading || demoLoading;
