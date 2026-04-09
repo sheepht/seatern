@@ -108,21 +108,28 @@ export default function PricingPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10">
         {PLANS.map((plan) => {
           const isCurrent = isActive && plan.type === currentPlanType;
+          const isComingSoon = plan.tables >= 50;
           const isSelected = selectedPlan === plan.type;
           return (
             <button
               key={plan.type}
-              onClick={() => !isCurrent && setSelectedPlan(plan.type)}
-              disabled={!!isCurrent}
+              onClick={() => !isCurrent && !isComingSoon && setSelectedPlan(plan.type)}
+              disabled={!!isCurrent || isComingSoon}
               className={`relative rounded-xl border-2 p-5 text-left transition-all ${
-                isCurrent
-                  ? 'border-green-300 bg-green-50'
-                  : isSelected
-                    ? 'border-[var(--accent)] bg-[var(--accent-light)]'
-                    : 'border-stone-200 hover:border-stone-300'
+                isComingSoon
+                  ? 'border-stone-200 bg-stone-50 opacity-60 cursor-not-allowed'
+                  : isCurrent
+                    ? 'border-green-300 bg-green-50'
+                    : isSelected
+                      ? 'border-[var(--accent)] bg-[var(--accent-light)]'
+                      : 'border-stone-200 hover:border-stone-300'
               }`}
             >
-              {isCurrent ? (
+              {isComingSoon ? (
+                <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-stone-400 text-white whitespace-nowrap">
+                  敬請期待
+                </span>
+              ) : isCurrent ? (
                 <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-600 text-white whitespace-nowrap">
                   目前方案
                 </span>
@@ -144,7 +151,7 @@ export default function PricingPage() {
               </div>
               {plan.hasGroupPref && (
                 <div className="text-xs text-[var(--accent)] font-medium mt-2">
-                  含群組同桌/避桌 <span className="text-stone-400 font-normal">(即將推出)</span>
+                  含群組同桌/避桌
                 </div>
               )}
             </button>
