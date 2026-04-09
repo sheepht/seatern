@@ -843,7 +843,7 @@ events.post('/:id/approve-plan', async (c) => {
 const TEMPLATE_OWNER_ID = '__demo_template__';
 
 // POST /events/:id/clone-demo — 從 DB 中的 template event 複製 demo 資料
-// 用純 SQL INSERT...SELECT + gen_random_uuid() 一次完成，最少 DB round-trips
+// Guard + 選 template + copy 全部合併在一個 SQL DO block 內，最小化 DB round-trips
 events.post('/:id/clone-demo', async (c) => {
   const ownerId = c.get('ownerId');
   const ownerType = c.get('ownerType');
@@ -854,79 +854,95 @@ events.post('/:id/clone-demo', async (c) => {
   const expired = expiredResponse(event);
   if (expired) return c.json(expired, 403);
 
-  // Guard: 已有賓客就拒絕
-  const existingCount = await prisma.guest.count({ where: { eventId } });
-  if (existingCount > 0) return c.json({ error: 'Event already has guests' }, 400);
+  console.log(`[CLONE-DEMO] Starting for event ${eventId}`);
 
-  // 隨機挑一個 template event
-  const templates = await prisma.event.findMany({
-    where: { ownerId: TEMPLATE_OWNER_ID },
-    select: { id: true, name: true },
-  });
-  if (templates.length === 0) return c.json({ error: 'No demo templates found' }, 500);
-  const template = templates[Math.floor(Math.random() * templates.length)];
-
-  console.log(`[CLONE-DEMO] Cloning template "${template.name}" to event ${eventId}`);
-
-  // 純 SQL：用 temp table 做 ID mapping，INSERT...SELECT 一次複製
-  // 所有 copy + UUID 生成都在 PostgreSQL server 端完成
-  await prisma.$executeRawUnsafe(`
-    DO $$
-    DECLARE
-      _tmpl_id text := '${template.id}';
-      _new_event text := '${eventId}';
-    BEGIN
-      -- ID mapping tables
-      CREATE TEMP TABLE _smap (old_id text, new_id text) ON COMMIT DROP;
-      CREATE TEMP TABLE _tmap (old_id text, new_id text) ON COMMIT DROP;
-      CREATE TEMP TABLE _gmap (old_id text, new_id text) ON COMMIT DROP;
-
-      -- 1. Subcategories
-      INSERT INTO _smap SELECT id, gen_random_uuid()::text FROM "Subcategory" WHERE "eventId" = _tmpl_id;
+  // 單一 SQL：guard + 隨機選 template + copy 全部在 PostgreSQL 完成
+  const result = await prisma.$queryRawUnsafe<Array<{ cloned: number }>>(`
+    WITH guard AS (
+      SELECT COUNT(*)::int AS cnt FROM "Guest" WHERE "eventId" = '${eventId}'
+    ),
+    tmpl AS (
+      SELECT id FROM "Event"
+      WHERE "ownerId" = '${TEMPLATE_OWNER_ID}'
+      ORDER BY random() LIMIT 1
+    ),
+    -- ID mappings
+    smap AS (
       INSERT INTO "Subcategory" (id, "eventId", name, category)
-      SELECT m.new_id, _new_event, s.name, s.category
-      FROM "Subcategory" s JOIN _smap m ON s.id = m.old_id;
-
-      -- 2. Tables
-      INSERT INTO _tmap SELECT id, gen_random_uuid()::text FROM "Table" WHERE "eventId" = _tmpl_id;
+      SELECT gen_random_uuid()::text, '${eventId}', s.name, s.category
+      FROM "Subcategory" s, guard, tmpl
+      WHERE guard.cnt = 0 AND s."eventId" = tmpl.id
+      RETURNING id AS new_id, name
+    ),
+    -- need old→new for subcategories: join via name (unique per event)
+    smap_full AS (
+      SELECT orig.id AS old_id, smap.new_id
+      FROM "Subcategory" orig
+      JOIN smap ON orig.name = smap.name
+      JOIN tmpl ON orig."eventId" = tmpl.id
+    ),
+    tmap AS (
       INSERT INTO "Table" (id, "eventId", name, capacity, "positionX", "positionY", "createdAt", "updatedAt")
-      SELECT m.new_id, _new_event, t.name, t.capacity, t."positionX", t."positionY", NOW(), NOW()
-      FROM "Table" t JOIN _tmap m ON t.id = m.old_id;
-
-      -- 3. Guests
-      INSERT INTO _gmap SELECT id, gen_random_uuid()::text FROM "Guest" WHERE "eventId" = _tmpl_id;
+      SELECT gen_random_uuid()::text, '${eventId}', t.name, t.capacity, t."positionX", t."positionY", NOW(), NOW()
+      FROM "Table" t, guard, tmpl
+      WHERE guard.cnt = 0 AND t."eventId" = tmpl.id
+      RETURNING id AS new_id, name
+    ),
+    tmap_full AS (
+      SELECT orig.id AS old_id, tmap.new_id
+      FROM "Table" orig
+      JOIN tmap ON orig.name = tmap.name
+      JOIN tmpl ON orig."eventId" = tmpl.id
+    ),
+    gmap AS (
       INSERT INTO "Guest" (id, "eventId", name, aliases, category, "rsvpStatus", "companionCount",
                            "dietaryNote", "specialNote", "subcategoryId", "assignedTableId", "seatIndex",
                            "satisfactionScore", "isOverflow", "isIsolated", "relationScore", "createdAt", "updatedAt")
-      SELECT gm.new_id, _new_event, g.name, g.aliases, g.category, g."rsvpStatus", g."companionCount",
+      SELECT gen_random_uuid()::text, '${eventId}', g.name, g.aliases, g.category, g."rsvpStatus", g."companionCount",
              g."dietaryNote", g."specialNote",
-             sm.new_id, tm.new_id, g."seatIndex",
+             sf.new_id, tf.new_id, g."seatIndex",
              0, false, false, g."relationScore", NOW(), NOW()
       FROM "Guest" g
-      JOIN _gmap gm ON g.id = gm.old_id
-      LEFT JOIN _smap sm ON g."subcategoryId" = sm.old_id
-      LEFT JOIN _tmap tm ON g."assignedTableId" = tm.old_id;
-
-      -- 4. Seat preferences
+      JOIN tmpl ON g."eventId" = tmpl.id
+      CROSS JOIN guard
+      LEFT JOIN smap_full sf ON g."subcategoryId" = sf.old_id
+      LEFT JOIN tmap_full tf ON g."assignedTableId" = tf.old_id
+      WHERE guard.cnt = 0
+      RETURNING id AS new_id, name
+    ),
+    gmap_full AS (
+      SELECT orig.id AS old_id, gmap.new_id
+      FROM "Guest" orig
+      JOIN gmap ON orig.name = gmap.name
+      JOIN tmpl ON orig."eventId" = tmpl.id
+    ),
+    prefs AS (
       INSERT INTO "SeatPreference" (id, "guestId", "preferredGuestId", rank)
       SELECT gen_random_uuid()::text, gm1.new_id, gm2.new_id, sp.rank
       FROM "SeatPreference" sp
-      JOIN _gmap gm1 ON sp."guestId" = gm1.old_id
-      JOIN _gmap gm2 ON sp."preferredGuestId" = gm2.old_id;
-
-      -- 5. Avoid pairs
+      JOIN gmap_full gm1 ON sp."guestId" = gm1.old_id
+      JOIN gmap_full gm2 ON sp."preferredGuestId" = gm2.old_id
+      RETURNING 1 AS x
+    ),
+    avoids AS (
       INSERT INTO "AvoidPair" (id, "eventId", "guestAId", "guestBId", reason)
-      SELECT gen_random_uuid()::text, _new_event, gm1.new_id, gm2.new_id, ap.reason
+      SELECT gen_random_uuid()::text, '${eventId}', gm1.new_id, gm2.new_id, ap.reason
       FROM "AvoidPair" ap
-      JOIN _gmap gm1 ON ap."guestAId" = gm1.old_id
-      JOIN _gmap gm2 ON ap."guestBId" = gm2.old_id
-      WHERE ap."eventId" = _tmpl_id;
-    END $$;
+      JOIN tmpl ON ap."eventId" = tmpl.id
+      JOIN gmap_full gm1 ON ap."guestAId" = gm1.old_id
+      JOIN gmap_full gm2 ON ap."guestBId" = gm2.old_id
+      RETURNING 1 AS x
+    )
+    SELECT (SELECT COUNT(*)::int FROM gmap) AS cloned;
   `);
 
-  const guestCount = await prisma.guest.count({ where: { eventId } });
-  console.log(`[CLONE-DEMO] Done: ${guestCount} guests cloned from "${template.name}"`);
-  return c.json({ success: true, guests: guestCount, template: template.name }, 201);
+  const cloned = result[0]?.cloned ?? 0;
+  if (cloned === 0) {
+    return c.json({ error: 'Event already has guests or no templates found' }, 400);
+  }
+
+  console.log(`[CLONE-DEMO] Done: ${cloned} guests`);
+  return c.json({ success: true, guests: cloned }, 201);
 });
 
 // ─── Demo Seed (legacy — JSON fixture 上傳) ─────────
