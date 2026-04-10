@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { api } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 import { useNavigate } from 'react-router-dom';
 import { useSeatingStore } from '@/stores/seating';
 import type { CreatedGuest, SubcategoryBatchPayload, AvoidPairBatchPayload } from '@/lib/types';
@@ -235,9 +236,18 @@ export default function ImportPage() {
 
       // 重新載入 store 再導頁，避免畫布/名單頁看不到新資料
       await useSeatingStore.getState().loadEvent();
+      trackEvent('import_guests', {
+        guest_count: guestList.length,
+        preference_count: validPrefs.length,
+        avoid_pair_count: avoidPairs.length,
+      });
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : '匯入失敗');
+      trackEvent('import_failed', {
+        guest_count: guestList.length,
+        reason: err instanceof Error ? err.message : 'unknown',
+      });
     } finally {
       setImporting(false);
     }

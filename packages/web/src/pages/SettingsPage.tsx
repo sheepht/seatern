@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useSeatingStore } from '@/stores/seating';
 import { supabase } from '@/lib/supabase';
 import { api } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 import type { UserIdentity } from '@supabase/supabase-js';
 
 export default function SettingsPage() {
@@ -115,6 +116,7 @@ export default function SettingsPage() {
       const a = document.createElement('a');
       a.href = url; a.download = 'seatern-export.json'; a.click();
       URL.revokeObjectURL(url);
+      trackEvent('export_seating', { format: 'json', source: 'settings' });
     } catch { /* empty */ } finally {
       setExporting(false);
     }

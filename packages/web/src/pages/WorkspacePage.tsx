@@ -21,6 +21,7 @@ import { DragOverlayContent } from '@/components/workspace/DragOverlayContent';
 import { ViolationModal } from '@/components/workspace/ViolationModal';
 import GuestFormModal from '@/components/GuestFormModal';
 import { loadCategoryColors } from '@/lib/category-colors';
+import { trackEvent } from '@/lib/analytics';
 
 function ExpandButton({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -266,6 +267,10 @@ export default function WorkspacePage() {
       }
 
       moveGuestToSeat(guestId, tableId, seatIndex, cursorBias);
+      if (!sessionStorage.getItem('seatern-assign-seat-fired')) {
+        trackEvent('assign_seat', { source: alreadyAtSameTable ? 'reseat' : 'from_pool' });
+        sessionStorage.setItem('seatern-assign-seat-fired', '1');
+      }
     } else if (overData?.type === 'unassigned' || over.id === 'unassigned') {
       moveGuest(guestId, null);
     }

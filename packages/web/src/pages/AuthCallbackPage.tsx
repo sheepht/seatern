@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { api } from '@/lib/api';
 import axios from 'axios';
 import { useAuthStore } from '@/stores/auth';
+import { trackEvent } from '@/lib/analytics';
 
 export default function AuthCallbackPage() {
   const [searchParams] = useSearchParams();
@@ -44,6 +45,7 @@ export default function AuthCallbackPage() {
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 404) {
           await api.post('/events', { name: '我的排位' });
+          trackEvent('create_event', { trigger: 'auth_callback' });
         }
       }
 

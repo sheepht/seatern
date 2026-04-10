@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 import { SeaternLogo } from '@/components/SeaternLogo';
+import { trackEvent } from '@/lib/analytics';
 
 export default function RegisterPage() {
   const { signUpWithEmail } = useAuthStore();
@@ -30,6 +31,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await signUpWithEmail(email, password);
+      trackEvent('sign_up', { method: 'email' });
       setSuccess(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '註冊失敗');

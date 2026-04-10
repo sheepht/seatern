@@ -5,6 +5,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 import { SeaternLogo } from '@/components/SeaternLogo';
 import { api } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 import axios from 'axios';
 
 async function ensureEventExists() {
@@ -13,6 +14,7 @@ async function ensureEventExists() {
   } catch (err) {
     if (axios.isAxiosError(err) && err.response?.status === 404) {
       await api.post('/events', { name: '我的排位' });
+      trackEvent('create_event', { trigger: 'login_page' });
     }
   }
 }

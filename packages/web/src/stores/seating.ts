@@ -6,6 +6,7 @@ import { type AutoAssignMode, type AutoAssignProgress } from '@/lib/auto-assign'
 import { runAutoAssignInWorker } from '@/lib/auto-assign-client';
 import { findFreePosition } from '@/lib/viewport';
 import { buildSlotArray, placeGuest, extractSeatIndices, type Slot } from '@/lib/seat-shift';
+import { trackEvent } from '@/lib/analytics';
 
 // ─── Types ──────────────────────────────────────────
 
@@ -102,6 +103,7 @@ async function fetchAndApplyEvent(set: SetFn, get: GetFn) {
     if (err && typeof err === 'object' && 'response' in err && (err as { response?: { status?: number } }).response?.status === 404) {
       try {
         await api.post('/events', { name: '我的排位' });
+        trackEvent('create_event', { trigger: 'auto_first_login' });
       } catch {
         set({ loading: false });
         window.location.href = '/';
@@ -1234,9 +1236,15 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       const res = await api.post(`/events/${eventId}/snapshots`, { name, data, averageSatisfaction: avg });
       snapshot = res.data;
     } catch {
+      trackEvent('save_failed', { target: 'snapshot' });
       return;
     }
     set({ snapshots: [snapshot, ...snapshots] });
+    trackEvent('save_snapshot', {
+      guest_count: data.guests.length,
+      table_count: data.tables.length,
+      avg_satisfaction: Math.round(avg),
+    });
   },
 
   restoreSnapshot: async (snapshotId) => {
@@ -1491,6 +1499,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       const guest: Guest = { ...raw, seatCount: (raw.companionCount ?? 0) + 1 };
       const nextGuests = [...guests, guest];
       set({ guests: nextGuests });
+      trackEvent('add_guest', { method: 'manual', total_guests: nextGuests.length });
 
       // Recalculate if confirmed
       if (guest.rsvpStatus === 'confirmed') {
