@@ -408,12 +408,15 @@ export function Toolbar({ onFitAll, page = 'workspace' }: ToolbarProps = {}) {
       >
         {/* Left: Brand + Event name + stats */}
         <div className="flex items-center gap-3">
-          <span
-            className="flex items-center gap-1.5 text-lg font-extrabold tracking-tight font-[family-name:var(--font-display)] text-[var(--accent)]"
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="flex items-center gap-1.5 text-lg font-extrabold tracking-tight font-[family-name:var(--font-display)] text-[var(--accent)] cursor-pointer hover:opacity-80 transition-opacity"
+            title="回到排位頁"
           >
             <SeaternLogo className="w-7 h-7" />
             排位鷗鷗
-          </span>
+          </button>
           <span className="text-[var(--border-strong)]">|</span>
           <span className="text-sm font-medium text-[var(--text-primary)]">
             {eventName || '未命名活動'}

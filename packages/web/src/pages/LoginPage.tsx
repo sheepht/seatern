@@ -71,13 +71,13 @@ export default function LoginPage() {
     <div className="space-y-2">
       <button
         onClick={handleGoogle}
-        className="w-full py-3 border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--accent-light)] text-sm text-[var(--text-secondary)] font-[family-name:var(--font-ui)] flex items-center justify-center gap-2"
+        className="w-full py-3 border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--accent-light)] text-sm text-[var(--text-secondary)] font-[family-name:var(--font-ui)] flex items-center justify-center gap-2 cursor-pointer"
       >
         <GoogleIcon /> 使用 Google 登入
       </button>
       <button
         onClick={handleLINE}
-        className="w-full py-3 border border-green-200 rounded-[var(--radius-sm)] hover:bg-green-100 text-sm bg-green-50 text-green-800 font-[family-name:var(--font-ui)] flex items-center justify-center gap-2"
+        className="w-full py-3 border border-green-200 rounded-[var(--radius-sm)] hover:bg-green-100 text-sm bg-green-50 text-green-800 font-[family-name:var(--font-ui)] flex items-center justify-center gap-2 cursor-pointer"
       >
         <LineIcon /> 使用 LINE 登入
       </button>
