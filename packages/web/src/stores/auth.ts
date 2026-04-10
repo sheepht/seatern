@@ -96,7 +96,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       subcategories: [],
       avoidPairs: [],
       snapshots: [],
-      tableLimit: 20,
+      tableLimit: 10,
       planStatus: null,
       planExpiresAt: null,
       tableLimitReached: false,

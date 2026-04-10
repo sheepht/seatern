@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { recalculateAll } from '@/lib/satisfaction';
 import { type AutoAssignMode, type AutoAssignProgress } from '@/lib/auto-assign';
 import { runAutoAssignInWorker } from '@/lib/auto-assign-client';
@@ -464,7 +465,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   showRecoveryPrompt: false,
   backupData: null,
   flyingGuestIds: new Set(),
-  tableLimit: 20,
+  tableLimit: 10,
   planStatus: null,
   planExpiresAt: null,
   tableLimitReached: false,
@@ -477,7 +478,10 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   },
 
   loadEvent: async () => {
-    set({ loading: true });
+    // 先依 Supabase session 預設 tableLimit（未登入 10、已登入 20），
+    // 避免 loading 期間顯示錯誤的桌數上限
+    const { data: { session } } = await supabase.auth.getSession();
+    set({ loading: true, tableLimit: session ? 20 : 10 });
     try {
       // 1. 嘗試從 localStorage 快取載入（省掉 API round trip）
       const cache = loadEventCache();
@@ -496,7 +500,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   },
 
   reloadEvent: async () => {
-    set({ loading: true });
+    const { data: { session } } = await supabase.auth.getSession();
+    set({ loading: true, tableLimit: session ? 20 : 10 });
     clearEventCache();
     try {
       await fetchAndApplyEvent(set, get);
