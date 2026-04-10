@@ -362,20 +362,21 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
             </div>
             <div className="flex items-center gap-1">
               {unassignedGuests.length > 0 && (
-                <button
-                  onClick={async () => {
-                    setShowModeModal(true);
-                    setEstimatedTime(null);
-                    const t = await estimateAutoAssignTimeInWorker(guests, tables, avoidPairs);
-                    setEstimatedTime(t);
-                  }}
-                  disabled={assigning}
-                  className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-[var(--radius-sm)] cursor-pointer disabled:opacity-50 hover:brightness-90 bg-[var(--accent)] text-white font-[family-name:var(--font-display)]"
-                  title="自動分配所有待排賓客"
-                >
-                  <Wand2 size={12} />
-                  自動分配
-                </button>
+                <Tip text="只會分配待排區的賓客">
+                  <button
+                    onClick={async () => {
+                      setShowModeModal(true);
+                      setEstimatedTime(null);
+                      const t = await estimateAutoAssignTimeInWorker(guests, tables, avoidPairs);
+                      setEstimatedTime(t);
+                    }}
+                    disabled={assigning}
+                    className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-[var(--radius-sm)] cursor-pointer disabled:opacity-50 hover:brightness-90 bg-[var(--accent)] text-white font-[family-name:var(--font-display)]"
+                  >
+                    <Wand2 size={12} />
+                    自動分配
+                  </button>
+                </Tip>
               )}
               {isOver && (
                 <span className="text-xs text-[var(--accent-dark)]">放開以取消安排</span>
