@@ -4,20 +4,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 import { SeaternLogo } from '@/components/SeaternLogo';
-import { api } from '@/lib/api';
-import { trackEvent } from '@/lib/analytics';
-import axios from 'axios';
-
-async function ensureEventExists() {
-  try {
-    await api.get('/events/mine');
-  } catch (err) {
-    if (axios.isAxiosError(err) && err.response?.status === 404) {
-      await api.post('/events', { name: '我的排位' });
-      trackEvent('create_event', { trigger: 'login_page' });
-    }
-  }
-}
+import { ensureDefaultEvent } from '@/lib/ensure-default-event';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -44,7 +31,7 @@ export default function LoginPage() {
     try {
       await signInWithEmail(email, password);
       await claimEvent();
-      await ensureEventExists();
+      await ensureDefaultEvent('login_page');
       navigate('/');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '登入失敗');

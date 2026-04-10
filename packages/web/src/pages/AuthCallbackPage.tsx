@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { api } from '@/lib/api';
-import axios from 'axios';
 import { useAuthStore } from '@/stores/auth';
-import { trackEvent } from '@/lib/analytics';
+import { ensureDefaultEvent } from '@/lib/ensure-default-event';
 
 export default function AuthCallbackPage() {
   const [searchParams] = useSearchParams();
@@ -38,17 +36,7 @@ export default function AuthCallbackPage() {
       }
 
       await claimEvent();
-
-      // Ensure an event exists before navigating to workspace
-      try {
-        await api.get('/events/mine');
-      } catch (err) {
-        if (axios.isAxiosError(err) && err.response?.status === 404) {
-          await api.post('/events', { name: '我的排位' });
-          trackEvent('create_event', { trigger: 'auth_callback' });
-        }
-      }
-
+      await ensureDefaultEvent('auth_callback');
       navigate('/', { replace: true });
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

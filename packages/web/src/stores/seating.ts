@@ -7,6 +7,7 @@ import { runAutoAssignInWorker } from '@/lib/auto-assign-client';
 import { findFreePosition } from '@/lib/viewport';
 import { buildSlotArray, placeGuest, extractSeatIndices, type Slot } from '@/lib/seat-shift';
 import { trackEvent } from '@/lib/analytics';
+import { ensureDefaultEvent } from '@/lib/ensure-default-event';
 
 // ─── Types ──────────────────────────────────────────
 
@@ -96,23 +97,11 @@ type GetFn = () => SeatingState;
 
 /** 從 API 抓取 event 資料，處理後套用到 store + 寫入快取 */
 async function fetchAndApplyEvent(set: SetFn, get: GetFn) {
-  let res;
-  try {
-    res = await api.get('/events/mine');
-  } catch (err: unknown) {
-    if (err && typeof err === 'object' && 'response' in err && (err as { response?: { status?: number } }).response?.status === 404) {
-      try {
-        await api.post('/events', { name: '我的排位' });
-        trackEvent('create_event', { trigger: 'auto_first_login' });
-      } catch {
-        set({ loading: false });
-        window.location.href = '/';
-        return;
-      }
-      res = await api.get('/events/mine');
-    } else {
-      throw err;
-    }
+  const res = await ensureDefaultEvent('auto_first_login');
+  if (!res) {
+    set({ loading: false });
+    window.location.href = '/';
+    return;
   }
   const data = res.data;
 
