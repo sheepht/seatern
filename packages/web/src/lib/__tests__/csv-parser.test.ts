@@ -16,6 +16,13 @@ describe('parseCSV', () => {
     expect(result.rows[1]['分類']).toBe('女方');
   });
 
+  it('剝除 UTF-8 BOM（Windows Excel 儲存的 CSV）', () => {
+    const csv = `\uFEFF姓名,分類\n王小明,男方`;
+    const result = parseCSV(csv);
+    expect(result.headers).toEqual(['姓名', '分類']);
+    expect(result.rows[0]['姓名']).toBe('王小明');
+  });
+
   it('處理引號內含逗號的欄位', () => {
     const csv = `姓名,備註\n王小明,"喜歡吃牛,不吃海鮮"`;
     const result = parseCSV(csv);

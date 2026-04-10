@@ -9,7 +9,7 @@ export interface ParseResult {
  * 解析 CSV 文字（逗號分隔）
  */
 export function parseCSV(text: string): ParseResult {
-  const trimmed = text.trim();
+  const trimmed = text.replace(/^\uFEFF/, '').trim();
   if (!trimmed) return { headers: [], rows: [] };
 
   const rows = csvParse(trimmed);
@@ -23,7 +23,7 @@ export function parseCSV(text: string): ParseResult {
  * 解析貼上的表格資料（Tab 分隔，從 Google Sheet 複製）
  */
 export function parsePaste(text: string): ParseResult {
-  const trimmed = text.trim();
+  const trimmed = text.replace(/^\uFEFF/, '').trim();
   if (!trimmed) return { headers: [], rows: [] };
 
   // 偵測分隔符號：Tab 優先（Sheet 複製），否則嘗試逗號
