@@ -9,7 +9,7 @@ export function resetDemoFlag(): void {
 }
 
 import { api } from './api';
-import { useSeatingStore } from '@/stores/seating';
+import { useSeatingStore, clearEventCache } from '@/stores/seating';
 
 /**
  * 為未登入的新使用者載入範例資料：
@@ -22,6 +22,7 @@ export async function loadDemoData(eventId: string): Promise<void> {
   try {
     await api.post(`/events/${eventId}/clone-demo`);
     localStorage.setItem(DEMO_LOADED_KEY, '1');
+    clearEventCache();
     await useSeatingStore.getState().loadEvent();
   } catch (err) {
     console.warn('[Demo] Failed to load demo data:', err);

@@ -54,7 +54,7 @@ function loadEventCache(): EventCache | null {
   } catch { return null; }
 }
 
-function clearEventCache() {
+export function clearEventCache() {
   try { localStorage.removeItem(EVENT_CACHE_KEY); } catch { /* ok */ }
 }
 
