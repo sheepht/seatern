@@ -6,6 +6,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { Toolbar } from '@/components/workspace/Toolbar';
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav';
 import TableLimitModal from '@/components/workspace/TableLimitModal';
+import { LoadingTable } from '@/components/workspace/LoadingTable';
 import { loadDemoData, hasDemoLoaded } from '@/lib/load-demo';
 
 export default function WorkspaceLayout() {
@@ -45,9 +46,7 @@ export default function WorkspaceLayout() {
       <div className="h-dvh flex flex-col bg-[var(--bg-primary)]">
         {!isMobile && <Toolbar page={page} />}
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-[var(--text-muted)] font-[family-name:var(--font-body)]">
-            {demoLoading ? '載入展示用賓客...' : '載入中...'}
-          </p>
+          <LoadingTable label={demoLoading ? '載入展示用賓客...' : '載入中...'} />
         </div>
         {isMobile && <MobileBottomNav />}
       </div>
