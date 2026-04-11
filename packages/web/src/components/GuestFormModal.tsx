@@ -385,6 +385,7 @@ export default function GuestFormModal({
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]"
     >
       <div
+        data-testid="guest-form-modal"
         onClick={(e) => e.stopPropagation()}
         className={isMobile
           ? 'bg-[var(--bg-surface)] w-full h-full overflow-auto p-4'

@@ -21,17 +21,19 @@ export { expect } from '@playwright/test';
  */
 export async function waitForWorkspaceReady(page: Page): Promise<void> {
   const { expect } = await import('@playwright/test');
-  await expect(page.getByText('載入中...')).toBeHidden({ timeout: 15_000 });
-  await expect(page.getByText('載入展示用賓客...')).toBeHidden({ timeout: 15_000 });
+  // 30s timeout：boot event + clone-demo + reloadEvent 三段非同步 API 串起來，
+  // 冷啟動（Prisma 連線池熱身）偶爾會超過 15s。設寬一點避免 flaky。
+  await expect(page.getByText('載入中...')).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByText('載入展示用賓客...')).toBeHidden({ timeout: 30_000 });
 
   // 桌子用 count > 0 檢查而不是 toBeVisible。
   // 原因：[data-table-id] 是 SVG <g>，它的 bounding box 在 React render / 動畫期間
   // 可能暫時是 0×0，Playwright 的 toBeVisible 會誤判為不可見。用 toHaveCount 只查
   // DOM 是否存在，不碰 bounding box 計算，就不會 flaky。
-  await expect(page.locator('[data-table-id]')).not.toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator('[data-table-id]')).not.toHaveCount(0, { timeout: 30_000 });
 
   // 賓客 chip / overlay 是 HTML 元素，toBeVisible 可靠
-  await expect(page.locator('[data-guest-id], [data-seated-guest-id]').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[data-guest-id], [data-seated-guest-id]').first()).toBeVisible({ timeout: 30_000 });
 
   // 等網路靜止，確保所有非同步 request（clone-demo + reloadEvent）都完成
   await page.waitForLoadState('networkidle');

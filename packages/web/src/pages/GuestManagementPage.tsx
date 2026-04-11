@@ -218,7 +218,7 @@ function DeleteConfirmModal({ guestName, tableName, onConfirm, onCancel }: {
   guestName: string; tableName: string; onConfirm: () => void; onCancel: () => void
 }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
+    <div data-testid="delete-guest-confirm" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
       <div className="bg-[var(--bg-surface)] rounded-[var(--radius-lg,12px)] p-6 max-w-[400px] w-[90%] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
         <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--text-primary)] mb-2">確定要刪除？</h3>
         <p className="font-[family-name:var(--font-body)] text-sm text-[var(--text-secondary)] mb-5">
@@ -998,6 +998,7 @@ export default function GuestManagementPage() {
 
         {/* Floating add button */}
         <button
+          data-testid="guest-list-add-button"
           onClick={() => setShowAddModal(true)}
           className={`fixed z-50 flex items-center gap-1.5 bg-[var(--accent)] text-white border-none rounded-[var(--radius-md,8px)] cursor-pointer text-sm font-[family-name:var(--font-ui)] font-semibold shadow-[0_4px_16px_rgba(0,0,0,0.15)] ${isMobile ? 'right-4 bottom-[72px] w-12 h-12 justify-center p-0' : 'right-8 bottom-8 px-5 py-3'}`}
         >
@@ -1011,7 +1012,7 @@ export default function GuestManagementPage() {
 
       {/* Clear all guests confirm modal */}
       {showClearAllConfirm && createPortal(
-        <div className="fixed inset-0 z-[999] flex items-center justify-center">
+        <div data-testid="clear-all-confirm" className="fixed inset-0 z-[999] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/25" onClick={() => setShowClearAllConfirm(false)} />
           <div className="relative bg-[var(--bg-surface)] rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] p-6 w-[360px] border border-[var(--border)]">
             <p className="text-base font-semibold text-[#DC2626] mb-2">刪除所有賓客</p>
@@ -1186,6 +1187,7 @@ const GuestRow = ({ guest, tableName, satColor, subcatName, maxCompanion, maxCom
 
   return (
     <tr
+      data-guest-row-id={guest.id}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={onEdit}
