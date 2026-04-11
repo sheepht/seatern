@@ -23,20 +23,8 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
 
-  webServer: [
-    {
-      command: 'npm run dev -w packages/api',
-      cwd: '../..',
-      url: 'http://localhost:3001/api/health',
-      reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
-    },
-    {
-      command: 'npm run dev -w packages/web',
-      cwd: '../..',
-      url: 'http://localhost:5173',
-      reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
-    },
-  ],
+  // webServer 刻意不設定。跑 E2E 前請自行在另一個 terminal 起 API + web：
+  //   npm run dev           # 或分別跑 npm run dev:api + npm run dev:web
+  // 想讓 E2E 走本地 DB 就用：
+  //   tsx --env-file=.env.local watch packages/api/src/index.ts
 });
