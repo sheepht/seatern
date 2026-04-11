@@ -14,6 +14,7 @@ import { diffGuests, type DiffResult } from '@/lib/guest-diff';
 import { CsvUpload } from '@/components/import/CsvUpload';
 import { ImportPreview } from '@/components/import/ImportPreview';
 import { PreferenceMatch } from '@/components/import/PreferenceMatch';
+import { LoadingTable } from '@/components/workspace/LoadingTable';
 
 type Step = 'input' | 'preview' | 'preferences'
 
@@ -253,6 +254,14 @@ export default function ImportPage() {
     }
   };
 
+  if (importing) {
+    return (
+      <div className="flex-1 overflow-hidden flex flex-col items-center justify-center bg-[var(--bg-primary)]">
+        <LoadingTable label="正在匯入賓客..." />
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-hidden flex flex-col bg-[var(--bg-primary)]">
       {/* input 步驟：居中卡片 */}
@@ -383,9 +392,6 @@ export default function ImportPage() {
         </div>
       )}
 
-      {importing && (
-        <div className="text-center py-8 text-sm text-[var(--text-secondary)]">匯入中...</div>
-      )}
     </div>
   );
 }
