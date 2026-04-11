@@ -28,8 +28,7 @@ describe('ZoomControls', () => {
   it('點擊 - → 呼叫 onZoomOut', async () => {
     const onZoomOut = vi.fn();
     render(<ZoomControls {...baseProps} onZoomOut={onZoomOut} />);
-    const buttons = screen.getAllByRole('button');
-    await userEvent.click(buttons[0]); // 第一個是 -
+    await userEvent.click(screen.getByRole('button', { name: '縮小 (-)' }));
     expect(onZoomOut).toHaveBeenCalledOnce();
   });
 
