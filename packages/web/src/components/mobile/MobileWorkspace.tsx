@@ -979,7 +979,7 @@ export function MobileWorkspace() {
                     if (!eid) return;
                     try {
                       await api.delete(`/events/${eid}/tables/empty`);
-                      await useSeatingStore.getState().loadEvent();
+                      await useSeatingStore.getState().reloadEvent();
                     } catch { /* ignore */ }
                   }}
                   disabled={!tables.some((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed'))}
@@ -1058,7 +1058,7 @@ export function MobileWorkspace() {
                   if (!eid) return;
                   try {
                     await api.delete(`/events/${eid}/tables/empty`);
-                    await useSeatingStore.getState().loadEvent();
+                    await useSeatingStore.getState().reloadEvent();
                   } catch { /* ignore */ }
                 }}
                 disabled={!tables.some((t) => !guests.some((g) => g.assignedTableId === t.id && g.rsvpStatus === 'confirmed'))}

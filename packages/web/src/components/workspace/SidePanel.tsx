@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { useDroppable } from '@dnd-kit/core';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Wand2, Plus, Save, Undo2, Redo2, Shuffle, LayoutGrid, Trash2, Dices, History, FlaskConical } from 'lucide-react';
-import { useSeatingStore } from '@/stores/seating';
+import { useSeatingStore, clearEventCache } from '@/stores/seating';
 import TableLimitBanner from './TableLimitBanner';
 import { estimateAutoAssignTimeInWorker } from '@/lib/auto-assign-client';
 import { getSatisfactionColor } from '@/lib/satisfaction';
@@ -520,6 +520,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
                 const eid = useSeatingStore.getState().eventId;
                 if (eid) await api.delete(`/events/${eid}/reset`);
                 resetDemoFlag();
+                clearEventCache();
                 window.location.reload();
               }}
               className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] border border-[#F59E0B] cursor-pointer hover:bg-amber-50 text-[#B45309]"

@@ -209,7 +209,8 @@ export default function ImportPage() {
       }
 
       // 重新載入 store 再導頁，避免畫布/名單頁看不到新資料
-      await useSeatingStore.getState().loadEvent();
+      // 必須用 reloadEvent 繞過 localStorage 快取，否則新賓客不會出現
+      await useSeatingStore.getState().reloadEvent();
       trackEvent('import_guests', {
         guest_count: guestList.length,
         preference_count: validPrefs.length,
