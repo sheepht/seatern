@@ -1034,8 +1034,8 @@ export default function GuestManagementPage() {
                   setClearingAll(true);
                   try {
                     await api.delete(`/events/${eventId}/reset`);
-                    const { loadEvent } = useSeatingStore.getState();
-                    if (eventId) await loadEvent();
+                    const { reloadEvent } = useSeatingStore.getState();
+                    if (eventId) await reloadEvent();
                   } finally {
                     setClearingAll(false);
                     setShowClearAllConfirm(false);
