@@ -8,7 +8,13 @@
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 
-	"forwardPorts": [5173, 3001],
+	"forwardPorts": [5173, 3001, 9324],
+	"portsAttributes": {
+		"9324": {
+			"label": "Playwright UI",
+			"onAutoForward": "silent"
+		}
+	},
 
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "sh ./.devcontainer/postCreateCommand.sh",

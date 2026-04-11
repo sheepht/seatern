@@ -81,6 +81,10 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
       ref={(el) => { setNodeRef(el); elRef.current = el; }}
       {...Object.fromEntries(Object.entries(listeners || {}).filter(([k]) => k !== 'onPointerDown' && k !== 'onTouchStart' && k !== 'onTouchMove'))}
       {...attributes}
+      data-seated-guest-id={guest.id}
+      data-seated-table-id={guest.assignedTableId || ''}
+      data-seated-seat-index={seatIndex}
+      data-seated-is-companion={isCompanion ? '1' : '0'}
       className="absolute rounded-full cursor-grab z-10 box-border border-[1.5px] border-dashed border-transparent transition-[border-color] duration-150 ease-out"
       style={{
         left: x - radius - 6,

@@ -341,6 +341,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
       {/* 未安排賓客 — 佔滿剩餘高度 */}
       <div
         ref={setNodeRef}
+        data-testid="unassigned-bar"
         className="flex-1 flex flex-col overflow-hidden transition-[background] duration-150 ease-in-out"
         style={{ background: isOver ? 'var(--accent-light)' : 'transparent' }}
       >

@@ -10,3 +10,8 @@ packages/db/prisma/generated/
 .gstack/
 .vercel
 .env*.local
+
+# Playwright
+packages/web/test-results/
+packages/web/playwright-report/
+packages/web/playwright/.cache/
