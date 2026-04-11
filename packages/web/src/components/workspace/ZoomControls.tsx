@@ -51,11 +51,23 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }:
     <div
       className="absolute bottom-4 left-4 flex items-center gap-0.5 rounded-lg border shadow-sm z-30 h-9 text-xs bg-[var(--bg-surface,#fff)] border-[var(--border,#E7E5E4)] font-[family-name:'Plus_Jakarta_Sans',sans-serif]"
     >
+      {/* Fit All — 最左 */}
+      <button
+        onClick={onFitAll}
+        className="flex items-center justify-center w-8 h-full rounded-l-lg transition-colors hover:text-[#B08D57] text-[var(--text-secondary,#78716C)] cursor-pointer"
+        title="顯示全部 (0)"
+      >
+        <Maximize2 size={14} />
+      </button>
+
+      {/* Divider */}
+      <div className="w-px h-5 bg-[var(--border,#E7E5E4)]" />
+
       {/* Zoom Out */}
       <button
         onClick={onZoomOut}
         disabled={atMin}
-        className={`flex items-center justify-center w-8 h-full rounded-l-lg transition-colors ${atMin ? 'text-[var(--text-muted,#A8A29E)] opacity-40 cursor-default' : 'text-[var(--text-secondary,#78716C)] cursor-pointer'}`}
+        className={`flex items-center justify-center w-8 h-full transition-colors ${atMin ? 'text-[var(--text-muted,#A8A29E)] opacity-40 cursor-default' : 'text-[var(--text-secondary,#78716C)] cursor-pointer'}`}
         title="縮小 (-)"
       >
         <Minus size={14} />
@@ -98,17 +110,19 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onFitAll, onSetZoom }:
         <Plus size={14} />
       </button>
 
-      {/* Divider */}
-      <div className="w-px h-5 bg-[var(--border,#E7E5E4)]" />
-
-      {/* Fit All */}
-      <button
-        onClick={onFitAll}
-        className="flex items-center justify-center w-8 h-full transition-colors hover:text-[#B08D57] text-[var(--text-secondary,#78716C)] cursor-pointer"
-        title="顯示全部 (0)"
-      >
-        <Maximize2 size={14} />
-      </button>
+      {/* 手機專用：直達 100%（桌面版有 1 快捷鍵） */}
+      {isMobile && (
+        <>
+          <div className="w-px h-5 bg-[var(--border,#E7E5E4)]" />
+          <button
+            onClick={() => onSetZoom(1)}
+            className="flex items-center justify-center px-2 h-full rounded-r-lg transition-colors hover:bg-black/5 text-[var(--text-secondary,#78716C)] cursor-pointer font-[family-name:var(--font-data)] tabular-nums"
+            title="放大至 100%"
+          >
+            1:1
+          </button>
+        </>
+      )}
 
       {/* Divider + Help（手機版隱藏快捷鍵） */}
       {!isMobile && <>
