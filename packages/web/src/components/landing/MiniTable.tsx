@@ -5,17 +5,6 @@ import type { DemoGuest, DemoTable } from './demoScorer';
 
 export type MiniTableState = 'idle' | 'drag-over' | 'reject-shake' | 'full';
 
-interface MiniTableProps {
-  table: DemoTable;
-  guests: DemoGuest[];
-  guestScores: Record<string, number>;
-  tableScore: number;
-  state: MiniTableState;
-  pulseGuestId?: string | null;
-  pulseAll?: boolean;
-  activeGuestId?: string | null;
-}
-
 /** 數字漸變動畫（對齊 workspace TableNode:13 的 useAnimatedNumber）*/
 function useAnimatedNumber(target: number, duration = 500): number {
   const [current, setCurrent] = useState(target);
@@ -46,9 +35,9 @@ function useAnimatedNumber(target: number, duration = 500): number {
 const CONTAINER = 240;
 const CENTER = CONTAINER / 2;
 const TABLE_RADIUS = 80;
-const SEAT_RADIUS = 56;          // distance from center to seat center
-const GUEST_R = 20;              // seat circle radius
-const RING_R = 23;               // satisfaction ring radius (outside the guest circle)
+const SEAT_RADIUS = 56;
+const GUEST_R = 20;
+const RING_R = 23;
 
 function seatPosition(index: number, total: number) {
   const angle = ((2 * Math.PI) / total) * index - Math.PI / 2;
@@ -64,66 +53,24 @@ const GROUP_COLORS: Record<DemoGuest['group'], { fill: string; stroke: string; t
   shared: { fill: '#F3F4F6', stroke: '#D1D5DB', text: '#374151' },
 };
 
-// ─── HTML drag overlay (one per seated guest) ────────
-interface DragHandleProps {
-  guestId: string;
-  x: number;
-  y: number;
-  guestName: string;
-}
-
-function SeatDragHandle({ guestId, x, y, guestName }: DragHandleProps) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: guestId,
-    data: { guestId },
-  });
-  return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      className="absolute cursor-grab active:cursor-grabbing select-none focus:outline-none focus:ring-2 focus:ring-[#B08D57] focus:ring-offset-2 rounded-full"
-      style={{
-        left: `calc(50% + ${x}px - ${RING_R + 2}px)`,
-        top: `calc(50% + ${y}px - ${RING_R + 2}px)`,
-        width: (RING_R + 2) * 2,
-        height: (RING_R + 2) * 2,
-        touchAction: 'none',
-        opacity: isDragging ? 0 : 1,
-      }}
-      aria-label={`賓客 ${guestName}，可拖曳到其他桌`}
-      data-testid={`landing-chip-${guestId}`}
-    />
-  );
-}
-
 // ─── SVG seat (filled) ───────────────────────────────
 interface FilledSeatProps {
   guest: DemoGuest;
   score: number;
   x: number;
   y: number;
-  pulse: boolean;
-  bounce: boolean;
 }
 
-function FilledSeat({ guest, score, x, y, pulse, bounce }: FilledSeatProps) {
+function FilledSeat({ guest, score, x, y }: FilledSeatProps) {
   const gc = GROUP_COLORS[guest.group];
   const satColor = getSatisfactionColor(score);
   const animated = useAnimatedNumber(score, 500);
   const progress = Math.max(0, Math.min(animated / 100, 1));
   const circum = 2 * Math.PI * RING_R;
-  const animClass = bounce ? 'animate-landing-bounce' : pulse ? 'animate-landing-pulse' : '';
 
   return (
-    <g
-      transform={`translate(${x}, ${y})`}
-      className={animClass}
-      style={{ transformOrigin: 'center', transformBox: 'fill-box' }}
-    >
-      {/* Background track */}
+    <g transform={`translate(${x}, ${y})`}>
       <circle r={RING_R} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
-      {/* Satisfaction progress arc */}
       <circle
         r={RING_R}
         fill="none"
@@ -137,9 +84,7 @@ function FilledSeat({ guest, score, x, y, pulse, bounce }: FilledSeatProps) {
           transition: 'stroke-dasharray 500ms ease-out, stroke 500ms ease-out',
         }}
       />
-      {/* Guest circle */}
       <circle r={GUEST_R} fill={gc.fill} stroke="white" strokeWidth={2} />
-      {/* Guest name */}
       <text
         y={4}
         textAnchor="middle"
@@ -180,84 +125,35 @@ function EmptySeat({ x, y, isPreview }: { x: number; y: number; isPreview: boole
   );
 }
 
-// ─── FloatingGuestChip — follows cursor during drag ──
-export function FloatingGuestChip({ guest, score }: { guest: DemoGuest; score: number }) {
-  const gc = GROUP_COLORS[guest.group];
-  const satColor = getSatisfactionColor(score);
-  const circum = 2 * Math.PI * RING_R;
-  const progress = Math.max(0, Math.min(score / 100, 1));
-  const size = (RING_R + 4) * 2;
-  return (
-    <svg
-      width={size}
-      height={size}
-      style={{
-        overflow: 'visible',
-        filter: 'drop-shadow(0 8px 16px rgba(176, 141, 87, 0.3))',
-      }}
-    >
-      <g transform={`translate(${size / 2}, ${size / 2})`}>
-        <circle r={RING_R} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
-        <circle
-          r={RING_R}
-          fill="none"
-          stroke={satColor}
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeDashoffset={circum * 0.25}
-          transform="rotate(-90)"
-          style={{ strokeDasharray: `${circum * progress} ${circum * (1 - progress)}` }}
-        />
-        <circle r={GUEST_R} fill={gc.fill} stroke="white" strokeWidth={2} />
-        <text
-          y={4}
-          textAnchor="middle"
-          fontSize={11}
-          fontWeight={600}
-          fill={gc.text}
-          style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
-        >
-          {guest.name}
-        </text>
-      </g>
-    </svg>
-  );
+// ─── MiniTableVisual — pure SVG（不用 DndContext）───
+interface MiniTableVisualProps {
+  table: DemoTable;
+  guests: DemoGuest[];
+  guestScores: Record<string, number>;
+  tableScore: number;
+  highlighted?: boolean;
+  previewSlotIndex?: number;
+  shake?: boolean;
 }
 
-// ─── MiniTable ───────────────────────────────────────
-export function MiniTable({
+export function MiniTableVisual({
   table,
   guests,
   guestScores,
   tableScore,
-  state,
-  pulseGuestId,
-  pulseAll,
-  activeGuestId,
-}: MiniTableProps) {
-  const { isOver, setNodeRef } = useDroppable({ id: table.id });
-  const effectiveState: MiniTableState = isOver ? 'drag-over' : state;
-
-  const tableStroke = effectiveState === 'drag-over' ? '#B08D57' : '#D6D3D1';
-  const tableFill = effectiveState === 'drag-over' ? '#F5F0E6' : '#FFFFFF';
-  const tableStrokeWidth = effectiveState === 'drag-over' ? 3 : 2;
-
-  // Animated table score
+  highlighted = false,
+  previewSlotIndex = -1,
+  shake = false,
+}: MiniTableVisualProps) {
   const animatedTableScore = useAnimatedNumber(tableScore, 500);
 
-  // Preview: if there's an active drag and this table is valid target, mark the
-  // next-empty slot as the "would-land" position
-  const draggedFromThisTable = activeGuestId
-    ? table.guestIds.includes(activeGuestId)
-    : false;
-  const hasRoom = guests.length < table.capacity;
-  const showPreview = Boolean(activeGuestId && !draggedFromThisTable && hasRoom);
-  const previewSlotIndex = showPreview ? guests.length : -1;
+  const tableStroke = highlighted ? '#B08D57' : '#D6D3D1';
+  const tableFill = highlighted ? '#F5F0E6' : '#FFFFFF';
+  const tableStrokeWidth = highlighted ? 3 : 2;
 
   return (
     <div
-      ref={setNodeRef}
-      className={`relative ${effectiveState === 'reject-shake' ? 'animate-landing-shake' : ''}`}
+      className={`relative ${shake ? 'animate-landing-shake' : ''}`}
       style={{ width: CONTAINER, height: CONTAINER }}
       data-testid={`mini-table-${table.id}`}
     >
@@ -267,7 +163,6 @@ export function MiniTable({
         className="absolute inset-0"
         style={{ overflow: 'visible' }}
       >
-        {/* Table body */}
         <circle
           cx={CENTER}
           cy={CENTER}
@@ -277,7 +172,6 @@ export function MiniTable({
           strokeWidth={tableStrokeWidth}
           style={{ transition: 'all 150ms ease-out' }}
         />
-        {/* Center: big animated score */}
         <text
           x={CENTER}
           y={CENTER + 4}
@@ -293,7 +187,6 @@ export function MiniTable({
         >
           {animatedTableScore}
         </text>
-        {/* Table name below the score */}
         <text
           x={CENTER}
           y={CENTER + 24}
@@ -305,7 +198,6 @@ export function MiniTable({
           {table.name}
         </text>
 
-        {/* Seats around perimeter */}
         <g transform={`translate(${CENTER}, ${CENTER})`}>
           {Array.from({ length: table.capacity }, (_, i) => {
             const { x, y } = seatPosition(i, table.capacity);
@@ -318,8 +210,6 @@ export function MiniTable({
                   score={guestScores[guest.id] ?? 50}
                   x={x}
                   y={y}
-                  pulse={!!pulseAll}
-                  bounce={pulseGuestId === guest.id}
                 />
               );
             }
@@ -335,7 +225,90 @@ export function MiniTable({
         </g>
       </svg>
 
-      {/* HTML drag overlays (one per filled seat) */}
+      <span className="sr-only">
+        {table.name} 滿意度 {tableScore} 分，共 {guests.length} 位賓客
+      </span>
+    </div>
+  );
+}
+
+// ─── SeatDragHandle — HTML overlay for dnd-kit ───────
+function SeatDragHandle({
+  guestId,
+  x,
+  y,
+  guestName,
+}: {
+  guestId: string;
+  x: number;
+  y: number;
+  guestName: string;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: guestId,
+    data: { guestId },
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className="absolute cursor-grab active:cursor-grabbing select-none focus:outline-none focus:ring-2 focus:ring-[#B08D57] focus:ring-offset-2 rounded-full"
+      style={{
+        left: `calc(50% + ${x}px - ${RING_R + 2}px)`,
+        top: `calc(50% + ${y}px - ${RING_R + 2}px)`,
+        width: (RING_R + 2) * 2,
+        height: (RING_R + 2) * 2,
+        touchAction: 'none',
+        opacity: isDragging ? 0 : 1,
+      }}
+      aria-label={`賓客 ${guestName}，可拖曳到其他桌`}
+      data-testid={`landing-chip-${guestId}`}
+    />
+  );
+}
+
+// ─── MiniTable — interactive wrapper（droppable + drag handles）
+// 目前 landing page 不用這個（feature section 走 MiniTableVisual），
+// 保留給未來可能的互動場景。
+interface MiniTableProps {
+  table: DemoTable;
+  guests: DemoGuest[];
+  guestScores: Record<string, number>;
+  tableScore: number;
+  state: MiniTableState;
+  activeGuestId?: string | null;
+}
+
+export function MiniTable({
+  table,
+  guests,
+  guestScores,
+  tableScore,
+  state,
+  activeGuestId,
+}: MiniTableProps) {
+  const { isOver, setNodeRef } = useDroppable({ id: table.id });
+  const effectiveState: MiniTableState = isOver ? 'drag-over' : state;
+
+  const draggedFromThisTable = activeGuestId
+    ? table.guestIds.includes(activeGuestId)
+    : false;
+  const hasRoom = guests.length < table.capacity;
+  const showPreview = Boolean(activeGuestId && !draggedFromThisTable && hasRoom);
+  const previewSlotIndex = showPreview ? guests.length : -1;
+
+  return (
+    <div ref={setNodeRef}>
+      <MiniTableVisual
+        table={table}
+        guests={guests}
+        guestScores={guestScores}
+        tableScore={tableScore}
+        highlighted={effectiveState === 'drag-over'}
+        previewSlotIndex={previewSlotIndex}
+        shake={effectiveState === 'reject-shake'}
+      />
       {guests.map((guest, i) => {
         const { x, y } = seatPosition(i, table.capacity);
         return (
@@ -348,10 +321,6 @@ export function MiniTable({
           />
         );
       })}
-
-      <span className="sr-only">
-        {table.name} 滿意度 {tableScore} 分，共 {guests.length} 位賓客
-      </span>
     </div>
   );
 }
