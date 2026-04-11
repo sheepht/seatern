@@ -20,6 +20,7 @@
     "d3-dsv": "^3.0.1",
     "lucide-react": "^0.475.0",
     "pathfinding": "^0.4.18",
+    "posthog-js": "^1.367.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-ga4": "^3.0.1",
