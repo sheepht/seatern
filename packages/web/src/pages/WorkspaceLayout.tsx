@@ -11,7 +11,7 @@ import { loadDemoData, hasDemoLoaded } from '@/lib/load-demo';
 
 export default function WorkspaceLayout() {
   const location = useLocation();
-  const loadEvent = useSeatingStore((s) => s.loadEvent);
+  const bootEvent = useSeatingStore((s) => s.bootEvent);
   const loading = useSeatingStore((s) => s.loading);
   const eventId = useSeatingStore((s) => s.eventId);
   const guests = useSeatingStore((s) => s.guests);
@@ -26,8 +26,8 @@ export default function WorkspaceLayout() {
     : 'workspace' as const;
 
   useEffect(() => {
-    if (!eventId) loadEvent();
-  }, [eventId, loadEvent]);
+    if (!eventId) bootEvent();
+  }, [eventId, bootEvent]);
 
   // 未登入 + 無賓客 → 自動載入範例資料
   useEffect(() => {

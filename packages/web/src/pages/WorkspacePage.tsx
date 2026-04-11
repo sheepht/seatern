@@ -423,7 +423,7 @@ export default function WorkspacePage() {
               setGuestSubcategory(editGuest.id, null);
             }
 
-            // 2. Close modal immediately — no loadEvent() needed
+            // 2. Close modal immediately — no reloadEvent() needed
             setEditingGuest(null);
           }}
           onDelete={(gid) => { setEditingGuest(null); deleteGuest(gid); }}

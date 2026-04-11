@@ -23,7 +23,7 @@ export interface SeatingSnapshot {
 }
 
 // ─── Event Cache (localStorage) ────────────────────
-// loadEvent 成功後快取整個 event state，下次載入直接用，省掉 API round trip
+// bootEvent 成功後快取整個 event state，下次載入直接用，省掉 API round trip
 export interface EventCache {
   ts: number
   eventId: string
@@ -374,7 +374,7 @@ interface SeatingState {
   >
 
   // Actions
-  loadEvent: () => Promise<void>
+  bootEvent: () => Promise<void>
   /** 強制從 API 重新載入（忽略 localStorage 快取） */
   reloadEvent: () => Promise<void>
   setSelectedTable: (tableId: string | null) => void
@@ -474,7 +474,13 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
     if (ctrl) ctrl.abort();
   },
 
-  loadEvent: async () => {
+  /**
+   * 啟動時的快取 fast path：有 localStorage 快取就直接套用省掉 API round trip，
+   * 沒快取才打 API。只該在 app 啟動/頁面第一次載入時呼叫。
+   * ⚠️ 任何寫後端的操作之後要 refresh，請用 reloadEvent 而不是 bootEvent，
+   * 否則快取會把畫面鎖死在舊狀態。
+   */
+  bootEvent: async () => {
     // 先依 Supabase session 預設 tableLimit（未登入 10、已登入 20），
     // 避免 loading 期間顯示錯誤的桌數上限
     const { data: { session } } = await supabase.auth.getSession();
@@ -491,7 +497,7 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
       // 2. 沒有快取 — 從 API 載入
       await fetchAndApplyEvent(set, get);
     } catch (err) {
-      console.error('Failed to load event:', err);
+      console.error('Failed to boot event:', err);
       set({ loading: false });
     }
   },
