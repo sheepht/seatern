@@ -122,8 +122,8 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
     if (!eventId) return;
     try {
       await api.delete(`/events/${eventId}/tables/empty`);
-      const { loadEvent } = useSeatingStore.getState();
-      await loadEvent();
+      const { reloadEvent } = useSeatingStore.getState();
+      await reloadEvent();
     } catch { /* ignore */ }
   };
 

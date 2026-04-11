@@ -1119,8 +1119,8 @@ export default function GuestManagementPage() {
                 await setGuestSubcategory(editGuest.id, null);
               }
               // Reload to get fresh data
-              const { loadEvent } = useSeatingStore.getState();
-              if (eventId) await loadEvent();
+              const { reloadEvent } = useSeatingStore.getState();
+              if (eventId) await reloadEvent();
               setEditingGuestId(null);
             }}
             onDelete={(gid) => { setEditingGuestId(null); handleDelete(guests.find((g) => g.id === gid)!); }}
@@ -1159,8 +1159,8 @@ export default function GuestManagementPage() {
                   });
                 } catch { /* no-op */ }
               }
-              const { loadEvent } = useSeatingStore.getState();
-              if (eventId) await loadEvent();
+              const { reloadEvent } = useSeatingStore.getState();
+              if (eventId) await reloadEvent();
               setShowAddModal(false);
               setToast({ message: `已新增 ${data.name}` });
             }
