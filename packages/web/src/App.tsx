@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/providers/AuthProvider';
@@ -14,6 +15,9 @@ import SettingsPage from '@/pages/SettingsPage';
 import PricingPage from '@/pages/PricingPage';
 import AdminPage from '@/pages/AdminPage';
 
+// Route-level code splitting：landing page 完全和 workspace bundle 分離
+const LandingPage = lazy(() => import('@/pages/LandingPage'));
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });
@@ -29,6 +33,14 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route
+              path="/welcome"
+              element={
+                <Suspense fallback={<div className="min-h-screen bg-[#FAFAF9]" />}>
+                  <LandingPage />
+                </Suspense>
+              }
+            />
 
             {/* Workspace（Phase 1 不需要登入） */}
             <Route path="/" element={<WorkspaceLayout />}>
