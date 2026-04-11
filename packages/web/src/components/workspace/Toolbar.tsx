@@ -440,7 +440,14 @@ export function Toolbar({ onFitAll, page = 'workspace' }: ToolbarProps = {}) {
                 }}
               />
             </div>
-            <span className="text-sm font-data font-semibold text-[var(--text-secondary)]">{assigned}/{total} 席</span>
+            <span className="relative group">
+              <span className="text-sm font-data font-semibold text-[var(--text-secondary)] cursor-default">{assigned}/{total} 席</span>
+              <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-full mt-2 whitespace-nowrap rounded-[var(--radius-sm)] bg-[var(--bg-elevated,#1f2937)] text-white text-xs px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 text-left leading-relaxed">
+                已安排 {assigned} 席 / 共 {total} 席<br />
+                「席」＝賓客本人 + 眷屬（含嬰兒）的總座位數<br />
+                <span className="opacity-80">例：王小明 1 大 1 嬰 → 算 2 席，但只是 1 人</span>
+              </span>
+            </span>
             <span className="relative group">
               <span className="text-sm font-data font-semibold cursor-default" style={{
                 color: tableCountPct >= 0.8 ? '#DC2626' : tableCountPct >= 0.6 ? '#CA8A04' : '#16A34A',

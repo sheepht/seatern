@@ -22,8 +22,15 @@ export function UnassignedBar() {
       }}
     >
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs font-medium text-[var(--text-secondary)]">
-          未安排（<span className="font-data">{unassigned.length}</span> 人 / <span className="font-data">{totalSeats}</span> 席）
+        <span className="relative group">
+          <span className="text-xs font-medium text-[var(--text-secondary)] cursor-default">
+            未安排（<span className="font-data">{unassigned.length}</span> 人 / <span className="font-data">{totalSeats}</span> 席）
+          </span>
+          <span className="pointer-events-none absolute left-0 bottom-full mb-2 whitespace-nowrap rounded-[var(--radius-sm)] bg-[var(--bg-elevated,#1f2937)] text-white text-xs px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 text-left leading-relaxed font-normal">
+            「人」＝賓客數（不含眷屬）<br />
+            「席」＝賓客本人 + 眷屬（含嬰兒）的總座位數<br />
+            <span className="opacity-80">例：王小明帶 1 位伴侶 + 1 位嬰兒 → 算 1 人、3 席</span>
+          </span>
         </span>
         {isOver && <span className="text-xs text-[var(--accent-dark)]">放開以取消安排</span>}
       </div>

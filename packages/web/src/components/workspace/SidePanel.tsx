@@ -348,7 +348,7 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
         {/* Header + 搜尋 */}
         <div className="px-4 pt-3 pb-2 shrink-0">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5">
+            <div className="relative group flex items-center gap-1.5 cursor-default">
               <span className="text-base font-medium uppercase tracking-wide font-[family-name:var(--font-display)] text-[var(--text-secondary)]">
                 未安排
               </span>
@@ -360,6 +360,11 @@ export function SidePanel({ onCollapse, onPanToTable }: { onCollapse?: () => voi
                   / {totalUnassignedSeats} 席
                 </span>
               )}
+              <span className="pointer-events-none absolute left-0 top-full mt-2 whitespace-nowrap rounded-[var(--radius-sm)] bg-[var(--bg-elevated,#1f2937)] text-white text-xs font-normal normal-case tracking-normal px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50 text-left leading-relaxed">
+                「人」＝賓客數（不含眷屬）<br />
+                「席」＝賓客本人 + 眷屬（含嬰兒）的總座位數<br />
+                <span className="opacity-80">例：王小明帶 1 位伴侶 + 1 位嬰兒 → 算 1 人、3 席</span>
+              </span>
             </div>
             <div className="flex items-center gap-1">
               {unassignedGuests.length > 0 && (
