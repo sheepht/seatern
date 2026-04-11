@@ -8,6 +8,7 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragStartEvent,
@@ -148,6 +149,10 @@ export default function WorkspacePage() {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 5 },
+    }),
+    useSensor(TouchSensor, {
+      // 手機：長按 150ms + 容忍 5px 抖動才啟動拖曳，避免跟 tap/scroll 衝突
+      activationConstraint: { delay: 150, tolerance: 5 },
     }),
   );
 

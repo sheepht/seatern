@@ -29,6 +29,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
   });
   const setHoveredGuest = useSeatingStore((s) => s.setHoveredGuest);
   const hoverSuppressedUntil = useSeatingStore((s) => s.hoverSuppressedUntil);
+  const touchDragActive = useSeatingStore((s) => s.touchDragActive);
   const moveGuest = useSeatingStore((s) => s.moveGuest);
   const setEditingGuest = useSeatingStore((s) => s.setEditingGuest);
   const guestsWithRecommendations = useSeatingStore((s) => s.guestsWithRecommendations);
@@ -41,6 +42,10 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
   const [showTooltip, setShowTooltip] = useState(false);
   const [longPressProgress, setLongPressProgress] = useState(false);
   const elRef = useRef<HTMLDivElement | null>(null);
+
+  // 手機版手刻觸控拖曳（dnd-kit 在 iOS/Android 上對這個 overlay 不穩，所以自己來）
+  const touchDragRef = useRef<{ startX: number; startY: number; dragging: boolean } | null>(null);
+  const [touchGhost, setTouchGhost] = useState<{ x: number; y: number } | null>(null);
 
   // 即時計算 tooltip 位置（跟著元素移動）
   const getTooltipPos = useCallback(() => {
@@ -74,7 +79,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
     <>
     <div
       ref={(el) => { setNodeRef(el); elRef.current = el; }}
-      {...Object.fromEntries(Object.entries(listeners || {}).filter(([k]) => k !== 'onPointerDown'))}
+      {...Object.fromEntries(Object.entries(listeners || {}).filter(([k]) => k !== 'onPointerDown' && k !== 'onTouchStart' && k !== 'onTouchMove'))}
       {...attributes}
       className="absolute rounded-full cursor-grab z-10 box-border border-[1.5px] border-dashed border-transparent transition-[border-color] duration-150 ease-out"
       style={{
@@ -82,7 +87,99 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         top: y - radius - 6,
         width: size + 12,
         height: size + 12,
-        opacity: isDragging ? 0.3 : undefined,
+        opacity: isDragging || touchGhost ? 0.3 : undefined,
+        // 手機觸控拖曳中：所有 overlay 都變透明以便 hit-test 下方的 SeatDropZone
+        pointerEvents: touchDragActive && !touchGhost ? 'none' : undefined,
+      }}
+      onTouchStart={(e) => {
+        if (e.touches.length !== 1) return;
+        e.stopPropagation();
+        const t0 = e.touches[0];
+        touchDragRef.current = { startX: t0.clientX, startY: t0.clientY, dragging: false };
+
+        // 從螢幕座標找出手指下方的空座位（走 data 屬性）
+        const findSeatAt = (clientX: number, clientY: number): { tableId: string; seatIndex: number } | null => {
+          const el = document.elementFromPoint(clientX, clientY);
+          if (!el) return null;
+          const seatEl = (el as Element).closest('[data-drop-table-id]') as HTMLElement | null;
+          if (!seatEl) return null;
+          if (seatEl.dataset.dropEmpty !== '1') return null; // 只接受空位
+          const tid = seatEl.dataset.dropTableId;
+          const sidx = seatEl.dataset.dropSeatIndex;
+          if (!tid || sidx == null) return null;
+          return { tableId: tid, seatIndex: parseInt(sidx, 10) };
+        };
+
+        const handleMove = (ev: TouchEvent) => {
+          const state = touchDragRef.current;
+          if (!state || ev.touches.length !== 1) return;
+          const t = ev.touches[0];
+          const dx = t.clientX - state.startX;
+          const dy = t.clientY - state.startY;
+          if (!state.dragging && Math.sqrt(dx * dx + dy * dy) > 8) {
+            state.dragging = true;
+            // 啟動拖曳 → 取消長按換位
+            if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
+            setLongPressProgress(false);
+            useSeatingStore.setState({ longPressActive: false, touchDragActive: true });
+            setShowTooltip(false);
+            setHoveredGuest(null);
+          }
+          if (state.dragging) {
+            ev.preventDefault();
+            setTouchGhost({ x: t.clientX, y: t.clientY });
+            // Hit-test SeatDropZone via DOM
+            const hover = findSeatAt(t.clientX, t.clientY);
+            const cur = useSeatingStore.getState().touchHoverSeat;
+            const changed = (hover?.tableId !== cur?.tableId) || (hover?.seatIndex !== cur?.seatIndex);
+            if (changed) useSeatingStore.setState({ touchHoverSeat: hover });
+          }
+        };
+
+        const handleEnd = (ev: TouchEvent) => {
+          document.removeEventListener('touchmove', handleMove);
+          document.removeEventListener('touchend', handleEnd);
+          document.removeEventListener('touchcancel', handleEnd);
+          const state = touchDragRef.current;
+          touchDragRef.current = null;
+          setTouchGhost(null);
+          const hoverSeat = useSeatingStore.getState().touchHoverSeat;
+          useSeatingStore.setState({ touchDragActive: false, touchHoverSeat: null });
+          if (!state?.dragging) return;
+
+          const end = ev.changedTouches[0];
+          if (!end) return;
+
+          // 優先：精確座位命中（拖到空位 → 放到那個位置）
+          if (hoverSeat) {
+            useSeatingStore.getState().moveGuestToSeat(guest.id, hoverSeat.tableId, hoverSeat.seatIndex);
+            return;
+          }
+
+          // 後備：桌子幾何命中（拖到桌子範圍但沒落到空位 → 自動挑空位）
+          const svg = document.getElementById('floorplan-svg') as SVGSVGElement | null;
+          if (!svg) return;
+          const ctm = svg.getScreenCTM();
+          if (!ctm) return;
+          const inv = ctm.inverse();
+          const svgX = inv.a * end.clientX + inv.c * end.clientY + inv.e;
+          const svgY = inv.b * end.clientX + inv.d * end.clientY + inv.f;
+
+          const { tables } = useSeatingStore.getState();
+          const hit = tables.find((tbl) => {
+            const r = Math.max(58 + Math.min(tbl.capacity, 12) * 7, 88);
+            const dxT = svgX - tbl.positionX;
+            const dyT = svgY - tbl.positionY;
+            return Math.sqrt(dxT * dxT + dyT * dyT) < r;
+          });
+          if (hit && hit.id !== guest.assignedTableId) {
+            useSeatingStore.getState().moveGuest(guest.id, hit.id);
+          }
+        };
+
+        document.addEventListener('touchmove', handleMove, { passive: false });
+        document.addEventListener('touchend', handleEnd);
+        document.addEventListener('touchcancel', handleEnd);
       }}
       onPointerDown={(e) => {
         // 長按 2 秒換位（與 dnd-kit 共存：不動 = 長按，移動 = 拖曳）
@@ -164,6 +261,21 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         setShowTooltip(false);
       }}
     />
+    {touchGhost && createPortal(
+      <div
+        className="fixed pointer-events-none z-[9999] rounded-full bg-[#B08D57] border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.3)] flex items-center justify-center text-white text-xs font-[family-name:var(--font-body)]"
+        style={{
+          // 偏到手指右上角（+28 往右、-28-2r 往上），讓手指不擋住 ghost
+          left: touchGhost.x + 28 - radius,
+          top: touchGhost.y - 28 - radius * 2,
+          width: radius * 2,
+          height: radius * 2,
+        }}
+      >
+        {(guest.aliases.length > 0 ? guest.aliases[0] : guest.name).slice(0, 3)}
+      </div>,
+      document.body,
+    )}
     {showTooltip && tooltipPos && createPortal(
       <>
         {/* 上方：賓客基本資訊 */}

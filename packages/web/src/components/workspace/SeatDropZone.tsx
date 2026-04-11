@@ -1,4 +1,5 @@
 import { useDroppable } from '@dnd-kit/core';
+import { useSeatingStore } from '@/stores/seating';
 
 interface Props {
   tableId: string
@@ -23,11 +24,18 @@ export function SeatDropZone({ tableId, seatIndex, x, y, radius, isEmpty, isActi
     id: `seat-drop-${tableId}-${seatIndex}`,
     data: { type: 'seat', tableId, seatIndex },
   });
+  const isTouchHover = useSeatingStore(
+    (s) => s.touchHoverSeat?.tableId === tableId && s.touchHoverSeat?.seatIndex === seatIndex,
+  );
+  const showOverStyle = (isOver || isTouchHover) && isEmpty;
 
   const size = radius * 2;
   return (
     <div
       ref={setNodeRef}
+      data-drop-table-id={tableId}
+      data-drop-seat-index={seatIndex}
+      data-drop-empty={isEmpty ? '1' : '0'}
       className="absolute rounded-full z-5 box-border transition-[background-color,border] duration-150"
       style={{
         left: x - radius,
@@ -36,8 +44,8 @@ export function SeatDropZone({ tableId, seatIndex, x, y, radius, isEmpty, isActi
         height: size,
         cursor: isEmpty && onEmptyClick ? 'pointer' : undefined,
         // 空位顯示 hover 效果，有人的位子不顯示（由 shift 預覽處理）
-        backgroundColor: isActive ? 'rgba(176, 141, 87, 0.3)' : isOver && isEmpty ? 'rgba(176, 141, 87, 0.2)' : undefined,
-        border: isActive ? '2px solid #B08D57' : isOver && isEmpty ? '2px dashed #B08D57' : undefined,
+        backgroundColor: isActive ? 'rgba(176, 141, 87, 0.3)' : showOverStyle ? 'rgba(176, 141, 87, 0.2)' : undefined,
+        border: isActive ? '2px solid #B08D57' : showOverStyle ? '2px dashed #B08D57' : undefined,
       }}
       onClick={isEmpty && onEmptyClick ? (e) => {
         e.stopPropagation();

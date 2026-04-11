@@ -292,6 +292,10 @@ interface SeatingState {
   bestSwapTableId: string | null
   /** 長按換位進行中 */
   longPressActive: boolean
+  /** 手機觸控拖曳中（讓所有 GuestSeatOverlay 變 pointer-events:none 以便 hit-test SeatDropZone） */
+  touchDragActive: boolean
+  /** 手機觸控拖曳中，手指目前懸停的座位（用來顯示目標虛線 + 決定放置位置） */
+  touchHoverSeat: { tableId: string; seatIndex: number } | null
   /** 上次重排的時間戳，用於觸發入場動畫 */
   lastResetAt: number
   /** 重排動畫進行中（桌上賓客淡出） */
@@ -445,6 +449,8 @@ export const useSeatingStore = create<SeatingState>((set, get) => ({
   guestsWithRecommendations: new Set(),
   bestSwapTableId: null,
   longPressActive: false,
+  touchDragActive: false,
+  touchHoverSeat: null,
   undoStack: [],
   lastResetAt: 0,
   isResetting: false,
