@@ -1,15 +1,17 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import { demoScorer, moveGuest, type DemoState, type DemoGuest } from './demoScorer';
 import { demoFixtures } from './demoFixtures';
-import { MiniTable, type MiniTableState } from './MiniTable';
+import { MiniTable, FloatingGuestChip, type MiniTableState } from './MiniTable';
 import { trackEvent } from '@/lib/analytics';
 
 const IDLE_PULSE_MS = 3000;
@@ -25,6 +27,7 @@ export default function LandingDemo() {
   const [pulseAll, setPulseAll] = useState(false);
   const [bounceGuestId, setBounceGuestId] = useState<string | null>(null);
   const [hintLevel, setHintLevel] = useState<0 | 1>(0);
+  const [activeGuest, setActiveGuest] = useState<DemoGuest | null>(null);
   const interactedRef = useRef(false);
   const hasTrackedRef = useRef(false);
 
@@ -90,9 +93,19 @@ export default function LandingDemo() {
     }
   }, []);
 
+  const handleDragStart = useCallback(
+    (ev: DragStartEvent) => {
+      const guestId = String(ev.active.id);
+      const guest = state.guests[guestId];
+      if (guest) setActiveGuest(guest);
+      markInteracted();
+    },
+    [state.guests, markInteracted],
+  );
+
   const handleDragEnd = useCallback(
     (ev: DragEndEvent) => {
-      markInteracted();
+      setActiveGuest(null);
       const guestId = String(ev.active.id);
       const toTableId = ev.over?.id ? String(ev.over.id) : null;
       if (!toTableId) return;
@@ -113,8 +126,12 @@ export default function LandingDemo() {
       }
       setState(next);
     },
-    [state, markInteracted],
+    [state],
   );
+
+  const handleDragCancel = useCallback(() => {
+    setActiveGuest(null);
+  }, []);
 
   const handleReset = useCallback(() => {
     setState(demoFixtures);
@@ -126,8 +143,13 @@ export default function LandingDemo() {
 
   return (
     <div className="flex w-full flex-col items-center gap-6">
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-12">
           {Object.values(state.tables).map((table) => (
             <MiniTable
               key={table.id}
@@ -140,6 +162,9 @@ export default function LandingDemo() {
             />
           ))}
         </div>
+        <DragOverlay dropAnimation={null}>
+          {activeGuest ? <FloatingGuestChip guest={activeGuest} /> : null}
+        </DragOverlay>
       </DndContext>
 
       <div className="flex items-center gap-3 text-sm text-[#78716C]">
