@@ -1,8 +1,12 @@
+import { lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 
-// Phase 1.5 placeholder：僅 hero 骨架 + CTA。
-// Phase 2 接 MiniTable + LandingDemo。Phase 3-5 補 sections。
+// Phase 2：Hero 有真的可拖曳 demo。Phase 3-5 補 sections。
 // 完整規格見 ~/.gstack/projects/seatern/ceo-plans/2026-04-11-landing-page.md
+//
+// LandingDemo 走 React.lazy 讓 @dnd-kit/core 不進首屏 bundle。
+// 首屏只載：React + Link + hero 骨架。
+const LandingDemo = lazy(() => import('@/components/landing/LandingDemo'));
 
 export default function LandingPage() {
   return (
@@ -27,11 +31,19 @@ export default function LandingPage() {
           拖一下賓客，立刻看到滿意度變化
         </p>
 
-        <div
-          className="mt-10 flex h-[180px] w-full max-w-2xl items-center justify-center rounded-2xl border border-dashed border-[#D6D3D1] bg-white/60 text-sm text-[#A8A29E] sm:h-[240px]"
-          aria-label="互動式座位安排示範（Phase 2 實作中）"
-        >
-          Hero demo 實作中…
+        <div className="mt-10 w-full max-w-3xl">
+          <Suspense
+            fallback={
+              <div
+                className="flex h-[240px] items-center justify-center rounded-2xl border border-dashed border-[#D6D3D1] bg-white/60 text-sm text-[#A8A29E]"
+                aria-label="載入互動式座位安排示範"
+              >
+                載入中…
+              </div>
+            }
+          >
+            <LandingDemo />
+          </Suspense>
         </div>
 
         <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
@@ -50,7 +62,7 @@ export default function LandingPage() {
         </div>
 
         <p className="mt-8 text-xs text-[#A8A29E]">
-          Phase 1.5 — 後續會補 Hero demo、痛點、流程、公式、FAQ
+          Phase 2 — 後續會補痛點、流程、公式、FAQ sections
         </p>
       </section>
     </main>
