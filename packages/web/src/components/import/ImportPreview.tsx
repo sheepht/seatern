@@ -208,6 +208,7 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
             返回
           </button>
           <button
+            data-testid="import-preview-confirm"
             onClick={() => onConfirm(allGuests)}
             disabled={!canConfirm}
             className="flex-1 py-3 text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 bg-[var(--accent)] rounded-[var(--radius-sm)] font-medium"
@@ -245,6 +246,7 @@ export function ImportPreview({ data, onConfirm, onBack, existingGuests }: Props
             返回
           </button>
           <button
+            data-testid="import-preview-confirm"
             onClick={() => onConfirm(allGuests)}
             disabled={!canConfirm}
             className="text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 bg-[var(--accent)] rounded-[var(--radius-sm)] font-medium px-6 py-2"
