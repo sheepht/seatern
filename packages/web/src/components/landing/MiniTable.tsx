@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import type { CSSProperties } from 'react';
+import { getSatisfactionColor } from '@/lib/satisfaction';
 import type { DemoGuest, DemoTable } from './demoScorer';
 
 export type MiniTableState = 'idle' | 'drag-over' | 'reject-shake' | 'full';
@@ -7,17 +8,47 @@ export type MiniTableState = 'idle' | 'drag-over' | 'reject-shake' | 'full';
 interface MiniTableProps {
   table: DemoTable;
   guests: DemoGuest[];
-  score: number;
+  guestScores: Record<string, number>;
+  tableScore: number;
   state: MiniTableState;
   pulseGuestId?: string | null;
   pulseAll?: boolean;
+  activeGuestId?: string | null;
 }
 
-// 圓桌幾何：和 workspace TableNode 共用 seatPosition 公式但尺寸 mini 化
-const TABLE_RADIUS = 72;
-const SEAT_RADIUS = 50;       // = TABLE_RADIUS - 22
-const CHIP_SIZE = 52;         // DOM chip 直徑（a11y 44+ 符合 iOS HIG）
-const CONTAINER = 200;        // SVG + 絕對定位容器邊長
+/** 數字漸變動畫（對齊 workspace TableNode:13 的 useAnimatedNumber）*/
+function useAnimatedNumber(target: number, duration = 500): number {
+  const [current, setCurrent] = useState(target);
+  const prevRef = useRef(target);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const from = prevRef.current;
+    if (from === target) return;
+    prevRef.current = target;
+    const start = performance.now();
+    const animate = (now: number) => {
+      const t = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setCurrent(Math.round(from + (target - from) * eased));
+      if (t < 1) rafRef.current = requestAnimationFrame(animate);
+    };
+    rafRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [target, duration]);
+
+  return current;
+}
+
+// ─── Geometry ────────────────────────────────────────
+const CONTAINER = 240;
+const CENTER = CONTAINER / 2;
+const TABLE_RADIUS = 80;
+const SEAT_RADIUS = 56;          // distance from center to seat center
+const GUEST_R = 20;              // seat circle radius
+const RING_R = 23;               // satisfaction ring radius (outside the guest circle)
 
 function seatPosition(index: number, total: number) {
   const angle = ((2 * Math.PI) / total) * index - Math.PI / 2;
@@ -27,113 +58,182 @@ function seatPosition(index: number, total: number) {
   };
 }
 
-const GROUP_STYLES: Record<DemoGuest['group'], { bg: string; border: string; color: string }> = {
-  groom: { bg: '#DBEAFE', border: '#BFDBFE', color: '#1E40AF' },
-  bride: { bg: '#FEE2E2', border: '#FECACA', color: '#991B1B' },
-  shared: { bg: '#F3F4F6', border: '#D1D5DB', color: '#374151' },
+const GROUP_COLORS: Record<DemoGuest['group'], { fill: string; stroke: string; text: string }> = {
+  groom: { fill: '#DBEAFE', stroke: '#BFDBFE', text: '#1E40AF' },
+  bride: { fill: '#FEE2E2', stroke: '#FECACA', text: '#991B1B' },
+  shared: { fill: '#F3F4F6', stroke: '#D1D5DB', text: '#374151' },
 };
 
-/**
- * 座位 chip（可拖曳）。視覺是圓形頭像 + 姓名文字。
- * 絕對定位在圓桌周圍，跟 workspace GuestSeatOverlay 的座位感一致。
- */
-function SeatedGuestChip({
-  guest,
-  style,
-  pulse,
-  bounce,
-}: {
-  guest: DemoGuest;
-  style: CSSProperties;
-  pulse: boolean;
-  bounce: boolean;
-}) {
+// ─── HTML drag overlay (one per seated guest) ────────
+interface DragHandleProps {
+  guestId: string;
+  x: number;
+  y: number;
+  guestName: string;
+}
+
+function SeatDragHandle({ guestId, x, y, guestName }: DragHandleProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: guest.id,
-    data: { guestId: guest.id },
+    id: guestId,
+    data: { guestId },
   });
-  const gs = GROUP_STYLES[guest.group];
-  const animClass = bounce
-    ? 'animate-landing-bounce'
-    : pulse
-      ? 'animate-landing-pulse'
-      : '';
   return (
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`absolute flex flex-col items-center justify-center rounded-full border-2 font-medium select-none cursor-grab active:cursor-grabbing shadow-sm ${
-        isDragging ? 'opacity-0' : ''
-      } ${animClass}`}
+      className="absolute cursor-grab active:cursor-grabbing select-none focus:outline-none focus:ring-2 focus:ring-[#B08D57] focus:ring-offset-2 rounded-full"
       style={{
-        ...style,
-        width: CHIP_SIZE,
-        height: CHIP_SIZE,
-        backgroundColor: gs.bg,
-        borderColor: gs.border,
-        color: gs.color,
+        left: `calc(50% + ${x}px - ${RING_R + 2}px)`,
+        top: `calc(50% + ${y}px - ${RING_R + 2}px)`,
+        width: (RING_R + 2) * 2,
+        height: (RING_R + 2) * 2,
         touchAction: 'none',
-        fontSize: 12,
-        lineHeight: 1,
+        opacity: isDragging ? 0 : 1,
       }}
-      aria-label={`賓客 ${guest.name}，可拖曳到其他桌`}
-      data-testid={`landing-chip-${guest.id}`}
-    >
-      <span>{guest.name}</span>
-    </div>
-  );
-}
-
-/**
- * DragOverlay 用的浮動 chip — 跟隨游標，視覺和 seated chip 一致
- */
-export function FloatingGuestChip({ guest }: { guest: DemoGuest }) {
-  const gs = GROUP_STYLES[guest.group];
-  return (
-    <div
-      className="flex flex-col items-center justify-center rounded-full border-2 font-medium shadow-lg cursor-grabbing"
-      style={{
-        width: CHIP_SIZE,
-        height: CHIP_SIZE,
-        backgroundColor: gs.bg,
-        borderColor: gs.border,
-        color: gs.color,
-        fontSize: 12,
-        lineHeight: 1,
-        transform: 'scale(1.08)',
-      }}
-    >
-      <span>{guest.name}</span>
-    </div>
-  );
-}
-
-/**
- * 空座位視覺 — 淡色虛線圓，顯示該位置可被拖入
- */
-function EmptySeat({ style }: { style: CSSProperties }) {
-  return (
-    <div
-      className="absolute rounded-full border-2 border-dashed border-[#D6D3D1]"
-      style={{
-        ...style,
-        width: CHIP_SIZE,
-        height: CHIP_SIZE,
-        opacity: 0.5,
-      }}
-      aria-hidden
+      aria-label={`賓客 ${guestName}，可拖曳到其他桌`}
+      data-testid={`landing-chip-${guestId}`}
     />
   );
 }
 
+// ─── SVG seat (filled) ───────────────────────────────
+interface FilledSeatProps {
+  guest: DemoGuest;
+  score: number;
+  x: number;
+  y: number;
+  pulse: boolean;
+  bounce: boolean;
+}
+
+function FilledSeat({ guest, score, x, y, pulse, bounce }: FilledSeatProps) {
+  const gc = GROUP_COLORS[guest.group];
+  const satColor = getSatisfactionColor(score);
+  const animated = useAnimatedNumber(score, 500);
+  const progress = Math.max(0, Math.min(animated / 100, 1));
+  const circum = 2 * Math.PI * RING_R;
+  const animClass = bounce ? 'animate-landing-bounce' : pulse ? 'animate-landing-pulse' : '';
+
+  return (
+    <g
+      transform={`translate(${x}, ${y})`}
+      className={animClass}
+      style={{ transformOrigin: 'center', transformBox: 'fill-box' }}
+    >
+      {/* Background track */}
+      <circle r={RING_R} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
+      {/* Satisfaction progress arc */}
+      <circle
+        r={RING_R}
+        fill="none"
+        stroke={satColor}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeDashoffset={circum * 0.25}
+        transform="rotate(-90)"
+        style={{
+          strokeDasharray: `${circum * progress} ${circum * (1 - progress)}`,
+          transition: 'stroke-dasharray 500ms ease-out, stroke 500ms ease-out',
+        }}
+      />
+      {/* Guest circle */}
+      <circle r={GUEST_R} fill={gc.fill} stroke="white" strokeWidth={2} />
+      {/* Guest name */}
+      <text
+        y={4}
+        textAnchor="middle"
+        fontSize={11}
+        fontWeight={600}
+        fill={gc.text}
+        style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
+      >
+        {guest.name}
+      </text>
+    </g>
+  );
+}
+
+// ─── SVG empty seat ──────────────────────────────────
+function EmptySeat({ x, y, isPreview }: { x: number; y: number; isPreview: boolean }) {
+  return (
+    <g transform={`translate(${x}, ${y})`}>
+      <circle
+        r={RING_R}
+        fill="none"
+        stroke={isPreview ? '#B08D57' : '#D6D3D1'}
+        strokeWidth={isPreview ? 2.5 : 1.8}
+        strokeDasharray="4 4"
+        opacity={isPreview ? 0.9 : 0.55}
+      />
+      {isPreview && (
+        <circle
+          r={GUEST_R}
+          fill="#F5F0E6"
+          stroke="#B08D57"
+          strokeWidth={1.5}
+          strokeDasharray="3 3"
+          opacity={0.7}
+        />
+      )}
+    </g>
+  );
+}
+
+// ─── FloatingGuestChip — follows cursor during drag ──
+export function FloatingGuestChip({ guest, score }: { guest: DemoGuest; score: number }) {
+  const gc = GROUP_COLORS[guest.group];
+  const satColor = getSatisfactionColor(score);
+  const circum = 2 * Math.PI * RING_R;
+  const progress = Math.max(0, Math.min(score / 100, 1));
+  const size = (RING_R + 4) * 2;
+  return (
+    <svg
+      width={size}
+      height={size}
+      style={{
+        overflow: 'visible',
+        filter: 'drop-shadow(0 8px 16px rgba(176, 141, 87, 0.3))',
+      }}
+    >
+      <g transform={`translate(${size / 2}, ${size / 2})`}>
+        <circle r={RING_R} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
+        <circle
+          r={RING_R}
+          fill="none"
+          stroke={satColor}
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeDashoffset={circum * 0.25}
+          transform="rotate(-90)"
+          style={{ strokeDasharray: `${circum * progress} ${circum * (1 - progress)}` }}
+        />
+        <circle r={GUEST_R} fill={gc.fill} stroke="white" strokeWidth={2} />
+        <text
+          y={4}
+          textAnchor="middle"
+          fontSize={11}
+          fontWeight={600}
+          fill={gc.text}
+          style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
+        >
+          {guest.name}
+        </text>
+      </g>
+    </svg>
+  );
+}
+
+// ─── MiniTable ───────────────────────────────────────
 export function MiniTable({
   table,
   guests,
-  score,
+  guestScores,
+  tableScore,
   state,
   pulseGuestId,
   pulseAll,
+  activeGuestId,
 }: MiniTableProps) {
   const { isOver, setNodeRef } = useDroppable({ id: table.id });
   const effectiveState: MiniTableState = isOver ? 'drag-over' : state;
@@ -142,49 +242,47 @@ export function MiniTable({
   const tableFill = effectiveState === 'drag-over' ? '#F5F0E6' : '#FFFFFF';
   const tableStrokeWidth = effectiveState === 'drag-over' ? 3 : 2;
 
-  // 產生 capacity 個座位槽，前 N 個放 guests，其餘空槽
-  const seats = Array.from({ length: table.capacity }, (_, i) => {
-    const pos = seatPosition(i, table.capacity);
-    const guest = guests[i] ?? null;
-    const style: CSSProperties = {
-      left: `calc(50% + ${pos.x}px)`,
-      top: `calc(50% + ${pos.y}px)`,
-      transform: 'translate(-50%, -50%)',
-    };
-    return { index: i, guest, style };
-  });
+  // Animated table score
+  const animatedTableScore = useAnimatedNumber(tableScore, 500);
+
+  // Preview: if there's an active drag and this table is valid target, mark the
+  // next-empty slot as the "would-land" position
+  const draggedFromThisTable = activeGuestId
+    ? table.guestIds.includes(activeGuestId)
+    : false;
+  const hasRoom = guests.length < table.capacity;
+  const showPreview = Boolean(activeGuestId && !draggedFromThisTable && hasRoom);
+  const previewSlotIndex = showPreview ? guests.length : -1;
 
   return (
     <div
       ref={setNodeRef}
-      className={`relative ${
-        effectiveState === 'reject-shake' ? 'animate-landing-shake' : ''
-      }`}
+      className={`relative ${effectiveState === 'reject-shake' ? 'animate-landing-shake' : ''}`}
       style={{ width: CONTAINER, height: CONTAINER }}
       data-testid={`mini-table-${table.id}`}
     >
-      {/* SVG 圓桌背景：桌面圓 + 中央分數 + 桌名 */}
       <svg
         width={CONTAINER}
         height={CONTAINER}
         className="absolute inset-0"
         style={{ overflow: 'visible' }}
-        aria-hidden
       >
+        {/* Table body */}
         <circle
-          cx={CONTAINER / 2}
-          cy={CONTAINER / 2}
+          cx={CENTER}
+          cy={CENTER}
           r={TABLE_RADIUS}
           fill={tableFill}
           stroke={tableStroke}
           strokeWidth={tableStrokeWidth}
           style={{ transition: 'all 150ms ease-out' }}
         />
+        {/* Center: big animated score */}
         <text
-          x={CONTAINER / 2}
-          y={CONTAINER / 2 + 4}
+          x={CENTER}
+          y={CENTER + 4}
           textAnchor="middle"
-          fontSize={34}
+          fontSize={36}
           fontWeight={800}
           fill="#1C1917"
           style={{
@@ -193,11 +291,12 @@ export function MiniTable({
           }}
           data-testid={`mini-table-score-${table.id}`}
         >
-          {score}
+          {animatedTableScore}
         </text>
+        {/* Table name below the score */}
         <text
-          x={CONTAINER / 2}
-          y={CONTAINER / 2 + 22}
+          x={CENTER}
+          y={CENTER + 24}
           textAnchor="middle"
           fontSize={11}
           fill="#78716C"
@@ -205,25 +304,53 @@ export function MiniTable({
         >
           {table.name}
         </text>
+
+        {/* Seats around perimeter */}
+        <g transform={`translate(${CENTER}, ${CENTER})`}>
+          {Array.from({ length: table.capacity }, (_, i) => {
+            const { x, y } = seatPosition(i, table.capacity);
+            const guest = guests[i] ?? null;
+            if (guest) {
+              return (
+                <FilledSeat
+                  key={guest.id}
+                  guest={guest}
+                  score={guestScores[guest.id] ?? 50}
+                  x={x}
+                  y={y}
+                  pulse={!!pulseAll}
+                  bounce={pulseGuestId === guest.id}
+                />
+              );
+            }
+            return (
+              <EmptySeat
+                key={`empty-${i}`}
+                x={x}
+                y={y}
+                isPreview={i === previewSlotIndex}
+              />
+            );
+          })}
+        </g>
       </svg>
 
-      {/* 座位圈：空座位用虛線圓，有人的用 draggable chip */}
-      {seats.map((seat) =>
-        seat.guest ? (
-          <SeatedGuestChip
-            key={seat.guest.id}
-            guest={seat.guest}
-            style={seat.style}
-            pulse={!!pulseAll}
-            bounce={pulseGuestId === seat.guest.id}
+      {/* HTML drag overlays (one per filled seat) */}
+      {guests.map((guest, i) => {
+        const { x, y } = seatPosition(i, table.capacity);
+        return (
+          <SeatDragHandle
+            key={guest.id}
+            guestId={guest.id}
+            guestName={guest.name}
+            x={x}
+            y={y}
           />
-        ) : (
-          <EmptySeat key={`empty-${seat.index}`} style={seat.style} />
-        ),
-      )}
+        );
+      })}
 
       <span className="sr-only">
-        {table.name} 滿意度 {score} 分，共 {guests.length} 位賓客
+        {table.name} 滿意度 {tableScore} 分，共 {guests.length} 位賓客
       </span>
     </div>
   );

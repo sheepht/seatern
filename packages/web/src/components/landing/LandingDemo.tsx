@@ -149,21 +149,28 @@ export default function LandingDemo() {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-12">
+        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8">
           {Object.values(state.tables).map((table) => (
             <MiniTable
               key={table.id}
               table={table}
               guests={guestsByTable[table.id] || []}
-              score={scores.tableAvg[table.id] ?? 50}
+              guestScores={scores.perGuest}
+              tableScore={scores.tableAvg[table.id] ?? 50}
               state={tableStates[table.id] || 'idle'}
               pulseAll={pulseAll}
               pulseGuestId={bounceGuestId}
+              activeGuestId={activeGuest?.id ?? null}
             />
           ))}
         </div>
         <DragOverlay dropAnimation={null}>
-          {activeGuest ? <FloatingGuestChip guest={activeGuest} /> : null}
+          {activeGuest ? (
+            <FloatingGuestChip
+              guest={activeGuest}
+              score={scores.perGuest[activeGuest.id] ?? 50}
+            />
+          ) : null}
         </DragOverlay>
       </DndContext>
 
