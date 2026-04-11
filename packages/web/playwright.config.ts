@@ -20,7 +20,15 @@ export default defineConfig({
   },
 
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // 1920×1080 給 FloorPlan 足夠空間，避免桌子被擠到 viewport 外
+        // 造成拖曳 source/target 座標在可視區外的 flaky
+        viewport: { width: 1920, height: 1080 },
+      },
+    },
   ],
 
   // webServer 刻意不設定。跑 E2E 前請自行在另一個 terminal 起 API + web：

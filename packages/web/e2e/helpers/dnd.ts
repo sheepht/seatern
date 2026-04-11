@@ -17,6 +17,10 @@ import type { Page, Locator } from '@playwright/test';
  * 5. mouseUp 在 target
  */
 export async function dndDrag(page: Page, source: Locator, target: Locator): Promise<void> {
+  // 先把兩邊都捲進可視區，避免 boundingBox 給到 viewport 外的座標導致拖曳 miss
+  await source.scrollIntoViewIfNeeded();
+  await target.scrollIntoViewIfNeeded();
+
   const src = await source.boundingBox();
   const tgt = await target.boundingBox();
   if (!src) throw new Error('dndDrag: source element has no bounding box (invisible?)');
