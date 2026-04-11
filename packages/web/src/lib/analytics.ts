@@ -8,9 +8,6 @@ export function initGA(): void {
 
   const gaId = import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined;
   const phKey = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
-  const phHost =
-    (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ??
-    'https://us.i.posthog.com';
 
   if (gaId) {
     ReactGA.initialize(gaId, {
@@ -19,8 +16,11 @@ export function initGA(): void {
   }
 
   if (phKey) {
+    // 透過自家 domain 的 /ingest reverse proxy 繞開廣告攔截器
+    // （vercel.json 和 vite.config.ts 都有對應 rewrite 設定）
     posthog.init(phKey, {
-      api_host: phHost,
+      api_host: '/ingest',
+      ui_host: 'https://us.posthog.com',
       capture_pageview: false,
       autocapture: true,
       persistence: 'localStorage+cookie',
