@@ -208,33 +208,6 @@ export default function ImportPage() {
         await api.post(`/events/${eventId}/avoid-pairs/batch`, { pairs: avoidPairs });
       }
 
-      // 自動補桌次（根據新增的確認出席席位數）
-      const newConfirmedSeats = guestList
-        .filter((g) => g.rsvpStatus === 'confirmed')
-        .reduce((sum, g) => sum + g.companionCount + 1, 0);
-
-      if (newConfirmedSeats > 0) {
-        const newTableCount = Math.ceil(newConfirmedSeats / 10);
-        // 取得現有桌次數量來決定新桌的名稱和位置
-        const eventRes = await api.get(`/events/${eventId}`);
-        const eventData = eventRes.data;
-        const existingTableCount = eventData.tables?.length || 0;
-        for (let i = 0; i < newTableCount; i++) {
-          const tableNum = existingTableCount + i + 1;
-          const totalTables = existingTableCount + newTableCount;
-          const cols = Math.ceil(Math.sqrt(totalTables));
-          const idx = existingTableCount + i;
-          const row = Math.floor(idx / cols);
-          const col = idx % cols;
-          await api.post(`/events/${eventId}/tables`, {
-            name: `第${tableNum}桌`,
-            capacity: 10,
-            positionX: 200 + col * 350,
-            positionY: 200 + row * 350,
-          });
-        }
-      }
-
       // 重新載入 store 再導頁，避免畫布/名單頁看不到新資料
       await useSeatingStore.getState().loadEvent();
       trackEvent('import_guests', {
