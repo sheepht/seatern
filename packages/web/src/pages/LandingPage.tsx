@@ -645,10 +645,10 @@ export default function LandingPage() {
       >
         <h1
           id="landing-hero-title"
-          className="text-center font-[800] tracking-tight text-[40px] leading-[1.1] sm:text-[52px] lg:text-[64px]"
+          className="text-center font-[800] tracking-tight text-[36px] leading-[1.15] sm:text-[48px] lg:text-[60px]"
           style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
         >
-          用心排好座位
+          排位鷗鷗 · 用心排好座位
         </h1>
         <p className="mt-6 max-w-2xl text-center text-lg text-[#78716C] sm:text-xl">
           婚禮、尾牙、活動的一站式座位安排工具。
