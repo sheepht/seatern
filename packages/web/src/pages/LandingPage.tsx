@@ -143,6 +143,62 @@ const avoidScores: Record<string, number> = {
 };
 const avoidTableAvg = 46;
 
+function SourceGuestChipSVG({
+  score,
+  color,
+  progress,
+}: {
+  score: number;
+  color: string;
+  progress: number;
+}) {
+  const r = 28;
+  const circum = 2 * Math.PI * r;
+  return (
+    <svg width={90} height={110} style={{ overflow: 'visible' }} aria-hidden>
+      <g transform="translate(45, 38)">
+        <circle r={r} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
+        <circle
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeDasharray={`${circum * progress} ${circum * (1 - progress)}`}
+          strokeDashoffset={circum * 0.25}
+          transform="rotate(-90)"
+          style={{
+            transition: 'stroke-dasharray 900ms ease-out, stroke 900ms ease-out',
+          }}
+        />
+        <circle r={23} fill="#DBEAFE" stroke="white" strokeWidth={1.5} />
+        <text
+          y={5}
+          textAnchor="middle"
+          fontSize={14}
+          fontWeight={700}
+          fill="#1E40AF"
+          fontFamily='"Noto Sans TC"'
+        >
+          志偉
+        </text>
+      </g>
+      <text
+        x={45}
+        y={92}
+        textAnchor="middle"
+        fontSize={12}
+        fontWeight={600}
+        fill={color}
+        fontFamily='"Noto Sans TC"'
+        style={{ transition: 'fill 900ms ease-out' }}
+      >
+        {score} 分
+      </text>
+    </svg>
+  );
+}
+
 function IllustrationRecommendation() {
   // 志偉的滿意度 cycle animation: 45 → 78 → 45 (every 2.2s)
   const [isAfter, setIsAfter] = useState(false);
@@ -151,106 +207,144 @@ function IllustrationRecommendation() {
     return () => clearInterval(id);
   }, []);
 
-  const r = 28;
-  const circum = 2 * Math.PI * r;
   const score = isAfter ? 78 : 45;
   const color = isAfter ? '#16A34A' : '#EA580C';
   const progress = score / 100;
 
-  return (
-    <div className="flex items-center justify-center gap-0 sm:gap-1">
-      {/* Combined SVG: 志偉 chip + 曲線箭頭（箭頭從 chip 右緣直接伸出）*/}
-      <svg width={230} height={160} style={{ overflow: 'visible' }} aria-hidden>
-        <defs>
-          <marker
-            id="rec-arrow-head"
-            viewBox="0 0 10 10"
-            refX={8}
-            refY={5}
-            markerWidth={6}
-            markerHeight={6}
-            orient="auto"
-          >
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#B08D57" />
-          </marker>
-        </defs>
+  const targetTable = (
+    <MiniTableVisual
+      table={recommendationTable}
+      guests={recommendationGuests}
+      guestScores={recommendationScores}
+      tableScore={88}
+      previewSlotIndex={9}
+      deltaBadge="+33"
+    />
+  );
 
-        {/* 志偉 chip at (50, 85) */}
-        <g transform="translate(50, 85)">
-          <circle r={r} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
-          <circle
-            r={r}
+  return (
+    <>
+      {/* 手機版：賓客在上、向下箭頭、桌子在下 */}
+      <div className="flex flex-col items-center gap-1 md:hidden">
+        <SourceGuestChipSVG score={score} color={color} progress={progress} />
+        <svg width={60} height={70} style={{ overflow: 'visible' }} aria-hidden>
+          <defs>
+            <marker
+              id="rec-arrow-head-mobile"
+              viewBox="0 0 10 10"
+              refX={8}
+              refY={5}
+              markerWidth={6}
+              markerHeight={6}
+              orient="auto"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#B08D57" />
+            </marker>
+          </defs>
+          <path
+            d="M 30 4 Q 10 30 30 56"
             fill="none"
-            stroke={color}
+            stroke="#B08D57"
             strokeWidth={3}
             strokeLinecap="round"
-            strokeDasharray={`${circum * progress} ${circum * (1 - progress)}`}
-            strokeDashoffset={circum * 0.25}
-            transform="rotate(-90)"
-            style={{
-              transition: 'stroke-dasharray 900ms ease-out, stroke 900ms ease-out',
-            }}
+            strokeDasharray="7 5"
+            markerEnd="url(#rec-arrow-head-mobile)"
           />
-          <circle r={23} fill="#DBEAFE" stroke="white" strokeWidth={1.5} />
           <text
-            y={5}
-            textAnchor="middle"
-            fontSize={14}
-            fontWeight={700}
-            fill="#1E40AF"
+            x={48}
+            y={38}
+            fontSize={11}
+            fontWeight={600}
+            fill="#8C6D3F"
             fontFamily='"Noto Sans TC"'
           >
-            志偉
+            智慧推薦
           </text>
-        </g>
-        <text
-          x={50}
-          y={140}
-          textAnchor="middle"
-          fontSize={12}
-          fontWeight={600}
-          fill={color}
-          fontFamily='"Noto Sans TC"'
-          style={{ transition: 'fill 900ms ease-out' }}
-        >
-          {score} 分
-        </text>
-
-        {/* 曲線箭頭：從志偉右緣出發，延伸到 SVG 邊界外，直接指向目標桌 */}
-        <path
-          d="M 80 78 Q 170 -5 268 32"
-          fill="none"
-          stroke="#B08D57"
-          strokeWidth={3}
-          strokeLinecap="round"
-          strokeDasharray="7 5"
-          markerEnd="url(#rec-arrow-head)"
-        />
-        <text
-          x={160}
-          y={155}
-          textAnchor="middle"
-          fontSize={12}
-          fontWeight={600}
-          fill="#8C6D3F"
-          fontFamily='"Noto Sans TC"'
-        >
-          智慧推薦
-        </text>
-      </svg>
-
-      {/* 目標桌 — 用負邊距緊貼 arrow 終點 */}
-      <div className="-ml-14 scale-[0.72] sm:-ml-10 sm:scale-[0.8]">
-        <MiniTableVisual
-          table={recommendationTable}
-          guests={recommendationGuests}
-          guestScores={recommendationScores}
-          tableScore={88}
-          previewSlotIndex={9}
-          deltaBadge="+33"
-        />
+        </svg>
+        <div className="-mt-2 scale-[0.75]">{targetTable}</div>
       </div>
-    </div>
+
+      {/* 桌機版：賓客在左、曲線向右箭頭、桌子在右 */}
+      <div className="hidden items-center justify-center md:flex">
+        <svg width={230} height={160} style={{ overflow: 'visible' }} aria-hidden>
+          <defs>
+            <marker
+              id="rec-arrow-head-desktop"
+              viewBox="0 0 10 10"
+              refX={8}
+              refY={5}
+              markerWidth={6}
+              markerHeight={6}
+              orient="auto"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#B08D57" />
+            </marker>
+          </defs>
+
+          <g transform="translate(50, 85)">
+            <circle r={28} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
+            <circle
+              r={28}
+              fill="none"
+              stroke={color}
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeDasharray={`${2 * Math.PI * 28 * progress} ${2 * Math.PI * 28 * (1 - progress)}`}
+              strokeDashoffset={2 * Math.PI * 28 * 0.25}
+              transform="rotate(-90)"
+              style={{
+                transition: 'stroke-dasharray 900ms ease-out, stroke 900ms ease-out',
+              }}
+            />
+            <circle r={23} fill="#DBEAFE" stroke="white" strokeWidth={1.5} />
+            <text
+              y={5}
+              textAnchor="middle"
+              fontSize={14}
+              fontWeight={700}
+              fill="#1E40AF"
+              fontFamily='"Noto Sans TC"'
+            >
+              志偉
+            </text>
+          </g>
+          <text
+            x={50}
+            y={140}
+            textAnchor="middle"
+            fontSize={12}
+            fontWeight={600}
+            fill={color}
+            fontFamily='"Noto Sans TC"'
+            style={{ transition: 'fill 900ms ease-out' }}
+          >
+            {score} 分
+          </text>
+
+          <path
+            d="M 80 78 Q 170 -5 268 32"
+            fill="none"
+            stroke="#B08D57"
+            strokeWidth={3}
+            strokeLinecap="round"
+            strokeDasharray="7 5"
+            markerEnd="url(#rec-arrow-head-desktop)"
+          />
+          <text
+            x={160}
+            y={155}
+            textAnchor="middle"
+            fontSize={12}
+            fontWeight={600}
+            fill="#8C6D3F"
+            fontFamily='"Noto Sans TC"'
+          >
+            智慧推薦
+          </text>
+        </svg>
+        <div className="-ml-10 scale-[0.8]">{targetTable}</div>
+      </div>
+    </>
   );
 }
 
