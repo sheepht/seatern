@@ -215,9 +215,9 @@ function IllustrationRecommendation() {
           {score} 分
         </text>
 
-        {/* 曲線箭頭：從志偉右緣 (80, 80) 曲線到右上 (218, 40)，視覺上指向目標桌 */}
+        {/* 曲線箭頭：從志偉右緣出發，延伸到 SVG 邊界外，直接指向目標桌 */}
         <path
-          d="M 80 78 Q 150 5 218 38"
+          d="M 80 78 Q 170 -5 268 32"
           fill="none"
           stroke="#B08D57"
           strokeWidth={3}
@@ -226,7 +226,7 @@ function IllustrationRecommendation() {
           markerEnd="url(#rec-arrow-head)"
         />
         <text
-          x={145}
+          x={160}
           y={155}
           textAnchor="middle"
           fontSize={12}
@@ -238,8 +238,8 @@ function IllustrationRecommendation() {
         </text>
       </svg>
 
-      {/* 目標桌 — MiniTableVisual 大圓桌 cap 10, deltaBadge +33 */}
-      <div className="-ml-6 scale-[0.72] sm:-ml-4 sm:scale-[0.8]">
+      {/* 目標桌 — 用負邊距緊貼 arrow 終點 */}
+      <div className="-ml-14 scale-[0.72] sm:-ml-10 sm:scale-[0.8]">
         <MiniTableVisual
           table={recommendationTable}
           guests={recommendationGuests}
@@ -428,8 +428,8 @@ function IllustrationOverflow() {
           const angle = ((2 * Math.PI) / 10) * i - Math.PI / 2;
           const cx = Math.cos(angle) * 52;
           const cy = Math.sin(angle) * 52;
-          // 第 0 和 1 是溢出的大學同學（藍色，和第 1 桌同色）
-          const isOverflow = i === 0 || i === 1;
+          // 第 7 和 8 位置在桌子左側（靠近第 1 桌），放溢出的大學同學
+          const isOverflow = i === 7 || i === 8;
           return (
             <g key={i}>
               {/* 溢出者特別圈起來 — 外層暖金粗虛線環 */}
@@ -459,19 +459,19 @@ function IllustrationOverflow() {
         })}
       </g>
 
-      {/* 兩桌之間的連結弧線（顯示同群組仍有連結）*/}
+      {/* 兩桌之間的連結弧線：第 1 桌右緣 → 第 2 桌左側溢出區 */}
       <path
-        d="M 138 115 Q 170 85 205 95"
+        d="M 155 120 Q 180 155 190 145"
         fill="none"
         stroke="#B08D57"
-        strokeWidth={2}
+        strokeWidth={2.5}
         strokeDasharray="4 3"
-        opacity={0.7}
+        opacity={0.8}
       />
 
-      {/* +5 鄰桌加成 badge 放在連結弧線上方 */}
-      <g transform="translate(170, 55)" style={{ filter: 'drop-shadow(0 2px 6px rgba(22,163,74,0.25))' }}>
-        <rect x={-42} y={-14} width={84} height={28} rx={14} fill="#DCFCE7" stroke="#16A34A" strokeWidth={2} />
+      {/* +5 鄰桌加成 badge 放在兩桌之間下方 */}
+      <g transform="translate(170, 180)" style={{ filter: 'drop-shadow(0 2px 6px rgba(22,163,74,0.25))' }}>
+        <rect x={-44} y={-14} width={88} height={28} rx={14} fill="#DCFCE7" stroke="#16A34A" strokeWidth={2} />
         <text y={5} textAnchor="middle" fontSize={13} fontWeight={800} fill="#15803D" fontFamily='"Plus Jakarta Sans"'>
           +5 鄰桌加成
         </text>

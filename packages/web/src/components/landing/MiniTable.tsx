@@ -207,9 +207,18 @@ export function MiniTableVisual({
   const tableStrokeWidth = highlighted ? 3 : 2;
 
   // 字級和 GUEST_R 解耦 — cap 10 的 chip 小但名字照樣大
+  // 字級和 GUEST_R 解耦 — cap 10 的 chip 小但名字照樣大
+  // 字級和 GUEST_R 解耦 — cap 10 的 chip 小但名字照樣大
   const nameSize = geo.GUEST_R >= 20 ? 14 : geo.GUEST_R >= 18 ? 13 : 13;
-  const scoreSize = geo.TABLE_RADIUS >= 100 ? 42 : 34;
-  const labelSize = geo.TABLE_RADIUS >= 100 ? 12 : 11;
+  const scoreSize = geo.TABLE_RADIUS >= 100 ? 36 : 28;
+  const labelSize = geo.TABLE_RADIUS >= 100 ? 13 : 12;
+
+  // 中心滿意度進度環 — 對齊 workspace TableNode.TableScoreRing
+  const scoreRingR = geo.TABLE_RADIUS >= 100 ? 38 : 30;
+  const scoreRingStrokeW = 5;
+  const scoreRingCircum = 2 * Math.PI * scoreRingR;
+  const scoreRingProgress = Math.max(0, Math.min(animatedTableScore / 100, 1));
+  const scoreColor = getSatisfactionColor(animatedTableScore);
 
   const deltaIsPositive = deltaBadge?.startsWith('+');
 
@@ -234,25 +243,53 @@ export function MiniTableVisual({
           strokeWidth={tableStrokeWidth}
           style={{ transition: 'all 150ms ease-out' }}
         />
+
+        {/* 中心滿意度進度環（workspace TableNode 樣式）*/}
+        <g transform={`translate(${geo.CENTER}, ${geo.CENTER})`}>
+          <circle
+            r={scoreRingR}
+            fill="none"
+            stroke="#E7E5E4"
+            strokeWidth={scoreRingStrokeW}
+          />
+          <circle
+            r={scoreRingR}
+            fill="none"
+            stroke={scoreColor}
+            strokeWidth={scoreRingStrokeW}
+            strokeLinecap="round"
+            strokeDasharray={`${scoreRingCircum * scoreRingProgress} ${scoreRingCircum * (1 - scoreRingProgress)}`}
+            strokeDashoffset={scoreRingCircum * 0.25}
+            transform="rotate(-90)"
+            style={{
+              transition: 'stroke-dasharray 500ms ease-out, stroke 500ms ease-out',
+            }}
+          />
+        </g>
+
         <text
           x={geo.CENTER}
-          y={geo.CENTER + 4}
+          y={geo.CENTER + scoreSize * 0.34}
           textAnchor="middle"
           fontSize={scoreSize}
           fontWeight={800}
-          fill="#1C1917"
+          fill={scoreColor}
           style={{
             fontFamily: '"Plus Jakarta Sans", sans-serif',
             fontVariantNumeric: 'tabular-nums',
+            transition: 'fill 500ms ease-out',
           }}
         >
           {animatedTableScore}
         </text>
+
+        {/* 桌名放在桌身上方、SVG 容器內（避開底部座位）*/}
         <text
           x={geo.CENTER}
-          y={geo.CENTER + 4 + scoreSize * 0.7}
+          y={geo.CENTER - geo.TABLE_RADIUS - 12}
           textAnchor="middle"
           fontSize={labelSize}
+          fontWeight={600}
           fill="#78716C"
           style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
         >
