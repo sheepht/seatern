@@ -231,7 +231,7 @@ export default function ImportPage() {
   if (importing) {
     return (
       <div className="flex-1 overflow-hidden flex flex-col items-center justify-center bg-[var(--bg-primary)]">
-        <LoadingTable label="正在匯入賓客..." />
+        <LoadingTable label="正在匯入賓客..." showTips />
       </div>
     );
   }

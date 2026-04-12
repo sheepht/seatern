@@ -14,8 +14,42 @@ const seats = Array.from({ length: CAPACITY }, (_, i) => {
   };
 });
 
-export function LoadingTable({ label }: { label: string }) {
+const TIPS = [
+  '拖曳賓客到桌子上即可安排座位，系統會即時計算滿意度',
+  '雙向都選「想同桌」的配對會形成強連結，優先安排在一起',
+  '滿意度分數越高代表賓客對座位越滿意，綠色 75+ 表示很好',
+  '可以用「自動排位」一鍵產生初始方案，再手動微調',
+  '標記「避免同桌」可以確保特定賓客不會被排在一起',
+  '每位賓客最多可以選 3 位想同桌的人，並排優先順序',
+  '拖曳賓客時會即時顯示對其他人滿意度的影響',
+  '儲存排位後可以建立快照，方便比較不同方案',
+  '橘色或紅色的賓客需要特別關注，可能沒有配到想同桌的人',
+  '系統會自動偵測孤立賓客，提醒你特別照顧他們',
+  '同群組的賓客坐在一起會提高群組分，建議優先安排',
+  '可以直接在畫布上拖曳桌子來調整實體位置',
+];
+
+function useRotatingTip() {
+  const [index, setIndex] = useState(() => Math.floor(Math.random() * TIPS.length));
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setIndex((prev) => (prev + 1) % TIPS.length);
+        setVisible(true);
+      }, 400);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return { tip: TIPS[index], visible };
+}
+
+export function LoadingTable({ label, showTips = false }: { label: string; showTips?: boolean }) {
   const [filled, setFilled] = useState(0);
+  const { tip, visible } = useRotatingTip();
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +110,19 @@ export function LoadingTable({ label }: { label: string }) {
       <p className="text-[var(--text-muted)] font-[family-name:var(--font-body)]">
         {label}
       </p>
+      {showTips && (
+        <div className="mt-3 max-w-xs text-center min-h-[3rem] flex items-center justify-center">
+          <p
+            className="text-xs text-[var(--text-secondary)] font-[family-name:var(--font-body)] leading-relaxed"
+            style={{
+              opacity: visible ? 1 : 0,
+              transition: 'opacity 400ms ease-in-out',
+            }}
+          >
+            💡 {tip}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
