@@ -270,6 +270,15 @@ button, a, input, select, textarea {
   }
 }
 
+/* Ocean Trace font for landing team names (personal use license) */
+@font-face {
+  font-family: 'Ocean Trace';
+  src: url('/fonts/OceanTrace-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Landing page hero demo — idle guidance + reject shake animations */
 @keyframes landing-pulse {
   0%, 100% { transform: scale(1); }
