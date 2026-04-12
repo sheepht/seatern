@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   useAdminPlans,
   useAdminApprove,
@@ -8,60 +9,6 @@ import {
 } from '@/hooks/useAdminApi';
 
 const PLAN_PRICE: Record<string, number> = { '30': 199, '50': 499, '80': 799, '200': 1499 };
-
-function AdminLogin({ onLogin }: { onLogin: (token: string) => void }) {
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-      if (!res.ok) {
-        setError('密碼錯誤');
-        return;
-      }
-      const { token } = await res.json();
-      sessionStorage.setItem('admin_token', token);
-      onLogin(token);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex items-center justify-center min-h-[80vh]">
-      <form onSubmit={handleSubmit} className="w-full max-w-xs">
-        <h1 className="text-2xl font-bold text-stone-900 font-[family-name:var(--font-display)] text-center mb-6">
-          管理後台
-        </h1>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="請輸入管理密碼"
-          autoFocus
-          className="w-full h-12 px-4 rounded-lg border border-stone-200 text-base focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
-        />
-        {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading || !password}
-          className="w-full h-12 mt-3 rounded-lg text-base font-medium text-white bg-[var(--accent)] disabled:opacity-50"
-        >
-          {loading ? '驗證中...' : '登入'}
-        </button>
-      </form>
-    </div>
-  );
-}
 
 const PLAN_OPTIONS = [
   { value: '', label: '無（免費版）' },
@@ -83,23 +30,47 @@ function toDateInput(iso: string | null) {
 }
 
 export default function AdminPage() {
-  const [token, setToken] = useState(() => sessionStorage.getItem('admin_token') || '');
+  const navigate = useNavigate();
+  const [token, setToken] = useState('');
+  const [verifying, setVerifying] = useState(true);
   const [tab, setTab] = useState<'pending' | 'all'>('pending');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ planType: '', planStatus: '', planExpiresAt: '', planCreatedAt: '', planNote: '' });
+
+  useEffect(() => {
+    const adminSecret = localStorage.getItem('admin_secret');
+    if (!adminSecret) {
+      navigate('/', { replace: true });
+      return;
+    }
+    fetch('/api/admin/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: adminSecret }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Unauthorized');
+        return res.json();
+      })
+      .then(({ token: t }) => {
+        setToken(t);
+        setVerifying(false);
+      })
+      .catch(() => {
+        localStorage.removeItem('admin_secret');
+        navigate('/', { replace: true });
+      });
+  }, [navigate]);
 
   const { data, isLoading, refetch, isError } = useAdminPlans(token);
   const approveMut = useAdminApprove(token);
   const rejectMut = useAdminReject(token);
   const updateMut = useAdminUpdateEvent(token);
 
-  // 401 → 清除 token
   if (isError) {
-    sessionStorage.removeItem('admin_token');
-    if (token) setToken('');
+    localStorage.removeItem('admin_secret');
+    navigate('/', { replace: true });
   }
-
-  const handleLogin = (t: string) => setToken(t);
 
   const pending = data?.pending ?? [];
   const all = data?.all ?? [];
@@ -129,7 +100,9 @@ export default function AdminPage() {
     }, { onSuccess: () => setEditingId(null) });
   };
 
-  if (!token) return <AdminLogin onLogin={handleLogin} />;
+  if (verifying || !token) return (
+    <p className="text-base text-stone-400 text-center py-12">驗證中...</p>
+  );
 
   const statusBadge = (status: string | null) => {
     switch (status) {
@@ -155,7 +128,7 @@ export default function AdminPage() {
           管理後台
         </h1>
         <button
-          onClick={() => { sessionStorage.removeItem('admin_token'); setToken(''); }}
+          onClick={() => { localStorage.removeItem('admin_secret'); navigate('/', { replace: true }); }}
           className="text-sm text-stone-400 hover:text-stone-600"
         >
           登出

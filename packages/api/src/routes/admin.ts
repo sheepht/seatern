@@ -10,7 +10,17 @@ admin.post('/login', async (c) => {
   if (!secret || password !== secret) {
     return c.json({ error: '密碼錯誤' }, 401);
   }
-  // 用 secret 的 hash 當作簡易 token（不需要額外 library）
+  const token = Buffer.from(secret).toString('base64');
+  return c.json({ token });
+});
+
+// POST /admin/verify — 用 localStorage 存的密鑰直接驗證
+admin.post('/verify', async (c) => {
+  const { secret: clientSecret } = await c.req.json<{ secret: string }>();
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret || clientSecret !== secret) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
   const token = Buffer.from(secret).toString('base64');
   return c.json({ token });
 });
