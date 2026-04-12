@@ -8,6 +8,7 @@ import { getCategoryColor, loadCategoryColors } from '@/lib/category-colors';
 import { findFreePosition, calculateGridLayout } from '@/lib/viewport';
 import { api } from '@/lib/api';
 import { FloorPlan, type FloorPlanHandle } from '@/components/workspace/FloorPlan';
+import GuestFormModal from '@/components/GuestFormModal';
 import type { Guest } from '@/stores/seating';
 
 // ─── Dashboard ─────────────────────────────────────
@@ -808,11 +809,26 @@ export function MobileWorkspace() {
   const resetAllSeats = useSeatingStore((s) => s.resetAllSeats);
   const isBatchSaving = useSeatingStore((s) => s.isBatchSaving);
   const autoArrangeTables = useSeatingStore((s) => s.autoArrangeTables);
+  const editingGuestId = useSeatingStore((s) => s.editingGuestId);
+  const setEditingGuest = useSeatingStore((s) => s.setEditingGuest);
+  const updateGuest = useSeatingStore((s) => s.updateGuest);
+  const moveGuest = useSeatingStore((s) => s.moveGuest);
+  const deleteGuest = useSeatingStore((s) => s.deleteGuest);
+  const updateGuestPreferences = useSeatingStore((s) => s.updateGuestPreferences);
+  const addAvoidPair = useSeatingStore((s) => s.addAvoidPair);
+  const removeAvoidPair = useSeatingStore((s) => s.removeAvoidPair);
+  const setGuestSubcategory = useSeatingStore((s) => s.setGuestSubcategory);
+  const subcategories = useSeatingStore((s) => s.subcategories);
+  const eventId = useSeatingStore((s) => s.eventId);
+  const eventCategories = useSeatingStore((s) => s.eventCategories);
   const [adding, setAdding] = useState(false);
   const [arranging, setArranging] = useState(false);
   const isDev = import.meta.env.DEV;
 
   const avoidPairs = useSeatingStore((s) => s.avoidPairs);
+  const categories = eventCategories.length > 0 ? eventCategories : ['男方', '女方', '共同'];
+  const categoryColors = useMemo(() => loadCategoryColors(eventId || ''), [eventId]);
+  const editGuest = editingGuestId ? guests.find((g) => g.id === editingGuestId) : null;
 
   // 推薦計算（useMemo 懶計算，只在賓客/桌次變化時重算）
   const recommendations = useMemo(
@@ -1164,6 +1180,71 @@ export function MobileWorkspace() {
             <p className="text-sm text-[var(--text-secondary)] font-[family-name:var(--font-ui)]">儲存中...</p>
           </div>
         </div>
+      )}
+
+      {/* 賓客編輯 modal */}
+      {editGuest && (
+        <GuestFormModal
+          mode="edit"
+          guest={editGuest}
+          tables={tables}
+          guests={guests}
+          avoidPairs={avoidPairs}
+          categories={categories}
+          subcategories={subcategories}
+          categoryColors={categoryColors}
+          onSubmit={async (data) => {
+            updateGuest(editGuest.id, {
+              name: data.name,
+              aliases: data.aliases,
+              category: data.category,
+              rsvpStatus: data.rsvpStatus,
+              companionCount: data.companionCount,
+              dietaryNote: data.dietaryNote,
+              specialNote: data.specialNote,
+            });
+            if (data.assignedTableId !== (editGuest.assignedTableId || null)) {
+              moveGuest(editGuest.id, data.assignedTableId);
+            }
+            const prefs = data.preferredGuestIds.map((gid, i) => ({ preferredGuestId: gid, rank: i + 1 }));
+            updateGuestPreferences(editGuest.id, prefs);
+
+            const oldAvoidIds = avoidPairs
+              .filter((ap) => ap.guestAId === editGuest.id || ap.guestBId === editGuest.id)
+              .map((ap) => ({ pairId: ap.id, otherId: ap.guestAId === editGuest.id ? ap.guestBId : ap.guestAId }));
+            for (const old of oldAvoidIds) {
+              if (!data.avoidGuestIds.includes(old.otherId)) removeAvoidPair(old.pairId);
+            }
+            for (const gid of data.avoidGuestIds) {
+              if (!oldAvoidIds.some((o) => o.otherId === gid)) addAvoidPair(editGuest.id, gid);
+            }
+
+            if (data.subcategoryName) {
+              const { subcategories } = useSeatingStore.getState();
+              const existing = subcategories.find(
+                (sc) => sc.name === data.subcategoryName && sc.category === data.category,
+              );
+              if (existing) {
+                const { guests } = useSeatingStore.getState();
+                const gIdx = guests.findIndex((g) => g.id === editGuest.id);
+                if (gIdx >= 0) {
+                  const next = [...guests];
+                  next[gIdx] = { ...next[gIdx], subcategory: existing };
+                  useSeatingStore.setState({ guests: next });
+                }
+              }
+              api.post(`/events/${eventId}/subcategories/batch`, {
+                assignments: [{ guestId: editGuest.id, subcategoryName: data.subcategoryName, category: data.category }],
+              }).catch(() => {});
+            } else if (editGuest.subcategory) {
+              setGuestSubcategory(editGuest.id, null);
+            }
+
+            setEditingGuest(null);
+          }}
+          onDelete={(gid) => { setEditingGuest(null); deleteGuest(gid); }}
+          onClose={() => setEditingGuest(null)}
+        />
       )}
     </div>
   );
