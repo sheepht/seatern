@@ -227,18 +227,19 @@ function IllustrationRecommendation() {
     <>
       {/* 手機版：合併 SVG（志偉 chip + 直線從 chip 身上出發），桌子緊貼箭頭下方 */}
       <div className="flex flex-col items-center md:hidden">
-        <svg width={140} height={180} style={{ overflow: 'visible' }} aria-hidden>
+        <svg width={140} height={200} aria-hidden>
           <defs>
             <marker
               id="rec-arrow-head-mobile"
-              viewBox="0 0 10 10"
-              refX={8}
-              refY={5}
-              markerWidth={6}
-              markerHeight={6}
+              viewBox="0 0 12 12"
+              refX={10}
+              refY={6}
+              markerWidth={14}
+              markerHeight={14}
+              markerUnits="userSpaceOnUse"
               orient="auto"
             >
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#B08D57" />
+              <path d="M 0 0 L 12 6 L 0 12 z" fill="#B08D57" />
             </marker>
           </defs>
 
@@ -283,15 +284,14 @@ function IllustrationRecommendation() {
             {score} 分
           </text>
 
-          {/* 直線箭頭：從 chip 中心正下方出發（x=70, y=40+ringR=68），往下穿出 SVG 底部 */}
+          {/* 直線箭頭：從 chip 中心正下方出發，終點留在 svg viewport 內讓 marker 正常渲染 */}
           <line
             x1={70}
             y1={68}
             x2={70}
-            y2={195}
+            y2={180}
             stroke="#B08D57"
             strokeWidth={3}
-            strokeLinecap="round"
             strokeDasharray="7 5"
             markerEnd="url(#rec-arrow-head-mobile)"
           />
@@ -306,23 +306,24 @@ function IllustrationRecommendation() {
             智慧推薦
           </text>
         </svg>
-        <div className="-mt-14 scale-[0.72]">{targetTable}</div>
+        <div className="-mt-10 scale-[0.72]">{targetTable}</div>
       </div>
 
       {/* 桌機版：賓客在左、曲線向右箭頭、桌子在右 */}
       <div className="hidden items-center justify-center md:flex">
-        <svg width={230} height={160} style={{ overflow: 'visible' }} aria-hidden>
+        <svg width={320} height={170} aria-hidden>
           <defs>
             <marker
               id="rec-arrow-head-desktop"
-              viewBox="0 0 10 10"
-              refX={8}
-              refY={5}
-              markerWidth={6}
-              markerHeight={6}
+              viewBox="0 0 12 12"
+              refX={10}
+              refY={6}
+              markerWidth={14}
+              markerHeight={14}
+              markerUnits="userSpaceOnUse"
               orient="auto"
             >
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#B08D57" />
+              <path d="M 0 0 L 12 6 L 0 12 z" fill="#B08D57" />
             </marker>
           </defs>
 
@@ -367,17 +368,16 @@ function IllustrationRecommendation() {
           </text>
 
           <path
-            d="M 80 78 Q 180 -15 300 42"
+            d="M 80 78 Q 180 -5 305 55"
             fill="none"
             stroke="#B08D57"
             strokeWidth={3}
-            strokeLinecap="round"
             strokeDasharray="7 5"
             markerEnd="url(#rec-arrow-head-desktop)"
           />
           <text
-            x={160}
-            y={155}
+            x={180}
+            y={158}
             textAnchor="middle"
             fontSize={12}
             fontWeight={600}
@@ -387,7 +387,7 @@ function IllustrationRecommendation() {
             智慧推薦
           </text>
         </svg>
-        <div className="-ml-24 scale-[0.8]">{targetTable}</div>
+        <div className="-ml-20 scale-[0.8]">{targetTable}</div>
       </div>
     </>
   );
