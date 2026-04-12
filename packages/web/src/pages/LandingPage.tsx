@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MiniTableVisual } from '@/components/landing/MiniTable';
+import { SeaternLogo } from '@/components/SeaternLogo';
 import type { DemoGuest, DemoTable } from '@/components/landing/demoScorer';
 
 // ─── Feature 2 showcase data: 2 tables × 10 seats × 分數分布 ─
@@ -643,31 +644,29 @@ export default function LandingPage() {
             'radial-gradient(ellipse at top right, rgba(245, 240, 230, 0.6) 0%, rgba(250, 250, 249, 0) 50%)',
         }}
       >
+        <SeaternLogo
+          className="mb-6 h-20 w-20 text-[#B08D57] sm:h-24 sm:w-24 lg:h-28 lg:w-28"
+          aria-hidden
+        />
         <h1
           id="landing-hero-title"
-          className="text-center font-[800] tracking-tight text-[36px] leading-[1.15] sm:text-[48px] lg:text-[60px]"
+          className="text-center font-[800] tracking-tight text-[30px] leading-[1.2] sm:text-[40px] lg:text-[52px]"
           style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
         >
-          排位鷗鷗 · 用心排好座位
+          排位鷗鷗 用心排好座位
         </h1>
         <p className="mt-6 max-w-2xl text-center text-lg text-[#78716C] sm:text-xl">
           婚禮、尾牙、活動的一站式座位安排工具。
           <br className="hidden sm:inline" />
           從匯入名單到智慧推薦，每個環節都替你想好了。
         </p>
-        <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
+        <div className="mt-10 flex justify-center">
           <Link
-            to="/register"
-            className="inline-flex h-12 items-center justify-center rounded-lg bg-[#B08D57] px-8 text-base font-semibold text-white shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-[#8C6D3F] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#B08D57] focus:ring-offset-2"
+            to="/"
+            className="inline-flex h-14 items-center justify-center rounded-lg bg-[#B08D57] px-10 text-lg font-semibold text-white shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-[#8C6D3F] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#B08D57] focus:ring-offset-2 sm:text-xl"
           >
             免費試用
           </Link>
-          <a
-            href="#features"
-            className="inline-flex h-12 items-center justify-center rounded-lg border border-[#D6D3D1] bg-white px-8 text-base font-medium text-[#1C1917] transition-colors hover:bg-[#F5F0E6]"
-          >
-            看看功能 ↓
-          </a>
         </div>
       </section>
 
@@ -801,8 +800,8 @@ export default function LandingPage() {
         </p>
         <div className="mt-8 flex justify-center">
           <Link
-            to="/register"
-            className="inline-flex h-12 items-center justify-center rounded-lg bg-[#B08D57] px-10 text-base font-semibold text-white shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-[#8C6D3F] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#B08D57] focus:ring-offset-2"
+            to="/"
+            className="inline-flex h-14 items-center justify-center rounded-lg bg-[#B08D57] px-12 text-lg font-semibold text-white shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-[#8C6D3F] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#B08D57] focus:ring-offset-2 sm:text-xl"
           >
             免費試用
           </Link>
