@@ -15,12 +15,16 @@ import type { Guest } from '@/stores/seating';
 
 function MobileDashboard() {
   const guests = useSeatingStore((s) => s.guests);
+  const getTotalAssignedSeats = useSeatingStore((s) => s.getTotalAssignedSeats);
+  const getTotalConfirmedSeats = useSeatingStore((s) => s.getTotalConfirmedSeats);
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed');
   const assigned = confirmed.filter((g) => g.assignedTableId);
   const unassigned = confirmed.filter((g) => !g.assignedTableId);
   const [showTip, setShowTip] = useState(false);
 
-  const totalGuests = confirmed.length;
+  const assignedSeats = getTotalAssignedSeats();
+  const totalSeats = getTotalConfirmedSeats();
+  const unassignedSeats = totalSeats - assignedSeats;
 
   const green = assigned.filter((g) => g.satisfactionScore >= 75).length;
   const yellow = assigned.filter((g) => g.satisfactionScore >= 50 && g.satisfactionScore < 75).length;
@@ -42,24 +46,24 @@ function MobileDashboard() {
             <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)]">未安排</span>
             <span
               className="text-lg font-[family-name:var(--font-data)] font-bold tabular-nums"
-              style={{ color: unassigned.length > 0 ? '#EA580C' : 'var(--text-muted)' }}
+              style={{ color: unassignedSeats > 0 ? '#EA580C' : 'var(--text-muted)' }}
             >
-              {unassigned.length}
+              {unassignedSeats}
             </span>
-            <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)]">人</span>
+            <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)]">席</span>
             <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)] mx-0.5">/</span>
             <span className="text-lg font-[family-name:var(--font-data)] font-bold tabular-nums text-[var(--text-secondary)]">
-              {totalGuests}
+              {totalSeats}
             </span>
-            <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)]">人</span>
+            <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)]">席</span>
             <span className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold text-[var(--text-muted)] border border-[var(--border-strong)]">?</span>
           </button>
           {showTip && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowTip(false)} />
               <div className="absolute left-0 top-full mt-2 z-50 rounded-[var(--radius-sm)] bg-[var(--bg-elevated,#1f2937)] text-white text-xs px-3 py-2 shadow-lg leading-relaxed whitespace-nowrap">
-                這裡的「人」＝賓客數<br />
-                每位賓客可能會攜帶眷屬，實際入座人數可能更多
+                「席」＝賓客本人 + 眷屬（含嬰兒）的總座位數<br />
+                <span className="opacity-80">例：王小明帶 1 位伴侶 + 1 位嬰兒 → 算 3 席</span>
               </div>
             </>
           )}
