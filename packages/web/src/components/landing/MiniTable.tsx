@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { getSatisfactionColor } from '@/lib/satisfaction';
 import type { DemoGuest, DemoTable } from './demoScorer';
-
-export type MiniTableState = 'idle' | 'drag-over' | 'reject-shake' | 'full';
 
 /** 數字漸變動畫（對齊 workspace TableNode:13 的 useAnimatedNumber）*/
 function useAnimatedNumber(target: number, duration = 500): number {
@@ -31,19 +28,39 @@ function useAnimatedNumber(target: number, duration = 500): number {
   return current;
 }
 
-// ─── Geometry ────────────────────────────────────────
-const CONTAINER = 240;
-const CENTER = CONTAINER / 2;
-const TABLE_RADIUS = 80;
-const SEAT_RADIUS = 56;
-const GUEST_R = 20;
-const RING_R = 23;
+// ─── Dynamic geometry — 對齊 workspace TableNode 公式 ─
+interface Geometry {
+  CONTAINER: number;
+  CENTER: number;
+  TABLE_RADIUS: number;
+  SEAT_RADIUS: number;
+  GUEST_R: number;
+  RING_R: number;
+}
 
-function seatPosition(index: number, total: number) {
+function computeGeometry(capacity: number): Geometry {
+  // workspace 公式: radius = max(88, 58 + capacity * 7)
+  const TABLE_RADIUS = Math.max(82, 54 + capacity * 6);
+  const SEAT_RADIUS = TABLE_RADIUS - 28;
+  // 高容量桌 chip 要縮小避免相鄰重疊
+  const GUEST_R = capacity <= 6 ? 20 : capacity <= 8 ? 18 : 15;
+  const RING_R = GUEST_R + 3;
+  const CONTAINER = (TABLE_RADIUS + 36) * 2;
+  return {
+    CONTAINER,
+    CENTER: CONTAINER / 2,
+    TABLE_RADIUS,
+    SEAT_RADIUS,
+    GUEST_R,
+    RING_R,
+  };
+}
+
+function seatPosition(index: number, total: number, seatRadius: number) {
   const angle = ((2 * Math.PI) / total) * index - Math.PI / 2;
   return {
-    x: Math.cos(angle) * SEAT_RADIUS,
-    y: Math.sin(angle) * SEAT_RADIUS,
+    x: Math.cos(angle) * seatRadius,
+    y: Math.sin(angle) * seatRadius,
   };
 }
 
@@ -54,25 +71,34 @@ const GROUP_COLORS: Record<DemoGuest['group'], { fill: string; stroke: string; t
 };
 
 // ─── SVG seat (filled) ───────────────────────────────
-interface FilledSeatProps {
+function FilledSeat({
+  guest,
+  score,
+  x,
+  y,
+  guestR,
+  ringR,
+  nameSize,
+}: {
   guest: DemoGuest;
   score: number;
   x: number;
   y: number;
-}
-
-function FilledSeat({ guest, score, x, y }: FilledSeatProps) {
+  guestR: number;
+  ringR: number;
+  nameSize: number;
+}) {
   const gc = GROUP_COLORS[guest.group];
   const satColor = getSatisfactionColor(score);
   const animated = useAnimatedNumber(score, 500);
   const progress = Math.max(0, Math.min(animated / 100, 1));
-  const circum = 2 * Math.PI * RING_R;
+  const circum = 2 * Math.PI * ringR;
 
   return (
     <g transform={`translate(${x}, ${y})`}>
-      <circle r={RING_R} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
+      <circle r={ringR} fill="none" stroke="#E7E5E4" strokeWidth={2} />
       <circle
-        r={RING_R}
+        r={ringR}
         fill="none"
         stroke={satColor}
         strokeWidth={2.5}
@@ -84,11 +110,11 @@ function FilledSeat({ guest, score, x, y }: FilledSeatProps) {
           transition: 'stroke-dasharray 500ms ease-out, stroke 500ms ease-out',
         }}
       />
-      <circle r={GUEST_R} fill={gc.fill} stroke="white" strokeWidth={2} />
+      <circle r={guestR} fill={gc.fill} stroke="white" strokeWidth={1.5} />
       <text
-        y={4}
+        y={nameSize / 2.8}
         textAnchor="middle"
-        fontSize={11}
+        fontSize={nameSize}
         fontWeight={600}
         fill={gc.text}
         style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
@@ -99,41 +125,29 @@ function FilledSeat({ guest, score, x, y }: FilledSeatProps) {
   );
 }
 
-// ─── SVG empty seat ──────────────────────────────────
-function EmptySeat({ x, y, isPreview }: { x: number; y: number; isPreview: boolean }) {
+function EmptySeat({ x, y, guestR, ringR }: { x: number; y: number; guestR: number; ringR: number }) {
   return (
     <g transform={`translate(${x}, ${y})`}>
       <circle
-        r={RING_R}
+        r={ringR}
         fill="none"
-        stroke={isPreview ? '#B08D57' : '#D6D3D1'}
-        strokeWidth={isPreview ? 2.5 : 1.8}
+        stroke="#D6D3D1"
+        strokeWidth={1.5}
         strokeDasharray="4 4"
-        opacity={isPreview ? 0.9 : 0.55}
+        opacity={0.55}
       />
-      {isPreview && (
-        <circle
-          r={GUEST_R}
-          fill="#F5F0E6"
-          stroke="#B08D57"
-          strokeWidth={1.5}
-          strokeDasharray="3 3"
-          opacity={0.7}
-        />
-      )}
+      <circle r={guestR * 0.85} fill="#FAFAF9" opacity={0.6} />
     </g>
   );
 }
 
-// ─── MiniTableVisual — pure SVG（不用 DndContext）───
+// ─── MiniTableVisual — pure SVG ─────────────────────
 interface MiniTableVisualProps {
   table: DemoTable;
   guests: DemoGuest[];
   guestScores: Record<string, number>;
   tableScore: number;
   highlighted?: boolean;
-  previewSlotIndex?: number;
-  shake?: boolean;
 }
 
 export function MiniTableVisual({
@@ -142,65 +156,67 @@ export function MiniTableVisual({
   guestScores,
   tableScore,
   highlighted = false,
-  previewSlotIndex = -1,
-  shake = false,
 }: MiniTableVisualProps) {
+  const geo = computeGeometry(table.capacity);
   const animatedTableScore = useAnimatedNumber(tableScore, 500);
 
   const tableStroke = highlighted ? '#B08D57' : '#D6D3D1';
   const tableFill = highlighted ? '#F5F0E6' : '#FFFFFF';
   const tableStrokeWidth = highlighted ? 3 : 2;
 
+  const nameSize = geo.GUEST_R <= 16 ? 9 : 11;
+  const scoreSize = geo.TABLE_RADIUS >= 100 ? 40 : 34;
+  const labelSize = geo.TABLE_RADIUS >= 100 ? 12 : 11;
+
   return (
     <div
-      className={`relative ${shake ? 'animate-landing-shake' : ''}`}
-      style={{ width: CONTAINER, height: CONTAINER }}
+      className="relative"
+      style={{ width: geo.CONTAINER, height: geo.CONTAINER }}
       data-testid={`mini-table-${table.id}`}
     >
       <svg
-        width={CONTAINER}
-        height={CONTAINER}
+        width={geo.CONTAINER}
+        height={geo.CONTAINER}
         className="absolute inset-0"
         style={{ overflow: 'visible' }}
       >
         <circle
-          cx={CENTER}
-          cy={CENTER}
-          r={TABLE_RADIUS}
+          cx={geo.CENTER}
+          cy={geo.CENTER}
+          r={geo.TABLE_RADIUS}
           fill={tableFill}
           stroke={tableStroke}
           strokeWidth={tableStrokeWidth}
           style={{ transition: 'all 150ms ease-out' }}
         />
         <text
-          x={CENTER}
-          y={CENTER + 4}
+          x={geo.CENTER}
+          y={geo.CENTER + 4}
           textAnchor="middle"
-          fontSize={36}
+          fontSize={scoreSize}
           fontWeight={800}
           fill="#1C1917"
           style={{
             fontFamily: '"Plus Jakarta Sans", sans-serif',
             fontVariantNumeric: 'tabular-nums',
           }}
-          data-testid={`mini-table-score-${table.id}`}
         >
           {animatedTableScore}
         </text>
         <text
-          x={CENTER}
-          y={CENTER + 24}
+          x={geo.CENTER}
+          y={geo.CENTER + 4 + scoreSize * 0.7}
           textAnchor="middle"
-          fontSize={11}
+          fontSize={labelSize}
           fill="#78716C"
           style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
         >
           {table.name}
         </text>
 
-        <g transform={`translate(${CENTER}, ${CENTER})`}>
+        <g transform={`translate(${geo.CENTER}, ${geo.CENTER})`}>
           {Array.from({ length: table.capacity }, (_, i) => {
-            const { x, y } = seatPosition(i, table.capacity);
+            const { x, y } = seatPosition(i, table.capacity, geo.SEAT_RADIUS);
             const guest = guests[i] ?? null;
             if (guest) {
               return (
@@ -210,6 +226,9 @@ export function MiniTableVisual({
                   score={guestScores[guest.id] ?? 50}
                   x={x}
                   y={y}
+                  guestR={geo.GUEST_R}
+                  ringR={geo.RING_R}
+                  nameSize={nameSize}
                 />
               );
             }
@@ -218,7 +237,8 @@ export function MiniTableVisual({
                 key={`empty-${i}`}
                 x={x}
                 y={y}
-                isPreview={i === previewSlotIndex}
+                guestR={geo.GUEST_R}
+                ringR={geo.RING_R}
               />
             );
           })}
@@ -228,99 +248,6 @@ export function MiniTableVisual({
       <span className="sr-only">
         {table.name} 滿意度 {tableScore} 分，共 {guests.length} 位賓客
       </span>
-    </div>
-  );
-}
-
-// ─── SeatDragHandle — HTML overlay for dnd-kit ───────
-function SeatDragHandle({
-  guestId,
-  x,
-  y,
-  guestName,
-}: {
-  guestId: string;
-  x: number;
-  y: number;
-  guestName: string;
-}) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: guestId,
-    data: { guestId },
-  });
-  return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      className="absolute cursor-grab active:cursor-grabbing select-none focus:outline-none focus:ring-2 focus:ring-[#B08D57] focus:ring-offset-2 rounded-full"
-      style={{
-        left: `calc(50% + ${x}px - ${RING_R + 2}px)`,
-        top: `calc(50% + ${y}px - ${RING_R + 2}px)`,
-        width: (RING_R + 2) * 2,
-        height: (RING_R + 2) * 2,
-        touchAction: 'none',
-        opacity: isDragging ? 0 : 1,
-      }}
-      aria-label={`賓客 ${guestName}，可拖曳到其他桌`}
-      data-testid={`landing-chip-${guestId}`}
-    />
-  );
-}
-
-// ─── MiniTable — interactive wrapper（droppable + drag handles）
-// 目前 landing page 不用這個（feature section 走 MiniTableVisual），
-// 保留給未來可能的互動場景。
-interface MiniTableProps {
-  table: DemoTable;
-  guests: DemoGuest[];
-  guestScores: Record<string, number>;
-  tableScore: number;
-  state: MiniTableState;
-  activeGuestId?: string | null;
-}
-
-export function MiniTable({
-  table,
-  guests,
-  guestScores,
-  tableScore,
-  state,
-  activeGuestId,
-}: MiniTableProps) {
-  const { isOver, setNodeRef } = useDroppable({ id: table.id });
-  const effectiveState: MiniTableState = isOver ? 'drag-over' : state;
-
-  const draggedFromThisTable = activeGuestId
-    ? table.guestIds.includes(activeGuestId)
-    : false;
-  const hasRoom = guests.length < table.capacity;
-  const showPreview = Boolean(activeGuestId && !draggedFromThisTable && hasRoom);
-  const previewSlotIndex = showPreview ? guests.length : -1;
-
-  return (
-    <div ref={setNodeRef}>
-      <MiniTableVisual
-        table={table}
-        guests={guests}
-        guestScores={guestScores}
-        tableScore={tableScore}
-        highlighted={effectiveState === 'drag-over'}
-        previewSlotIndex={previewSlotIndex}
-        shake={effectiveState === 'reject-shake'}
-      />
-      {guests.map((guest, i) => {
-        const { x, y } = seatPosition(i, table.capacity);
-        return (
-          <SeatDragHandle
-            key={guest.id}
-            guestId={guest.id}
-            guestName={guest.name}
-            x={x}
-            y={y}
-          />
-        );
-      })}
     </div>
   );
 }
