@@ -1003,7 +1003,7 @@ export default function LandingPage() {
                   />
                 </div>
                 <h3
-                  className="mt-5 text-3xl text-[#1C1917] sm:text-4xl"
+                  className="mt-5 text-2xl font-bold text-[#1C1917] sm:text-3xl"
                   style={{ fontFamily: '"Ocean Trace", "Plus Jakarta Sans", sans-serif' }}
                 >
                   {member.name}
