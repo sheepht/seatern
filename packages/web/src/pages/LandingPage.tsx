@@ -978,18 +978,18 @@ export default function LandingPage() {
                 name: 'JF oooooo',
                 avatar: 'https://sheepht.com/jf.png',
                 bio: [
-                  '喜歡唱歌打電動、身心靈保養與旅行',
-                  '每週三晚上八點在 Twitch 上放送娛樂',
-                  '人生就應該要做自己想做的事情，嘻嘻',
+                  '喜歡唱歌打電動身心靈神祕學跟旅行',
+                  '每週三晚上八點在 Twitch 上出沒玩耍',
+                  '人生就應該浪費在開心的事物上 噢耶',
                 ],
               },
               {
                 name: 'Sexyoung',
                 avatar: 'https://sheepht.com/sexyoung.jpeg',
                 bio: [
-                  '音樂中毒玩家，不管什麼樂器都敢挑戰',
-                  '喜歡在晚上看 YT 補冷知識',
-                  '喝茶一定要喝蜂蜜紅茶才開心，吱吱',
+                  '音遊中毒玩家不管是跳舞機到太鼓達人',
+                  '喜歡在晚上學習 YT 偏門冷知識',
+                  '睡前一定要擼貓擼到開心再睡覺',
                 ],
               },
             ].map((member) => (
