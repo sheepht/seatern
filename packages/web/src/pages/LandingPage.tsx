@@ -224,10 +224,9 @@ function IllustrationRecommendation() {
 
   return (
     <>
-      {/* 手機版：賓客在上、向下箭頭、桌子在下 */}
-      <div className="flex flex-col items-center gap-1 md:hidden">
-        <SourceGuestChipSVG score={score} color={color} progress={progress} />
-        <svg width={60} height={70} style={{ overflow: 'visible' }} aria-hidden>
+      {/* 手機版：合併 SVG（志偉 chip + 直線從 chip 身上出發），桌子緊貼箭頭下方 */}
+      <div className="flex flex-col items-center md:hidden">
+        <svg width={140} height={180} style={{ overflow: 'visible' }} aria-hidden>
           <defs>
             <marker
               id="rec-arrow-head-mobile"
@@ -241,9 +240,54 @@ function IllustrationRecommendation() {
               <path d="M 0 0 L 10 5 L 0 10 z" fill="#B08D57" />
             </marker>
           </defs>
-          <path
-            d="M 30 4 Q 10 30 30 56"
-            fill="none"
+
+          {/* 志偉 chip 在頂部 */}
+          <g transform="translate(70, 40)">
+            <circle r={28} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
+            <circle
+              r={28}
+              fill="none"
+              stroke={color}
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeDasharray={`${2 * Math.PI * 28 * progress} ${2 * Math.PI * 28 * (1 - progress)}`}
+              strokeDashoffset={2 * Math.PI * 28 * 0.25}
+              transform="rotate(-90)"
+              style={{
+                transition: 'stroke-dasharray 900ms ease-out, stroke 900ms ease-out',
+              }}
+            />
+            <circle r={23} fill="#DBEAFE" stroke="white" strokeWidth={1.5} />
+            <text
+              y={5}
+              textAnchor="middle"
+              fontSize={14}
+              fontWeight={700}
+              fill="#1E40AF"
+              fontFamily='"Noto Sans TC"'
+            >
+              志偉
+            </text>
+          </g>
+          <text
+            x={70}
+            y={95}
+            textAnchor="middle"
+            fontSize={12}
+            fontWeight={600}
+            fill={color}
+            fontFamily='"Noto Sans TC"'
+            style={{ transition: 'fill 900ms ease-out' }}
+          >
+            {score} 分
+          </text>
+
+          {/* 直線箭頭：從 chip 中心正下方出發（x=70, y=40+ringR=68），往下到 SVG 底部外 */}
+          <line
+            x1={70}
+            y1={68}
+            x2={70}
+            y2={175}
             stroke="#B08D57"
             strokeWidth={3}
             strokeLinecap="round"
@@ -251,8 +295,8 @@ function IllustrationRecommendation() {
             markerEnd="url(#rec-arrow-head-mobile)"
           />
           <text
-            x={48}
-            y={38}
+            x={92}
+            y={140}
             fontSize={11}
             fontWeight={600}
             fill="#8C6D3F"
@@ -261,7 +305,7 @@ function IllustrationRecommendation() {
             智慧推薦
           </text>
         </svg>
-        <div className="-mt-2 scale-[0.75]">{targetTable}</div>
+        <div className="-mt-3 scale-[0.72]">{targetTable}</div>
       </div>
 
       {/* 桌機版：賓客在左、曲線向右箭頭、桌子在右 */}
@@ -805,12 +849,14 @@ export default function LandingPage() {
               guestScores={showcaseScores}
               tableScore={showcaseT1Avg}
             />
-            <MiniTableVisual
-              table={showcaseT2}
-              guests={showcaseGuestsT2}
-              guestScores={showcaseScores}
-              tableScore={showcaseT2Avg}
-            />
+            <div className="hidden md:block">
+              <MiniTableVisual
+                table={showcaseT2}
+                guests={showcaseGuestsT2}
+                guestScores={showcaseScores}
+                tableScore={showcaseT2Avg}
+              />
+            </div>
           </div>
         </div>
       </section>
