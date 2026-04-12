@@ -270,8 +270,8 @@ function IllustrationRecommendation() {
             </text>
           </g>
           <text
-            x={70}
-            y={95}
+            x={100}
+            y={82}
             textAnchor="middle"
             fontSize={12}
             fontWeight={600}
