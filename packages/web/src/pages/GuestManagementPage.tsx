@@ -72,7 +72,7 @@ function SwipeableCard({ onSwipeLeft, onSwipeRight, onClick, children }: {
 
 // ─── Types ──────────────────────────────────────────
 
-type SortField = 'name' | 'category' | 'rsvpStatus' | 'satisfactionScore' | 'assignedTableId' | 'companionCount' | 'prefCount' | 'avoidCount' | 'dietaryNote' | 'specialNote'
+type SortField = 'name' | 'category' | 'subcategory' | 'rsvpStatus' | 'satisfactionScore' | 'assignedTableId' | 'companionCount' | 'prefCount' | 'avoidCount' | 'dietaryNote' | 'specialNote'
 type SortDir = 'asc' | 'desc'
 type CategoryFilter = '全部' | '未排座' | string
 
@@ -386,6 +386,7 @@ export default function GuestManagementPage() {
     switch (sortField) {
       case 'name': cmp = a.name.localeCompare(b.name, 'zh-Hant'); break;
       case 'category': cmp = (a.category || '').localeCompare(b.category || '', 'zh-Hant'); break;
+      case 'subcategory': cmp = (a.subcategory?.name || '').localeCompare(b.subcategory?.name || '', 'zh-Hant'); break;
       case 'rsvpStatus': cmp = a.rsvpStatus.localeCompare(b.rsvpStatus); break;
       case 'satisfactionScore': {
         // 未排桌的賓客視為 -1 分，確保排序能區分已排/未排
@@ -394,7 +395,12 @@ export default function GuestManagementPage() {
         cmp = aScore - bScore;
         break;
       }
-      case 'assignedTableId': cmp = (a.assignedTableId || '').localeCompare(b.assignedTableId || ''); break;
+      case 'assignedTableId': {
+        const aName = a.assignedTableId ? tableNameMap.get(a.assignedTableId) || '' : '';
+        const bName = b.assignedTableId ? tableNameMap.get(b.assignedTableId) || '' : '';
+        cmp = aName.localeCompare(bName, 'zh-Hant', { numeric: true });
+        break;
+      }
       case 'companionCount': cmp = a.companionCount - b.companionCount; break;
       case 'prefCount': cmp = a.seatPreferences.length - b.seatPreferences.length; break;
       case 'avoidCount': cmp = avoidCount(a) - avoidCount(b); break;
@@ -895,7 +901,7 @@ export default function GuestManagementPage() {
               <tr className="border-b-2 border-[var(--border)]">
                 <th onClick={() => handleSort('name')} className={thClass}>姓名{sortArrow('name')}</th>
                 <th onClick={() => handleSort('category')} className={thClass}>分類{sortArrow('category')}</th>
-                <th className={thClass}>子分類</th>
+                <th onClick={() => handleSort('subcategory')} className={thClass}>子分類{sortArrow('subcategory')}</th>
                 <th onClick={() => handleSort('assignedTableId')} className={thClass}>桌次{sortArrow('assignedTableId')}</th>
                 <th onClick={() => handleSort('satisfactionScore')} className={`${thClass} text-right`}>滿意度{sortArrow('satisfactionScore')}</th>
                 <th onClick={() => handleSort('rsvpStatus')} className={`${thClass} text-center`}>出席{sortArrow('rsvpStatus')}</th>
