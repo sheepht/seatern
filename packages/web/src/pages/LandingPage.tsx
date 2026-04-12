@@ -949,8 +949,40 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="w-full bg-[#1C1917] px-6 py-10 text-center text-sm text-[#A8A29E]">
-        <p>排位鷗鷗 Seatern · 用心排好座位</p>
+      <footer className="w-full bg-[#1C1917] px-6 py-12 text-[#A8A29E]">
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-6 text-center sm:flex-row sm:justify-between sm:text-left">
+          <div>
+            <p className="text-base font-semibold text-[#FAFAF9]" style={{ fontFamily: '"Noto Sans TC", sans-serif' }}>
+              排位鷗鷗 Seatern
+            </p>
+            <p className="mt-1 text-sm">用心排好座位</p>
+          </div>
+          <div className="flex flex-col items-center gap-1 sm:items-end">
+            <p className="text-sm">
+              由{' '}
+              <a
+                href="https://sheepht.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-[#D4A85B] underline-offset-2 hover:underline"
+              >
+                羊姥苑工作室
+              </a>{' '}
+              製作
+            </p>
+            <a
+              href="https://sheepht.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-[#78716C] hover:text-[#D4A85B]"
+            >
+              sheepht.com
+            </a>
+          </div>
+        </div>
+        <p className="mx-auto mt-8 max-w-5xl border-t border-[#292524] pt-6 text-center text-xs text-[#78716C]">
+          © {new Date().getFullYear()} 羊姥苑工作室 · All rights reserved.
+        </p>
       </footer>
     </main>
   );
