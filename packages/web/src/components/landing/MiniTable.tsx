@@ -39,13 +39,13 @@ interface Geometry {
 }
 
 function computeGeometry(capacity: number): Geometry {
-  // workspace 公式: radius = max(88, 58 + capacity * 7)
+  // workspace 公式變形: radius 隨 capacity 線性增長
   const TABLE_RADIUS = Math.max(82, 54 + capacity * 6);
-  const SEAT_RADIUS = TABLE_RADIUS - 28;
-  // 高容量桌 chip 要縮小避免相鄰重疊
-  const GUEST_R = capacity <= 6 ? 20 : capacity <= 8 ? 18 : 15;
+  const SEAT_RADIUS = TABLE_RADIUS - 30;
+  // chip 大小盡量保持可讀，只在 cap > 12 才縮小
+  const GUEST_R = capacity <= 12 ? 20 : 18;
   const RING_R = GUEST_R + 3;
-  const CONTAINER = (TABLE_RADIUS + 36) * 2;
+  const CONTAINER = (TABLE_RADIUS + 40) * 2;
   return {
     CONTAINER,
     CENTER: CONTAINER / 2,
@@ -79,6 +79,7 @@ function FilledSeat({
   guestR,
   ringR,
   nameSize,
+  badge,
 }: {
   guest: DemoGuest;
   score: number;
@@ -87,6 +88,7 @@ function FilledSeat({
   guestR: number;
   ringR: number;
   nameSize: number;
+  badge?: string;
 }) {
   const gc = GROUP_COLORS[guest.group];
   const satColor = getSatisfactionColor(score);
@@ -121,6 +123,19 @@ function FilledSeat({
       >
         {guest.name}
       </text>
+      {badge && (
+        <g transform={`translate(${ringR + 2}, ${-ringR - 2})`}>
+          <circle r={11} fill="#FEE2E2" stroke="#DC2626" strokeWidth={1.5} />
+          <text
+            y={4}
+            textAnchor="middle"
+            fontSize={13}
+            style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+          >
+            {badge}
+          </text>
+        </g>
+      )}
     </g>
   );
 }
@@ -168,6 +183,10 @@ interface MiniTableVisualProps {
   tableScore: number;
   highlighted?: boolean;
   previewSlotIndex?: number;
+  /** { guestId: emoji } — 渲染在賓客右上的徽章（青筋 💢 等） */
+  seatBadges?: Record<string, string>;
+  /** 桌中央下方的分數變化徽章，格式 "+5" / "-3"；正值綠、負值紅 */
+  deltaBadge?: string | null;
 }
 
 export function MiniTableVisual({
@@ -177,6 +196,8 @@ export function MiniTableVisual({
   tableScore,
   highlighted = false,
   previewSlotIndex = -1,
+  seatBadges,
+  deltaBadge,
 }: MiniTableVisualProps) {
   const geo = computeGeometry(table.capacity);
   const animatedTableScore = useAnimatedNumber(tableScore, 500);
@@ -185,9 +206,11 @@ export function MiniTableVisual({
   const tableFill = highlighted ? '#F5F0E6' : '#FFFFFF';
   const tableStrokeWidth = highlighted ? 3 : 2;
 
-  const nameSize = geo.GUEST_R >= 18 ? 12 : geo.GUEST_R >= 15 ? 11 : 9;
-  const scoreSize = geo.TABLE_RADIUS >= 100 ? 40 : 34;
+  const nameSize = geo.GUEST_R >= 20 ? 13 : 11;
+  const scoreSize = geo.TABLE_RADIUS >= 100 ? 42 : 34;
   const labelSize = geo.TABLE_RADIUS >= 100 ? 12 : 11;
+
+  const deltaIsPositive = deltaBadge?.startsWith('+');
 
   return (
     <div
@@ -235,6 +258,34 @@ export function MiniTableVisual({
           {table.name}
         </text>
 
+        {deltaBadge && (
+          <g
+            transform={`translate(${geo.CENTER}, ${geo.CENTER + geo.TABLE_RADIUS + 20})`}
+            style={{ filter: 'drop-shadow(0 2px 6px rgba(176, 141, 87, 0.25))' }}
+          >
+            <rect
+              x={-32}
+              y={-14}
+              width={64}
+              height={28}
+              rx={14}
+              fill={deltaIsPositive ? '#DCFCE7' : '#FEE2E2'}
+              stroke={deltaIsPositive ? '#16A34A' : '#DC2626'}
+              strokeWidth={2}
+            />
+            <text
+              y={5}
+              textAnchor="middle"
+              fontSize={15}
+              fontWeight={800}
+              fill={deltaIsPositive ? '#15803D' : '#991B1B'}
+              style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
+            >
+              {deltaBadge}
+            </text>
+          </g>
+        )}
+
         <g transform={`translate(${geo.CENTER}, ${geo.CENTER})`}>
           {Array.from({ length: table.capacity }, (_, i) => {
             const { x, y } = seatPosition(i, table.capacity, geo.SEAT_RADIUS);
@@ -250,6 +301,7 @@ export function MiniTableVisual({
                   guestR={geo.GUEST_R}
                   ringR={geo.RING_R}
                   nameSize={nameSize}
+                  badge={seatBadges?.[guest.id]}
                 />
               );
             }

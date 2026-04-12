@@ -95,22 +95,51 @@ function IllustrationImport() {
   );
 }
 
-// Feature 3 target table: capacity 5, 4 高分賓客 + 1 空位被推薦
+// Feature 3 target table: capacity 10, 9 高分賓客 + 1 空位被推薦
 const recommendationTable: DemoTable = {
   id: 'rec-t3',
   name: '第 3 桌',
-  capacity: 5,
-  guestIds: ['r1', 'r2', 'r3', 'r4'],
+  capacity: 10,
+  guestIds: ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8', 'r9'],
 };
 const recommendationGuests: DemoGuest[] = [
   { id: 'r1', name: '大雄', group: 'groom', mutualPrefs: [] },
   { id: 'r2', name: '家豪', group: 'groom', mutualPrefs: [] },
   { id: 'r3', name: '文華', group: 'groom', mutualPrefs: [] },
   { id: 'r4', name: '建國', group: 'groom', mutualPrefs: [] },
+  { id: 'r5', name: '國強', group: 'groom', mutualPrefs: [] },
+  { id: 'r6', name: '明華', group: 'groom', mutualPrefs: [] },
+  { id: 'r7', name: '志豪', group: 'groom', mutualPrefs: [] },
+  { id: 'r8', name: '宗翰', group: 'groom', mutualPrefs: [] },
+  { id: 'r9', name: '小明', group: 'groom', mutualPrefs: [] },
 ];
 const recommendationScores: Record<string, number> = {
-  r1: 88, r2: 92, r3: 84, r4: 90,
+  r1: 88, r2: 92, r3: 84, r4: 90, r5: 86, r6: 91, r7: 85, r8: 89, r9: 87,
 };
+
+// Feature 4 avoid pair: 10 人桌 + Harry Potter vs 佛地魔 同桌 + 💢 標記
+const avoidTable: DemoTable = {
+  id: 'avoid-t',
+  name: '大家都不開心',
+  capacity: 10,
+  guestIds: ['harry', 'a2', 'a3', 'a4', 'a5', 'voldemort', 'a7', 'a8', 'a9', 'a10'],
+};
+const avoidGuests: DemoGuest[] = [
+  { id: 'harry', name: '哈利', group: 'bride', mutualPrefs: [] },
+  { id: 'a2', name: '榮恩', group: 'groom', mutualPrefs: [] },
+  { id: 'a3', name: '妙麗', group: 'bride', mutualPrefs: [] },
+  { id: 'a4', name: '石內卜', group: 'groom', mutualPrefs: [] },
+  { id: 'a5', name: '貝拉', group: 'bride', mutualPrefs: [] },
+  { id: 'voldemort', name: '佛地魔', group: 'shared', mutualPrefs: [] },
+  { id: 'a7', name: '路平', group: 'groom', mutualPrefs: [] },
+  { id: 'a8', name: '唐克斯', group: 'bride', mutualPrefs: [] },
+  { id: 'a9', name: '穆敵', group: 'groom', mutualPrefs: [] },
+  { id: 'a10', name: '鄧不利多', group: 'shared', mutualPrefs: [] },
+];
+const avoidScores: Record<string, number> = {
+  harry: 18, a2: 52, a3: 48, a4: 45, a5: 50, voldemort: 18, a7: 58, a8: 55, a9: 52, a10: 62,
+};
+const avoidTableAvg = 46;
 
 function SourceGuestChip() {
   const r = 26;
@@ -145,51 +174,59 @@ function SourceGuestChip() {
   );
 }
 
-function RecommendationArrow() {
+function RecommendationCurvedArrow() {
   return (
-    <div className="flex flex-col items-center">
-      <div
-        className="mb-2 rounded-full border border-[#B08D57] bg-[#F5F0E6] px-3 py-1 text-xs font-bold text-[#8C6D3F] shadow-sm"
-        style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
-      >
-        +33 分
-      </div>
-      <svg width={90} height={24} aria-hidden>
-        <line
-          x1={6}
-          y1={12}
-          x2={70}
-          y2={12}
-          stroke="#B08D57"
-          strokeWidth={3}
-          strokeLinecap="round"
-          strokeDasharray="6 5"
-        />
-        <polygon points="68,4 84,12 68,20" fill="#B08D57" />
-      </svg>
-      <p
-        className="mt-1 text-[10px] font-medium text-[#8C6D3F]"
-        style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
+    <svg width={140} height={120} aria-hidden style={{ overflow: 'visible' }}>
+      <defs>
+        <marker
+          id="rec-arrow-head"
+          viewBox="0 0 10 10"
+          refX={8}
+          refY={5}
+          markerWidth={6}
+          markerHeight={6}
+          orient="auto"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#B08D57" />
+        </marker>
+      </defs>
+      <path
+        d="M 8 80 Q 70 0 130 50"
+        fill="none"
+        stroke="#B08D57"
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeDasharray="7 5"
+        markerEnd="url(#rec-arrow-head)"
+      />
+      <text
+        x={70}
+        y={108}
+        textAnchor="middle"
+        fontSize={11}
+        fontWeight={600}
+        fill="#8C6D3F"
+        fontFamily='"Noto Sans TC"'
       >
         推薦移動
-      </p>
-    </div>
+      </text>
+    </svg>
   );
 }
 
 function IllustrationRecommendation() {
-  // 智慧推薦線：左邊源頭賓客 (45 分) + 中間箭頭 +33 + 右邊 MiniTableVisual 目標桌
   return (
-    <div className="flex items-center justify-center gap-2 sm:gap-4">
+    <div className="flex items-center justify-center gap-1 sm:gap-2">
       <SourceGuestChip />
-      <RecommendationArrow />
-      <div className="scale-[0.85] sm:scale-90">
+      <RecommendationCurvedArrow />
+      <div className="scale-[0.75] sm:scale-[0.82]">
         <MiniTableVisual
           table={recommendationTable}
           guests={recommendationGuests}
           guestScores={recommendationScores}
           tableScore={88}
-          previewSlotIndex={4}
+          previewSlotIndex={9}
+          deltaBadge="+33"
         />
       </div>
     </div>
@@ -197,47 +234,29 @@ function IllustrationRecommendation() {
 }
 
 function IllustrationAvoidPair() {
+  // 10 人桌放 Harry + 佛地魔 + 8 個 HP 角色，2 人帶青筋 💢 標記
   return (
-    <svg width={260} height={200} viewBox="0 0 260 200" aria-hidden>
-      {/* Left: Harry Potter (gryffindor red/gold accent) */}
-      <g transform="translate(65, 100)">
-        <circle r={42} fill="#FEE2E2" stroke="#DC2626" strokeWidth={2.5} />
-        <text y={-2} textAnchor="middle" fontSize={13} fontWeight={700} fill="#991B1B" fontFamily='"Noto Sans TC"'>
-          哈利
-        </text>
-        <text y={14} textAnchor="middle" fontSize={12} fontWeight={600} fill="#991B1B" fontFamily='"Noto Sans TC"'>
-          波特
-        </text>
-      </g>
-      {/* Right: Voldemort (slytherin green) */}
-      <g transform="translate(195, 100)">
-        <circle r={42} fill="#DCFCE7" stroke="#16A34A" strokeWidth={2.5} />
-        <text y={-2} textAnchor="middle" fontSize={13} fontWeight={700} fill="#166534" fontFamily='"Noto Sans TC"'>
-          佛地魔
-        </text>
-      </g>
-      {/* Red X warning in the middle */}
-      <g transform="translate(130, 100)">
-        <circle r={22} fill="#FFFFFF" stroke="#DC2626" strokeWidth={2.5} />
-        <line x1={-10} y1={-10} x2={10} y2={10} stroke="#DC2626" strokeWidth={3.5} strokeLinecap="round" />
-        <line x1={-10} y1={10} x2={10} y2={-10} stroke="#DC2626" strokeWidth={3.5} strokeLinecap="round" />
-      </g>
-      <text x={130} y={170} textAnchor="middle" fontSize={11} fill="#78716C" fontFamily='"Noto Sans TC"'>
-        標記「避免同桌」
-      </text>
-    </svg>
+    <div className="scale-[0.82] sm:scale-90">
+      <MiniTableVisual
+        table={avoidTable}
+        guests={avoidGuests}
+        guestScores={avoidScores}
+        tableScore={avoidTableAvg}
+        seatBadges={{ harry: '💢', voldemort: '💢' }}
+      />
+    </div>
   );
 }
 
 function IllustrationGuestList() {
-  // 賓客清單 / 低分賓客視圖
+  // 賓客清單 / 低分賓客視圖（字體放大版）
   return (
-    <svg width={280} height={220} viewBox="0 0 280 220" aria-hidden>
-      <rect x={10} y={10} width={260} height={200} rx={10} fill="#FFFFFF" stroke="#D6D3D1" strokeWidth={2} />
-      <text x={24} y={34} fontSize={12} fontWeight={700} fill="#1C1917" fontFamily='"Noto Sans TC"'>
+    <svg width={320} height={260} viewBox="0 0 320 260" aria-hidden>
+      <rect x={10} y={10} width={300} height={240} rx={12} fill="#FFFFFF" stroke="#D6D3D1" strokeWidth={2} />
+      <text x={26} y={38} fontSize={15} fontWeight={700} fill="#1C1917" fontFamily='"Noto Sans TC"'>
         需要關注的賓客 (3)
       </text>
-      <line x1={24} y1={42} x2={256} y2={42} stroke="#E7E5E4" />
+      <line x1={26} y1={48} x2={294} y2={48} stroke="#E7E5E4" />
 
       {[
         { name: '林志偉', meta: '第 5 桌 · 素食需求', score: 45, color: '#EA580C' },
@@ -246,28 +265,32 @@ function IllustrationGuestList() {
         { name: '王小華', meta: '第 2 桌', score: 72, color: '#CA8A04' },
         { name: '張雅婷', meta: '第 4 桌', score: 68, color: '#CA8A04' },
       ].map((row, i) => {
-        const y = 58 + i * 30;
+        const y = 66 + i * 36;
+        const cy = y + 12;
+        const rRing = 16;
+        const circumRow = 2 * Math.PI * rRing;
         return (
           <g key={i}>
-            {/* Avatar */}
-            <circle cx={36} cy={y + 10} r={13} fill="none" stroke="#E7E5E4" strokeWidth={2} />
-            <circle cx={36} cy={y + 10} r={13} fill="none" stroke={row.color} strokeWidth={2.5}
-              strokeDasharray={`${2 * Math.PI * 13 * (row.score / 100)} ${2 * Math.PI * 13 * (1 - row.score / 100)}`}
-              strokeDashoffset={2 * Math.PI * 13 * 0.25}
-              transform={`rotate(-90 36 ${y + 10})`}
+            {/* Avatar ring */}
+            <circle cx={40} cy={cy} r={rRing} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
+            <circle cx={40} cy={cy} r={rRing} fill="none" stroke={row.color} strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeDasharray={`${circumRow * (row.score / 100)} ${circumRow * (1 - row.score / 100)}`}
+              strokeDashoffset={circumRow * 0.25}
+              transform={`rotate(-90 40 ${cy})`}
             />
-            <circle cx={36} cy={y + 10} r={10} fill="#F3F4F6" stroke="white" strokeWidth={1} />
-            {/* Name */}
-            <text x={58} y={y + 7} fontSize={11} fontWeight={600} fill="#1C1917" fontFamily='"Noto Sans TC"'>
+            <circle cx={40} cy={cy} r={12} fill="#F3F4F6" stroke="white" strokeWidth={1.5} />
+            {/* Name + meta */}
+            <text x={68} y={cy - 2} fontSize={14} fontWeight={700} fill="#1C1917" fontFamily='"Noto Sans TC"'>
               {row.name}
             </text>
-            <text x={58} y={y + 20} fontSize={9} fill="#78716C" fontFamily='"Noto Sans TC"'>
+            <text x={68} y={cy + 14} fontSize={11} fill="#78716C" fontFamily='"Noto Sans TC"'>
               {row.meta}
             </text>
             {/* Score badge */}
-            <g transform={`translate(240, ${y + 10})`}>
-              <rect x={-20} y={-11} width={40} height={22} rx={11} fill={row.color} />
-              <text y={4} textAnchor="middle" fontSize={12} fontWeight={700} fill="white" fontFamily='"Plus Jakarta Sans"'>
+            <g transform={`translate(274, ${cy})`}>
+              <rect x={-22} y={-13} width={44} height={26} rx={13} fill={row.color} />
+              <text y={5} textAnchor="middle" fontSize={14} fontWeight={800} fill="white" fontFamily='"Plus Jakarta Sans"'>
                 {row.score}
               </text>
             </g>
@@ -312,22 +335,26 @@ function IllustrationAutoAssign() {
         </text>
       </g>
 
-      {/* Right: 2 organized tables */}
+      {/* Right: 2 organized tables — 賓客全綠表示全部滿意 */}
       {[
         { cx: 205, cy: 60 },
         { cx: 205, cy: 140 },
       ].map((t, ti) => (
         <g key={ti}>
           <circle cx={t.cx} cy={t.cy} r={34} fill="#FFFFFF" stroke="#B08D57" strokeWidth={2} />
-          <text x={t.cx} y={t.cy + 3} textAnchor="middle" fontSize={14} fontWeight={800} fill="#1C1917" fontFamily='"Plus Jakarta Sans"'>
+          <text x={t.cx} y={t.cy + 3} textAnchor="middle" fontSize={14} fontWeight={800} fill="#16A34A" fontFamily='"Plus Jakarta Sans"'>
             {ti === 0 ? 92 : 88}
           </text>
           {Array.from({ length: 6 }, (_, i) => {
             const angle = ((2 * Math.PI) / 6) * i - Math.PI / 2;
             const cx = t.cx + Math.cos(angle) * 26;
             const cy = t.cy + Math.sin(angle) * 26;
-            const color = i % 2 === 0 ? '#DBEAFE' : '#FEE2E2';
-            return <circle key={i} cx={cx} cy={cy} r={6} fill={color} stroke="white" strokeWidth={1} />;
+            return (
+              <g key={i}>
+                <circle cx={cx} cy={cy} r={8} fill="none" stroke="#16A34A" strokeWidth={2} />
+                <circle cx={cx} cy={cy} r={6} fill="#BBF7D0" stroke="white" strokeWidth={1} />
+              </g>
+            );
           })}
         </g>
       ))}
@@ -336,100 +363,177 @@ function IllustrationAutoAssign() {
 }
 
 function IllustrationOverflow() {
-  // 群組溢出：12 人群組放不下 10 人桌，溢出 2 人到鄰桌
+  // 鄰桌加成：主桌 10 大學同學 + 鄰桌 8 公司同事 + 2 位溢出大學同學
+  // 重點：溢出的 2 位雖然不是和子分類同桌，但因為鄰桌，仍有 +5 加成
   return (
-    <svg width={280} height={200} viewBox="0 0 280 200" aria-hidden>
-      {/* Main table with 10 seats filled */}
-      <g transform="translate(95, 100)">
-        <circle r={58} fill="#FFFFFF" stroke="#B08D57" strokeWidth={2.5} />
-        <text y={-2} textAnchor="middle" fontSize={16} fontWeight={800} fill="#1C1917" fontFamily='"Plus Jakarta Sans"'>
-          10
+    <svg width={340} height={240} viewBox="0 0 340 240" aria-hidden>
+      {/* Main table: 大學同學 10 人 */}
+      <g transform="translate(90, 120)">
+        <circle r={68} fill="#FFFFFF" stroke="#16A34A" strokeWidth={2.5} />
+        <text y={-4} textAnchor="middle" fontSize={22} fontWeight={800} fill="#16A34A" fontFamily='"Plus Jakarta Sans"'>
+          85
         </text>
-        <text y={14} textAnchor="middle" fontSize={9} fill="#78716C" fontFamily='"Noto Sans TC"'>
+        <text y={14} textAnchor="middle" fontSize={11} fill="#78716C" fontFamily='"Noto Sans TC"'>
+          第 1 桌
+        </text>
+        <text y={28} textAnchor="middle" fontSize={10} fill="#78716C" fontFamily='"Noto Sans TC"'>
           大學同學
         </text>
         {Array.from({ length: 10 }, (_, i) => {
           const angle = ((2 * Math.PI) / 10) * i - Math.PI / 2;
-          const cx = Math.cos(angle) * 44;
-          const cy = Math.sin(angle) * 44;
+          const cx = Math.cos(angle) * 52;
+          const cy = Math.sin(angle) * 52;
           return (
-            <circle key={i} cx={cx} cy={cy} r={8} fill="#DBEAFE" stroke="white" strokeWidth={1.5} />
+            <g key={i}>
+              <circle cx={cx} cy={cy} r={11} fill="none" stroke="#16A34A" strokeWidth={2} />
+              <circle cx={cx} cy={cy} r={9} fill="#DBEAFE" stroke="white" strokeWidth={1} />
+            </g>
           );
         })}
       </g>
 
-      {/* Arrow */}
-      <path d="M 162 90 L 182 90" stroke="#B08D57" strokeWidth={2.5} strokeLinecap="round" strokeDasharray="4 3" />
-      <path d="M 176 84 L 184 90 L 176 96" stroke="#B08D57" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-
-      {/* Overflow neighbor table */}
-      <g transform="translate(220, 80)">
-        <circle r={34} fill="#FFFFFF" stroke="#D6D3D1" strokeWidth={1.8} />
-        <text y={3} textAnchor="middle" fontSize={11} fontWeight={700} fill="#78716C" fontFamily='"Plus Jakarta Sans"'>
-          鄰桌
+      {/* Neighbor table: 公司同事 8 + 大學同學溢出 2 */}
+      <g transform="translate(240, 120)">
+        <circle r={68} fill="#FFFFFF" stroke="#D6D3D1" strokeWidth={2} />
+        <text y={-4} textAnchor="middle" fontSize={22} fontWeight={800} fill="#1C1917" fontFamily='"Plus Jakarta Sans"'>
+          78
         </text>
-        {/* 2 overflow guests highlighted */}
-        <g transform="translate(-18, -20)">
-          <circle r={9} fill="#DBEAFE" stroke="#B08D57" strokeWidth={2} />
-        </g>
-        <g transform="translate(18, -20)">
-          <circle r={9} fill="#DBEAFE" stroke="#B08D57" strokeWidth={2} />
-        </g>
+        <text y={14} textAnchor="middle" fontSize={11} fill="#78716C" fontFamily='"Noto Sans TC"'>
+          第 2 桌
+        </text>
+        <text y={28} textAnchor="middle" fontSize={10} fill="#78716C" fontFamily='"Noto Sans TC"'>
+          公司同事
+        </text>
+        {Array.from({ length: 10 }, (_, i) => {
+          const angle = ((2 * Math.PI) / 10) * i - Math.PI / 2;
+          const cx = Math.cos(angle) * 52;
+          const cy = Math.sin(angle) * 52;
+          // 第 0 和 1 是溢出的大學同學（藍色 + 暖金環）
+          const isOverflow = i === 0 || i === 1;
+          return (
+            <g key={i}>
+              <circle cx={cx} cy={cy} r={11} fill="none" stroke={isOverflow ? '#B08D57' : '#CA8A04'} strokeWidth={2} />
+              <circle cx={cx} cy={cy} r={9} fill={isOverflow ? '#DBEAFE' : '#FEE2E2'} stroke="white" strokeWidth={1} />
+            </g>
+          );
+        })}
       </g>
-      <text x={220} y={135} textAnchor="middle" fontSize={10} fill="#8C6D3F" fontWeight={600} fontFamily='"Noto Sans TC"'>
-        溢出 2 位
-      </text>
 
-      <text x={140} y={188} textAnchor="middle" fontSize={10} fill="#78716C" fontFamily='"Noto Sans TC"'>
-        12 人群組 · 單桌上限 10 人
+      {/* 兩桌之間的連結弧線（顯示同群組仍有連結）*/}
+      <path
+        d="M 138 115 Q 170 85 205 95"
+        fill="none"
+        stroke="#B08D57"
+        strokeWidth={2}
+        strokeDasharray="4 3"
+        opacity={0.7}
+      />
+
+      {/* +5 鄰桌加成 badge 放在連結弧線上方 */}
+      <g transform="translate(170, 55)" style={{ filter: 'drop-shadow(0 2px 6px rgba(22,163,74,0.25))' }}>
+        <rect x={-42} y={-14} width={84} height={28} rx={14} fill="#DCFCE7" stroke="#16A34A" strokeWidth={2} />
+        <text y={5} textAnchor="middle" fontSize={13} fontWeight={800} fill="#15803D" fontFamily='"Plus Jakarta Sans"'>
+          +5 鄰桌加成
+        </text>
+      </g>
+
+      <text x={170} y={220} textAnchor="middle" fontSize={11} fill="#78716C" fontFamily='"Noto Sans TC"'>
+        12 人大學群組 · 溢出 2 位到鄰桌仍保留群組分
       </text>
     </svg>
   );
 }
 
 function IllustrationCompanion() {
-  // 眷屬跟隨：主人 + 嬰兒椅小圈一起移動
+  // 眷屬跟隨：模擬工作區拖曳 — 一張桌子 + 被拖曳的主人+眷屬 ghost 浮動 + +N 徽章
   return (
-    <svg width={280} height={200} viewBox="0 0 280 200" aria-hidden>
-      {/* Before: main + companion together */}
-      <g transform="translate(60, 100)">
-        <circle r={28} fill="#FEE2E2" stroke="#991B1B" strokeWidth={2} />
-        <text y={4} textAnchor="middle" fontSize={12} fontWeight={600} fill="#991B1B" fontFamily='"Noto Sans TC"'>
-          媽媽
+    <svg width={320} height={240} viewBox="0 0 320 240" aria-hidden style={{ overflow: 'visible' }}>
+      <defs>
+        <filter id="drag-shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx={0} dy={6} stdDeviation={5} floodColor="#B08D57" floodOpacity={0.35} />
+        </filter>
+      </defs>
+
+      {/* Source table (cap 10, 主人離開的原位 dashed) */}
+      <g transform="translate(100, 130)">
+        <circle r={68} fill="#FFFFFF" stroke="#D6D3D1" strokeWidth={2} />
+        <text y={-4} textAnchor="middle" fontSize={22} fontWeight={800} fill="#1C1917" fontFamily='"Plus Jakarta Sans"'>
+          82
         </text>
-        <g transform="translate(22, 22)">
-          <circle r={12} fill="#FEE2E2" stroke="#991B1B" strokeWidth={1.5} />
-          <text y={3} textAnchor="middle" fontSize={8} fontWeight={600} fill="#991B1B" fontFamily='"Noto Sans TC"'>
+        <text y={14} textAnchor="middle" fontSize={11} fill="#78716C" fontFamily='"Noto Sans TC"'>
+          第 4 桌
+        </text>
+        {Array.from({ length: 10 }, (_, i) => {
+          const angle = ((2 * Math.PI) / 10) * i - Math.PI / 2;
+          const cx = Math.cos(angle) * 52;
+          const cy = Math.sin(angle) * 52;
+          // 第 0 是主人原位（dashed empty），第 1 是眷屬原位（dashed empty）
+          const isEmpty = i === 0 || i === 1;
+          if (isEmpty) {
+            return (
+              <circle
+                key={i}
+                cx={cx}
+                cy={cy}
+                r={11}
+                fill="#F5F0E6"
+                stroke="#B08D57"
+                strokeWidth={2}
+                strokeDasharray="3 2"
+                opacity={0.7}
+              />
+            );
+          }
+          return (
+            <g key={i}>
+              <circle cx={cx} cy={cy} r={11} fill="none" stroke="#16A34A" strokeWidth={2} />
+              <circle cx={cx} cy={cy} r={9} fill="#FEE2E2" stroke="white" strokeWidth={1} />
+            </g>
+          );
+        })}
+      </g>
+
+      {/* Dragged ghost: 主人 + 嬰兒一起飄在上方右側 */}
+      <g transform="translate(235, 80)" filter="url(#drag-shadow)">
+        {/* 主人 */}
+        <g>
+          <circle r={24} fill="none" stroke="#16A34A" strokeWidth={2.5} />
+          <circle r={20} fill="#FEE2E2" stroke="white" strokeWidth={2} />
+          <text y={5} textAnchor="middle" fontSize={13} fontWeight={700} fill="#991B1B" fontFamily='"Noto Sans TC"'>
+            媽媽
+          </text>
+        </g>
+        {/* 眷屬 (小圈 + 連結) */}
+        <g transform="translate(28, 24)">
+          <line x1={-14} y1={-12} x2={-4} y2={-4} stroke="#8C6D3F" strokeWidth={2} strokeDasharray="2 2" />
+          <circle r={14} fill="none" stroke="#16A34A" strokeWidth={2} />
+          <circle r={11} fill="#FEE2E2" stroke="white" strokeWidth={1.5} />
+          <text y={4} textAnchor="middle" fontSize={10} fontWeight={700} fill="#991B1B" fontFamily='"Noto Sans TC"'>
             嬰兒
           </text>
         </g>
-        {/* Link between them */}
-        <line x1={18} y1={18} x2={10} y2={10} stroke="#8C6D3F" strokeWidth={2} strokeDasharray="2 2" />
       </g>
 
-      {/* Arrow */}
-      <path d="M 115 100 L 155 100" stroke="#B08D57" strokeWidth={3} strokeLinecap="round" />
-      <path d="M 149 94 L 157 100 L 149 106" stroke="#B08D57" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <text x={135} y={85} textAnchor="middle" fontSize={10} fill="#8C6D3F" fontWeight={600} fontFamily='"Noto Sans TC"'>
-        拖曳
-      </text>
-
-      {/* After: moved together */}
-      <g transform="translate(210, 100)">
-        <circle r={28} fill="#FEE2E2" stroke="#991B1B" strokeWidth={2} />
-        <text y={4} textAnchor="middle" fontSize={12} fontWeight={600} fill="#991B1B" fontFamily='"Noto Sans TC"'>
-          媽媽
+      {/* +N 眷屬 badge (貼在 ghost 右上，像工作區拖曳時的分數 delta badge) */}
+      <g transform="translate(288, 56)" style={{ filter: 'drop-shadow(0 2px 6px rgba(176,141,87,0.35))' }}>
+        <rect x={-28} y={-13} width={56} height={26} rx={13} fill="#F5F0E6" stroke="#B08D57" strokeWidth={2} />
+        <text y={5} textAnchor="middle" fontSize={13} fontWeight={800} fill="#8C6D3F" fontFamily='"Plus Jakarta Sans"'>
+          +1 位
         </text>
-        <g transform="translate(22, 22)">
-          <circle r={12} fill="#FEE2E2" stroke="#991B1B" strokeWidth={1.5} />
-          <text y={3} textAnchor="middle" fontSize={8} fontWeight={600} fill="#991B1B" fontFamily='"Noto Sans TC"'>
-            嬰兒
-          </text>
-        </g>
-        <line x1={18} y1={18} x2={10} y2={10} stroke="#8C6D3F" strokeWidth={2} strokeDasharray="2 2" />
       </g>
-      <text x={140} y={180} textAnchor="middle" fontSize={10} fill="#78716C" fontFamily='"Noto Sans TC"'>
-        眷屬自動跟著主人移動
+
+      {/* 拖曳虛線軌跡：從原位到 ghost */}
+      <path
+        d="M 100 80 Q 170 40 225 70"
+        fill="none"
+        stroke="#B08D57"
+        strokeWidth={2}
+        strokeDasharray="5 4"
+        opacity={0.6}
+      />
+
+      <text x={160} y={222} textAnchor="middle" fontSize={11} fill="#78716C" fontFamily='"Noto Sans TC"'>
+        拖主人，眷屬自動跟著走
       </text>
     </svg>
   );
