@@ -42,8 +42,8 @@ function computeGeometry(capacity: number): Geometry {
   // workspace 公式變形: radius 隨 capacity 線性增長
   const TABLE_RADIUS = Math.max(82, 54 + capacity * 6);
   const SEAT_RADIUS = TABLE_RADIUS - 30;
-  // chip 大小盡量保持可讀，只在 cap > 12 才縮小
-  const GUEST_R = capacity <= 12 ? 20 : 18;
+  // chip 隨 capacity 縮小，文字字級另外控制（和 GUEST_R 解耦）
+  const GUEST_R = capacity <= 6 ? 20 : capacity <= 8 ? 18 : capacity <= 10 ? 16 : 14;
   const RING_R = GUEST_R + 3;
   const CONTAINER = (TABLE_RADIUS + 40) * 2;
   return {
@@ -206,7 +206,8 @@ export function MiniTableVisual({
   const tableFill = highlighted ? '#F5F0E6' : '#FFFFFF';
   const tableStrokeWidth = highlighted ? 3 : 2;
 
-  const nameSize = geo.GUEST_R >= 20 ? 13 : 11;
+  // 字級和 GUEST_R 解耦 — cap 10 的 chip 小但名字照樣大
+  const nameSize = geo.GUEST_R >= 20 ? 14 : geo.GUEST_R >= 18 ? 13 : 13;
   const scoreSize = geo.TABLE_RADIUS >= 100 ? 42 : 34;
   const labelSize = geo.TABLE_RADIUS >= 100 ? 12 : 11;
 

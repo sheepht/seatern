@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MiniTableVisual } from '@/components/landing/MiniTable';
 import type { DemoGuest, DemoTable } from '@/components/landing/demoScorer';
@@ -125,7 +126,7 @@ const avoidTable: DemoTable = {
   guestIds: ['harry', 'a2', 'a3', 'a4', 'a5', 'voldemort', 'a7', 'a8', 'a9', 'a10'],
 };
 const avoidGuests: DemoGuest[] = [
-  { id: 'harry', name: '哈利', group: 'bride', mutualPrefs: [] },
+  { id: 'harry', name: '波特', group: 'bride', mutualPrefs: [] },
   { id: 'a2', name: '榮恩', group: 'groom', mutualPrefs: [] },
   { id: 'a3', name: '妙麗', group: 'bride', mutualPrefs: [] },
   { id: 'a4', name: '石內卜', group: 'groom', mutualPrefs: [] },
@@ -141,85 +142,104 @@ const avoidScores: Record<string, number> = {
 };
 const avoidTableAvg = 46;
 
-function SourceGuestChip() {
-  const r = 26;
+function IllustrationRecommendation() {
+  // 志偉的滿意度 cycle animation: 45 → 78 → 45 (every 2.2s)
+  const [isAfter, setIsAfter] = useState(false);
+  useEffect(() => {
+    const id = setInterval(() => setIsAfter((v) => !v), 2200);
+    return () => clearInterval(id);
+  }, []);
+
+  const r = 28;
   const circum = 2 * Math.PI * r;
-  // 志偉目前 45 分 → orange
-  const progress = 0.45;
+  const score = isAfter ? 78 : 45;
+  const color = isAfter ? '#16A34A' : '#EA580C';
+  const progress = score / 100;
+
   return (
-    <div className="flex flex-col items-center">
-      <svg width={70} height={70} style={{ overflow: 'visible' }} aria-hidden>
-        <g transform="translate(35, 35)">
+    <div className="flex items-center justify-center gap-0 sm:gap-1">
+      {/* Combined SVG: 志偉 chip + 曲線箭頭（箭頭從 chip 右緣直接伸出）*/}
+      <svg width={230} height={160} style={{ overflow: 'visible' }} aria-hidden>
+        <defs>
+          <marker
+            id="rec-arrow-head"
+            viewBox="0 0 10 10"
+            refX={8}
+            refY={5}
+            markerWidth={6}
+            markerHeight={6}
+            orient="auto"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#B08D57" />
+          </marker>
+        </defs>
+
+        {/* 志偉 chip at (50, 85) */}
+        <g transform="translate(50, 85)">
           <circle r={r} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
           <circle
             r={r}
             fill="none"
-            stroke="#EA580C"
-            strokeWidth={2.5}
+            stroke={color}
+            strokeWidth={3}
             strokeLinecap="round"
             strokeDasharray={`${circum * progress} ${circum * (1 - progress)}`}
             strokeDashoffset={circum * 0.25}
             transform="rotate(-90)"
+            style={{
+              transition: 'stroke-dasharray 900ms ease-out, stroke 900ms ease-out',
+            }}
           />
-          <circle r={22} fill="#DBEAFE" stroke="white" strokeWidth={1.5} />
-          <text y={4} textAnchor="middle" fontSize={12} fontWeight={600} fill="#1E40AF" fontFamily='"Noto Sans TC"'>
+          <circle r={23} fill="#DBEAFE" stroke="white" strokeWidth={1.5} />
+          <text
+            y={5}
+            textAnchor="middle"
+            fontSize={14}
+            fontWeight={700}
+            fill="#1E40AF"
+            fontFamily='"Noto Sans TC"'
+          >
             志偉
           </text>
         </g>
-      </svg>
-      <p className="mt-1 text-xs text-[#78716C]" style={{ fontFamily: '"Noto Sans TC", sans-serif' }}>
-        目前 45 分
-      </p>
-    </div>
-  );
-}
-
-function RecommendationCurvedArrow() {
-  return (
-    <svg width={140} height={120} aria-hidden style={{ overflow: 'visible' }}>
-      <defs>
-        <marker
-          id="rec-arrow-head"
-          viewBox="0 0 10 10"
-          refX={8}
-          refY={5}
-          markerWidth={6}
-          markerHeight={6}
-          orient="auto"
+        <text
+          x={50}
+          y={140}
+          textAnchor="middle"
+          fontSize={12}
+          fontWeight={600}
+          fill={color}
+          fontFamily='"Noto Sans TC"'
+          style={{ transition: 'fill 900ms ease-out' }}
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#B08D57" />
-        </marker>
-      </defs>
-      <path
-        d="M 8 80 Q 70 0 130 50"
-        fill="none"
-        stroke="#B08D57"
-        strokeWidth={3}
-        strokeLinecap="round"
-        strokeDasharray="7 5"
-        markerEnd="url(#rec-arrow-head)"
-      />
-      <text
-        x={70}
-        y={108}
-        textAnchor="middle"
-        fontSize={11}
-        fontWeight={600}
-        fill="#8C6D3F"
-        fontFamily='"Noto Sans TC"'
-      >
-        推薦移動
-      </text>
-    </svg>
-  );
-}
+          {score} 分
+        </text>
 
-function IllustrationRecommendation() {
-  return (
-    <div className="flex items-center justify-center gap-1 sm:gap-2">
-      <SourceGuestChip />
-      <RecommendationCurvedArrow />
-      <div className="scale-[0.75] sm:scale-[0.82]">
+        {/* 曲線箭頭：從志偉右緣 (80, 80) 曲線到右上 (218, 40)，視覺上指向目標桌 */}
+        <path
+          d="M 80 78 Q 150 5 218 38"
+          fill="none"
+          stroke="#B08D57"
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeDasharray="7 5"
+          markerEnd="url(#rec-arrow-head)"
+        />
+        <text
+          x={145}
+          y={155}
+          textAnchor="middle"
+          fontSize={12}
+          fontWeight={600}
+          fill="#8C6D3F"
+          fontFamily='"Noto Sans TC"'
+        >
+          智慧推薦
+        </text>
+      </svg>
+
+      {/* 目標桌 — MiniTableVisual 大圓桌 cap 10, deltaBadge +33 */}
+      <div className="-ml-6 scale-[0.72] sm:-ml-4 sm:scale-[0.8]">
         <MiniTableVisual
           table={recommendationTable}
           guests={recommendationGuests}
@@ -408,12 +428,32 @@ function IllustrationOverflow() {
           const angle = ((2 * Math.PI) / 10) * i - Math.PI / 2;
           const cx = Math.cos(angle) * 52;
           const cy = Math.sin(angle) * 52;
-          // 第 0 和 1 是溢出的大學同學（藍色 + 暖金環）
+          // 第 0 和 1 是溢出的大學同學（藍色，和第 1 桌同色）
           const isOverflow = i === 0 || i === 1;
           return (
             <g key={i}>
-              <circle cx={cx} cy={cy} r={11} fill="none" stroke={isOverflow ? '#B08D57' : '#CA8A04'} strokeWidth={2} />
-              <circle cx={cx} cy={cy} r={9} fill={isOverflow ? '#DBEAFE' : '#FEE2E2'} stroke="white" strokeWidth={1} />
+              {/* 溢出者特別圈起來 — 外層暖金粗虛線環 */}
+              {isOverflow && (
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={17}
+                  fill="none"
+                  stroke="#B08D57"
+                  strokeWidth={2.5}
+                  strokeDasharray="3 2"
+                  style={{ filter: 'drop-shadow(0 0 4px rgba(176,141,87,0.4))' }}
+                />
+              )}
+              <circle cx={cx} cy={cy} r={11} fill="none" stroke={isOverflow ? '#16A34A' : '#CA8A04'} strokeWidth={2} />
+              <circle
+                cx={cx}
+                cy={cy}
+                r={9}
+                fill={isOverflow ? '#DBEAFE' : '#FEE2E2'}
+                stroke="white"
+                strokeWidth={1}
+              />
             </g>
           );
         })}
