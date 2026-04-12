@@ -1029,7 +1029,7 @@ export default function LandingPage() {
             </p>
             <p className="mt-1 text-sm">用心排好座位</p>
           </div>
-          <div className="flex flex-col items-center gap-1 sm:items-end">
+          <div className="flex flex-col items-center gap-3 sm:items-end">
             <p className="text-sm">
               由{' '}
               <a
@@ -1050,6 +1050,32 @@ export default function LandingPage() {
             >
               sheepht.com
             </a>
+            <div className="flex items-center gap-3">
+              <a
+                href="https://www.instagram.com/sheepht"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram @sheepht"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-[#44403C] text-[#A8A29E] transition-colors hover:border-[#D4A85B] hover:text-[#D4A85B]"
+              >
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x={2} y={2} width={20} height={20} rx={5} ry={5} />
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                  <line x1={17.5} y1={6.5} x2={17.51} y2={6.5} />
+                </svg>
+              </a>
+              <a
+                href="https://www.threads.com/@sheepht"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Threads @sheepht"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-[#44403C] text-[#A8A29E] transition-colors hover:border-[#D4A85B] hover:text-[#D4A85B]"
+              >
+                <svg width={18} height={18} viewBox="0 0 192 192" fill="currentColor" aria-hidden>
+                  <path d="M141.537 88.988a66.6 66.6 0 0 0-2.518-1.143c-1.482-27.307-16.403-42.94-41.457-43.1h-.34c-14.986 0-27.449 6.396-35.12 18.036l13.779 9.452c5.73-8.695 14.724-10.548 21.348-10.548h.229c8.249.053 14.474 2.452 18.503 7.129 2.932 3.405 4.892 8.111 5.864 14.05-7.327-1.246-15.253-1.63-23.727-1.143-23.88 1.374-39.236 15.302-38.205 34.653.523 9.818 5.4 18.264 13.735 23.782 7.045 4.67 16.126 6.95 25.564 6.437 12.473-.683 22.253-5.436 29.076-14.127 5.184-6.601 8.46-15.161 9.906-25.95 5.933 3.583 10.328 8.298 12.755 13.966 4.126 9.639 4.367 25.482-8.559 38.398-11.327 11.317-24.937 16.213-45.498 16.364-22.806-.169-40.043-7.485-51.244-21.742C35.236 139.956 29.808 120.615 29.6 96c.208-24.615 5.636-43.956 16.14-57.5C56.941 24.244 74.178 16.928 96.984 16.76c22.97.168 40.508 7.52 52.135 21.847 5.705 7.028 10.002 15.868 12.82 26.184l16.292-4.346c-3.418-12.697-8.794-23.644-16.131-32.69C147.036 9.989 124.995.286 97.046.1h-.113C69.04.286 47.245 10.027 32.16 29.051 18.733 45.988 11.804 69.579 11.565 95.932L11.563 96l.002.068c.239 26.353 7.168 49.944 20.595 66.881 15.085 19.024 36.88 28.765 64.773 28.951h.113c24.795-.172 42.265-6.663 56.673-21.05 18.848-18.822 18.277-42.4 12.067-56.912-4.454-10.408-12.934-18.856-24.303-24.437l.054-.513zm-42.867 44.002c-10.443.588-21.293-4.098-21.828-14.135-.397-7.442 5.296-15.746 22.472-16.735 1.966-.114 3.897-.168 5.791-.168 6.242 0 12.083.6 17.452 1.766-2.003 25.145-13.813 28.708-23.887 29.272z" />
+                </svg>
+              </a>
+            </div>
           </div>
         </div>
         <p className="mx-auto mt-8 max-w-5xl border-t border-[#292524] pt-6 text-center text-xs text-[#78716C]">
