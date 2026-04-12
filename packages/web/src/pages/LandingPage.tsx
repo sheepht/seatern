@@ -143,62 +143,6 @@ const avoidScores: Record<string, number> = {
 };
 const avoidTableAvg = 46;
 
-function SourceGuestChipSVG({
-  score,
-  color,
-  progress,
-}: {
-  score: number;
-  color: string;
-  progress: number;
-}) {
-  const r = 28;
-  const circum = 2 * Math.PI * r;
-  return (
-    <svg width={90} height={110} style={{ overflow: 'visible' }} aria-hidden>
-      <g transform="translate(45, 38)">
-        <circle r={r} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
-        <circle
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={3}
-          strokeLinecap="round"
-          strokeDasharray={`${circum * progress} ${circum * (1 - progress)}`}
-          strokeDashoffset={circum * 0.25}
-          transform="rotate(-90)"
-          style={{
-            transition: 'stroke-dasharray 900ms ease-out, stroke 900ms ease-out',
-          }}
-        />
-        <circle r={23} fill="#DBEAFE" stroke="white" strokeWidth={1.5} />
-        <text
-          y={5}
-          textAnchor="middle"
-          fontSize={14}
-          fontWeight={700}
-          fill="#1E40AF"
-          fontFamily='"Noto Sans TC"'
-        >
-          志偉
-        </text>
-      </g>
-      <text
-        x={45}
-        y={92}
-        textAnchor="middle"
-        fontSize={12}
-        fontWeight={600}
-        fill={color}
-        fontFamily='"Noto Sans TC"'
-        style={{ transition: 'fill 900ms ease-out' }}
-      >
-        {score} 分
-      </text>
-    </svg>
-  );
-}
-
 function IllustrationRecommendation() {
   // 志偉的滿意度 cycle animation: 45 → 78 → 45 (every 2.2s)
   const [isAfter, setIsAfter] = useState(false);
