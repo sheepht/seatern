@@ -125,18 +125,37 @@ function FilledSeat({
   );
 }
 
-function EmptySeat({ x, y, guestR, ringR }: { x: number; y: number; guestR: number; ringR: number }) {
+function EmptySeat({
+  x,
+  y,
+  guestR,
+  ringR,
+  isPreview,
+}: {
+  x: number;
+  y: number;
+  guestR: number;
+  ringR: number;
+  isPreview: boolean;
+}) {
   return (
     <g transform={`translate(${x}, ${y})`}>
       <circle
         r={ringR}
         fill="none"
-        stroke="#D6D3D1"
-        strokeWidth={1.5}
+        stroke={isPreview ? '#B08D57' : '#D6D3D1'}
+        strokeWidth={isPreview ? 2.5 : 1.5}
         strokeDasharray="4 4"
-        opacity={0.55}
+        opacity={isPreview ? 0.9 : 0.55}
       />
-      <circle r={guestR * 0.85} fill="#FAFAF9" opacity={0.6} />
+      <circle
+        r={guestR * 0.85}
+        fill={isPreview ? '#F5F0E6' : '#FAFAF9'}
+        stroke={isPreview ? '#B08D57' : 'none'}
+        strokeWidth={isPreview ? 1.5 : 0}
+        strokeDasharray={isPreview ? '3 2' : undefined}
+        opacity={isPreview ? 0.85 : 0.6}
+      />
     </g>
   );
 }
@@ -148,6 +167,7 @@ interface MiniTableVisualProps {
   guestScores: Record<string, number>;
   tableScore: number;
   highlighted?: boolean;
+  previewSlotIndex?: number;
 }
 
 export function MiniTableVisual({
@@ -156,6 +176,7 @@ export function MiniTableVisual({
   guestScores,
   tableScore,
   highlighted = false,
+  previewSlotIndex = -1,
 }: MiniTableVisualProps) {
   const geo = computeGeometry(table.capacity);
   const animatedTableScore = useAnimatedNumber(tableScore, 500);
@@ -164,7 +185,7 @@ export function MiniTableVisual({
   const tableFill = highlighted ? '#F5F0E6' : '#FFFFFF';
   const tableStrokeWidth = highlighted ? 3 : 2;
 
-  const nameSize = geo.GUEST_R <= 16 ? 9 : 11;
+  const nameSize = geo.GUEST_R >= 18 ? 12 : geo.GUEST_R >= 15 ? 11 : 9;
   const scoreSize = geo.TABLE_RADIUS >= 100 ? 40 : 34;
   const labelSize = geo.TABLE_RADIUS >= 100 ? 12 : 11;
 
@@ -239,6 +260,7 @@ export function MiniTableVisual({
                 y={y}
                 guestR={geo.GUEST_R}
                 ringR={geo.RING_R}
+                isPreview={i === previewSlotIndex}
               />
             );
           })}

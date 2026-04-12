@@ -95,85 +95,104 @@ function IllustrationImport() {
   );
 }
 
-function IllustrationRecommendation() {
-  // 智慧推薦線：一位賓客 → 虛線箭頭 → 最適合的空座位 + 預測分數
+// Feature 3 target table: capacity 5, 4 高分賓客 + 1 空位被推薦
+const recommendationTable: DemoTable = {
+  id: 'rec-t3',
+  name: '第 3 桌',
+  capacity: 5,
+  guestIds: ['r1', 'r2', 'r3', 'r4'],
+};
+const recommendationGuests: DemoGuest[] = [
+  { id: 'r1', name: '大雄', group: 'groom', mutualPrefs: [] },
+  { id: 'r2', name: '家豪', group: 'groom', mutualPrefs: [] },
+  { id: 'r3', name: '文華', group: 'groom', mutualPrefs: [] },
+  { id: 'r4', name: '建國', group: 'groom', mutualPrefs: [] },
+];
+const recommendationScores: Record<string, number> = {
+  r1: 88, r2: 92, r3: 84, r4: 90,
+};
+
+function SourceGuestChip() {
+  const r = 26;
+  const circum = 2 * Math.PI * r;
+  // 志偉目前 45 分 → orange
+  const progress = 0.45;
   return (
-    <svg width={280} height={220} viewBox="0 0 280 220" aria-hidden>
-      {/* Origin: guest on the left */}
-      <g transform="translate(50, 110)">
-        <circle r={26} fill="none" stroke="#E7E5E4" strokeWidth={2} />
-        <circle r={26} fill="none" stroke="#CA8A04" strokeWidth={2.5}
-          strokeDasharray={`${2 * Math.PI * 26 * 0.45} ${2 * Math.PI * 26 * 0.55}`}
-          strokeDashoffset={2 * Math.PI * 26 * 0.25}
-          transform="rotate(-90)"
+    <div className="flex flex-col items-center">
+      <svg width={70} height={70} style={{ overflow: 'visible' }} aria-hidden>
+        <g transform="translate(35, 35)">
+          <circle r={r} fill="none" stroke="#E7E5E4" strokeWidth={2.5} />
+          <circle
+            r={r}
+            fill="none"
+            stroke="#EA580C"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeDasharray={`${circum * progress} ${circum * (1 - progress)}`}
+            strokeDashoffset={circum * 0.25}
+            transform="rotate(-90)"
+          />
+          <circle r={22} fill="#DBEAFE" stroke="white" strokeWidth={1.5} />
+          <text y={4} textAnchor="middle" fontSize={12} fontWeight={600} fill="#1E40AF" fontFamily='"Noto Sans TC"'>
+            志偉
+          </text>
+        </g>
+      </svg>
+      <p className="mt-1 text-xs text-[#78716C]" style={{ fontFamily: '"Noto Sans TC", sans-serif' }}>
+        目前 45 分
+      </p>
+    </div>
+  );
+}
+
+function RecommendationArrow() {
+  return (
+    <div className="flex flex-col items-center">
+      <div
+        className="mb-2 rounded-full border border-[#B08D57] bg-[#F5F0E6] px-3 py-1 text-xs font-bold text-[#8C6D3F] shadow-sm"
+        style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
+      >
+        +33 分
+      </div>
+      <svg width={90} height={24} aria-hidden>
+        <line
+          x1={6}
+          y1={12}
+          x2={70}
+          y2={12}
+          stroke="#B08D57"
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeDasharray="6 5"
         />
-        <circle r={22} fill="#DBEAFE" stroke="white" strokeWidth={1.5} />
-        <text y={4} textAnchor="middle" fontSize={12} fontWeight={600} fill="#1E40AF" fontFamily='"Noto Sans TC"'>
-          志偉
-        </text>
-        <text y={50} textAnchor="middle" fontSize={10} fill="#78716C" fontFamily='"Noto Sans TC"'>
-          目前 45 分
-        </text>
-      </g>
+        <polygon points="68,4 84,12 68,20" fill="#B08D57" />
+      </svg>
+      <p
+        className="mt-1 text-[10px] font-medium text-[#8C6D3F]"
+        style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
+      >
+        推薦移動
+      </p>
+    </div>
+  );
+}
 
-      {/* Dashed recommendation arrow */}
-      <path
-        d="M 80 100 Q 140 60 200 90"
-        fill="none"
-        stroke="#B08D57"
-        strokeWidth={2.5}
-        strokeDasharray="6 5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 194 84 L 202 92 L 194 95"
-        fill="none"
-        stroke="#B08D57"
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <g transform="translate(140, 62)">
-        <rect x={-26} y={-12} width={52} height={20} rx={10} fill="#F5F0E6" stroke="#B08D57" strokeWidth={1.5} />
-        <text y={2} textAnchor="middle" fontSize={11} fontWeight={600} fill="#8C6D3F" fontFamily='"Plus Jakarta Sans"'>
-          +33 分
-        </text>
-      </g>
-
-      {/* Target: round table with empty seat highlighted */}
-      <g transform="translate(210, 120)">
-        <circle r={52} fill="#FFFFFF" stroke="#D6D3D1" strokeWidth={2} />
-        <text y={0} textAnchor="middle" fontSize={18} fontWeight={800} fill="#1C1917" fontFamily='"Plus Jakarta Sans"'>
-          78
-        </text>
-        <text y={14} textAnchor="middle" fontSize={9} fill="#78716C" fontFamily='"Noto Sans TC"'>
-          第 3 桌
-        </text>
-        {/* 4 filled seats */}
-        {[0, 1, 2, 3].map((i) => {
-          const angle = ((2 * Math.PI) / 5) * i - Math.PI / 2;
-          const cx = Math.cos(angle) * 36;
-          const cy = Math.sin(angle) * 36;
-          return (
-            <g key={i}>
-              <circle cx={cx} cy={cy} r={12} fill="none" stroke="#16A34A" strokeWidth={1.5} />
-              <circle cx={cx} cy={cy} r={9} fill="#DBEAFE" stroke="white" strokeWidth={1} />
-            </g>
-          );
-        })}
-        {/* Empty target seat (highlighted) */}
-        {(() => {
-          const angle = ((2 * Math.PI) / 5) * 4 - Math.PI / 2;
-          const cx = Math.cos(angle) * 36;
-          const cy = Math.sin(angle) * 36;
-          return (
-            <g>
-              <circle cx={cx} cy={cy} r={13} fill="#F5F0E6" stroke="#B08D57" strokeWidth={2} strokeDasharray="3 2" />
-            </g>
-          );
-        })()}
-      </g>
-    </svg>
+function IllustrationRecommendation() {
+  // 智慧推薦線：左邊源頭賓客 (45 分) + 中間箭頭 +33 + 右邊 MiniTableVisual 目標桌
+  return (
+    <div className="flex items-center justify-center gap-2 sm:gap-4">
+      <SourceGuestChip />
+      <RecommendationArrow />
+      <div className="scale-[0.85] sm:scale-90">
+        <MiniTableVisual
+          table={recommendationTable}
+          guests={recommendationGuests}
+          guestScores={recommendationScores}
+          tableScore={88}
+          previewSlotIndex={4}
+        />
+      </div>
+    </div>
   );
 }
 
