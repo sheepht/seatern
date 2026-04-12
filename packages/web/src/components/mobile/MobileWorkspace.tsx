@@ -19,7 +19,6 @@ function MobileDashboard() {
   const getTotalConfirmedSeats = useSeatingStore((s) => s.getTotalConfirmedSeats);
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed');
   const assigned = confirmed.filter((g) => g.assignedTableId);
-  const unassigned = confirmed.filter((g) => !g.assignedTableId);
   const [showTip, setShowTip] = useState(false);
 
   const assignedSeats = getTotalAssignedSeats();

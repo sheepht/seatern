@@ -925,7 +925,7 @@ export default function LandingPage() {
                 avatar: 'https://sheepht.com/jf.png',
                 bio: [
                   '喜歡唱歌打電動身心靈神祕學跟旅行',
-                  '每週三晚上八點在 Twitch 上出沒玩耍',
+                  '不定期在YT直播聊聊天',
                   '人生就應該浪費在開心的事物上 噢耶',
                 ],
               },
