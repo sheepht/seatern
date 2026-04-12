@@ -187,6 +187,8 @@ interface MiniTableVisualProps {
   seatBadges?: Record<string, string>;
   /** 桌中央下方的分數變化徽章，格式 "+5" / "-3"；正值綠、負值紅 */
   deltaBadge?: string | null;
+  /** 隱藏桌名 label（例如 F3 不要顯示「第 3 桌」）*/
+  hideName?: boolean;
 }
 
 export function MiniTableVisual({
@@ -198,6 +200,7 @@ export function MiniTableVisual({
   previewSlotIndex = -1,
   seatBadges,
   deltaBadge,
+  hideName = false,
 }: MiniTableVisualProps) {
   const geo = computeGeometry(table.capacity);
   const animatedTableScore = useAnimatedNumber(tableScore, 500);
@@ -284,17 +287,19 @@ export function MiniTableVisual({
         </text>
 
         {/* 桌名放在桌身上方、SVG 容器內（避開底部座位）*/}
-        <text
-          x={geo.CENTER}
-          y={geo.CENTER - geo.TABLE_RADIUS - 12}
-          textAnchor="middle"
-          fontSize={labelSize}
-          fontWeight={600}
-          fill="#78716C"
-          style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
-        >
-          {table.name}
-        </text>
+        {!hideName && (
+          <text
+            x={geo.CENTER}
+            y={geo.CENTER - geo.TABLE_RADIUS - 12}
+            textAnchor="middle"
+            fontSize={labelSize}
+            fontWeight={600}
+            fill="#78716C"
+            style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
+          >
+            {table.name}
+          </text>
+        )}
 
         {deltaBadge && (
           <g

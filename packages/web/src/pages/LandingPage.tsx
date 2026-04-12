@@ -219,6 +219,7 @@ function IllustrationRecommendation() {
       tableScore={88}
       previewSlotIndex={9}
       deltaBadge="+33"
+      hideName
     />
   );
 
@@ -282,12 +283,12 @@ function IllustrationRecommendation() {
             {score} 分
           </text>
 
-          {/* 直線箭頭：從 chip 中心正下方出發（x=70, y=40+ringR=68），往下到 SVG 底部外 */}
+          {/* 直線箭頭：從 chip 中心正下方出發（x=70, y=40+ringR=68），往下穿出 SVG 底部 */}
           <line
             x1={70}
             y1={68}
             x2={70}
-            y2={175}
+            y2={195}
             stroke="#B08D57"
             strokeWidth={3}
             strokeLinecap="round"
@@ -305,7 +306,7 @@ function IllustrationRecommendation() {
             智慧推薦
           </text>
         </svg>
-        <div className="-mt-3 scale-[0.72]">{targetTable}</div>
+        <div className="-mt-14 scale-[0.72]">{targetTable}</div>
       </div>
 
       {/* 桌機版：賓客在左、曲線向右箭頭、桌子在右 */}
@@ -366,7 +367,7 @@ function IllustrationRecommendation() {
           </text>
 
           <path
-            d="M 80 78 Q 170 -5 268 32"
+            d="M 80 78 Q 180 -15 300 42"
             fill="none"
             stroke="#B08D57"
             strokeWidth={3}
@@ -386,7 +387,7 @@ function IllustrationRecommendation() {
             智慧推薦
           </text>
         </svg>
-        <div className="-ml-10 scale-[0.8]">{targetTable}</div>
+        <div className="-ml-24 scale-[0.8]">{targetTable}</div>
       </div>
     </>
   );
