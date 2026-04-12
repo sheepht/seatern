@@ -111,9 +111,9 @@ export function LoadingTable({ label, showTips = false }: { label: string; showT
         {label}
       </p>
       {showTips && (
-        <div className="mt-3 max-w-xs text-center min-h-[3rem] flex items-center justify-center">
+        <div className="mt-3 max-w-md text-center min-h-[3.5rem] flex items-center justify-center">
           <p
-            className="text-xs text-[var(--text-secondary)] font-[family-name:var(--font-body)] leading-relaxed"
+            className="text-lg text-[var(--text-secondary)] font-[family-name:var(--font-body)] leading-relaxed"
             style={{
               opacity: visible ? 1 : 0,
               transition: 'opacity 400ms ease-in-out',
