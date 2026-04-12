@@ -18,8 +18,9 @@ function MobileDashboard() {
   const confirmed = guests.filter((g) => g.rsvpStatus === 'confirmed');
   const assigned = confirmed.filter((g) => g.assignedTableId);
   const unassigned = confirmed.filter((g) => !g.assignedTableId);
-  const unassignedSeats = unassigned.reduce((s, g) => s + g.seatCount, 0);
   const [showTip, setShowTip] = useState(false);
+
+  const totalGuests = confirmed.length;
 
   const green = assigned.filter((g) => g.satisfactionScore >= 75).length;
   const yellow = assigned.filter((g) => g.satisfactionScore >= 50 && g.satisfactionScore < 75).length;
@@ -30,13 +31,13 @@ function MobileDashboard() {
 
   return (
     <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-surface)] shrink-0">
-      {/* Top row: unassigned (left) + satisfaction legend (right) */}
-      <div className="flex items-center justify-between mb-1.5">
+      {/* Top row: unassigned / total */}
+      <div className="flex items-center mb-1.5">
         <div className="relative">
           <button
             type="button"
             onClick={() => setShowTip((v) => !v)}
-            className="flex items-center gap-1.5 text-left"
+            className="flex items-center gap-1 text-left"
           >
             <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)]">未安排</span>
             <span
@@ -46,36 +47,23 @@ function MobileDashboard() {
               {unassigned.length}
             </span>
             <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)]">人</span>
-            {unassignedSeats !== unassigned.length && (
-              <>
-                <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)]">/</span>
-                <span className="text-base font-[family-name:var(--font-data)] font-medium tabular-nums text-[var(--text-muted)]">
-                  {unassignedSeats}
-                </span>
-                <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)]">席</span>
-              </>
-            )}
+            <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)] mx-0.5">/</span>
+            <span className="text-lg font-[family-name:var(--font-data)] font-bold tabular-nums text-[var(--text-secondary)]">
+              {totalGuests}
+            </span>
+            <span className="text-sm text-[var(--text-muted)] font-[family-name:var(--font-body)]">人</span>
             <span className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold text-[var(--text-muted)] border border-[var(--border-strong)]">?</span>
           </button>
           {showTip && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowTip(false)} />
               <div className="absolute left-0 top-full mt-2 z-50 rounded-[var(--radius-sm)] bg-[var(--bg-elevated,#1f2937)] text-white text-xs px-3 py-2 shadow-lg leading-relaxed whitespace-nowrap">
-                「人」＝賓客數（不含眷屬）<br />
-                「席」＝賓客本人 + 眷屬（含嬰兒）的總座位數<br />
-                <span className="opacity-80">例：王小明帶 1 位伴侶 + 1 位嬰兒 → 算 1 人、3 席</span>
+                這裡的「人」＝賓客數<br />
+                每位賓客可能會攜帶眷屬，實際入座人數可能更多
               </div>
             </>
           )}
         </div>
-        {assigned.length > 0 && (
-          <span className="flex items-center gap-2 text-sm font-[family-name:var(--font-body)] text-[var(--text-muted)]">
-            {green > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--satisfaction-green)' }} />好{green}人</span>}
-            {yellow > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--satisfaction-yellow)' }} />可{yellow}人</span>}
-            {orange > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--satisfaction-orange)' }} />普{orange}人</span>}
-            {red > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--satisfaction-red)' }} />差{red}人</span>}
-          </span>
-        )}
       </div>
       {/* Bar chart */}
       {assigned.length > 0 && (
@@ -84,6 +72,15 @@ function MobileDashboard() {
           {yellow > 0 && <div style={{ flex: yellow / total, background: 'var(--satisfaction-yellow)' }} />}
           {orange > 0 && <div style={{ flex: orange / total, background: 'var(--satisfaction-orange)' }} />}
           {red > 0 && <div style={{ flex: red / total, background: 'var(--satisfaction-red)' }} />}
+        </div>
+      )}
+      {/* Satisfaction legend (below bar) */}
+      {assigned.length > 0 && (
+        <div className="flex items-center justify-end gap-2 mt-1 text-xs font-[family-name:var(--font-body)] text-[var(--text-muted)]">
+          {green > 0 && <span className="flex items-center gap-0.5"><span className="w-2 h-2 rounded-full" style={{ background: 'var(--satisfaction-green)' }} />好{green}人</span>}
+          {yellow > 0 && <span className="flex items-center gap-0.5"><span className="w-2 h-2 rounded-full" style={{ background: 'var(--satisfaction-yellow)' }} />可{yellow}人</span>}
+          {orange > 0 && <span className="flex items-center gap-0.5"><span className="w-2 h-2 rounded-full" style={{ background: 'var(--satisfaction-orange)' }} />普{orange}人</span>}
+          {red > 0 && <span className="flex items-center gap-0.5"><span className="w-2 h-2 rounded-full" style={{ background: 'var(--satisfaction-red)' }} />差{red}人</span>}
         </div>
       )}
     </div>
