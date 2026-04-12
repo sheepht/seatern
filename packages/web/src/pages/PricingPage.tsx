@@ -178,14 +178,14 @@ export default function PricingPage() {
 
             <div className="flex items-center justify-between">
               <span className="text-stone-500">銀行</span>
-              <span className="text-stone-900">國泰世華 (013)</span>
+              <span className="text-stone-900">中國信託商業銀行 (822)</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-stone-500">帳號</span>
               <div className="flex items-center gap-2">
-                <span className="text-stone-900 font-[family-name:var(--font-data)]">0000-0000-0000-0000</span>
+                <span className="text-stone-900 font-[family-name:var(--font-data)]">462-511-215-799</span>
                 <button
-                  onClick={() => navigator.clipboard.writeText('0000000000000000')}
+                  onClick={() => navigator.clipboard.writeText('462511215799')}
                   className="text-[11px] text-[var(--accent)] hover:underline"
                 >
                   複製
