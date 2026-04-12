@@ -284,12 +284,12 @@ function IllustrationRecommendation() {
             {score} 分
           </text>
 
-          {/* 直線箭頭：從 chip 中心正下方出發，終點留在 svg viewport 內讓 marker 正常渲染 */}
+          {/* 直線箭頭：從 chip 中心正下方出發，盡量延伸到 svg 底部讓箭頭貼到桌子 */}
           <line
             x1={70}
             y1={68}
             x2={70}
-            y2={180}
+            y2={194}
             stroke="#B08D57"
             strokeWidth={3}
             strokeDasharray="7 5"
@@ -306,7 +306,7 @@ function IllustrationRecommendation() {
             智慧推薦
           </text>
         </svg>
-        <div className="-mt-10 scale-[0.72]">{targetTable}</div>
+        <div className="-mt-16 scale-[0.72]">{targetTable}</div>
       </div>
 
       {/* 桌機版：賓客在左、曲線向右箭頭、桌子在右 */}
