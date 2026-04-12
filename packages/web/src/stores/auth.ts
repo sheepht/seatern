@@ -52,9 +52,20 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   claimEvent: async () => {
     try {
-      const res = await api.post('/auth/claim-event');
+      // 把 localStorage 快取的 eventId 傳給後端，作為 cookie 遺失時的 fallback
+      let cachedEventId: string | undefined;
+      try {
+        const raw = localStorage.getItem('seatern-event-cache');
+        if (raw) cachedEventId = JSON.parse(raw)?.eventId;
+      } catch { /* ignore */ }
+
+      const res = await api.post('/auth/claim-event', {
+        ...(cachedEventId ? { eventId: cachedEventId } : {}),
+      });
       // Force seating store to reload the user's event
       const { useSeatingStore } = await import('./seating');
+      const { clearEventCache } = await import('./seating');
+      clearEventCache();
       useSeatingStore.setState({ eventId: null });
       return res.data;
     } catch {

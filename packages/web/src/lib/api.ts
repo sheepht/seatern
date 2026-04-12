@@ -28,3 +28,24 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+// "Event not found" 自動清快取並重載：localStorage 快取的 eventId 可能已過時
+let _eventRecoveryInProgress = false;
+api.interceptors.response.use(undefined, async (error) => {
+  if (
+    error.response?.status === 404 &&
+    error.response?.data?.error === 'Event not found' &&
+    !_eventRecoveryInProgress
+  ) {
+    _eventRecoveryInProgress = true;
+    try {
+      const { clearEventCache } = await import('@/stores/seating');
+      clearEventCache();
+      const { useSeatingStore } = await import('@/stores/seating');
+      await useSeatingStore.getState().reloadEvent();
+    } finally {
+      _eventRecoveryInProgress = false;
+    }
+  }
+  return Promise.reject(error);
+});
+

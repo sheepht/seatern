@@ -316,6 +316,13 @@ auth.post('/claim-event', async (c) => {
   // Read session UUID from httpOnly cookie
   const sessionId = getCookie(c, SESSION_COOKIE);
 
+  // 前端可傳 eventId 作為 cookie 遺失時的 fallback（OAuth 重導向可能丟失 cookie）
+  let bodyEventId: string | undefined;
+  try {
+    const body = await c.req.json<{ eventId?: string }>();
+    bodyEventId = body.eventId;
+  } catch { /* no body or invalid JSON */ }
+
   // Check if user already owns an event
   const existingEvent = await prisma.event.findFirst({
     where: { ownerId: userId, ownerType: 'user' },
@@ -334,29 +341,33 @@ auth.post('/claim-event', async (c) => {
     });
   }
 
-  if (!sessionId) {
-    // No session cookie, nothing to migrate
+  // Find anonymous event: try cookie first, then fallback to eventId from body
+  let anonymousEvent = null;
+  if (sessionId) {
+    anonymousEvent = await prisma.event.findFirst({
+      where: { ownerId: sessionId, ownerType: 'anonymous' },
+    });
+  }
+  if (!anonymousEvent && bodyEventId) {
+    anonymousEvent = await prisma.event.findFirst({
+      where: { id: bodyEventId, ownerType: 'anonymous' },
+    });
+  }
+
+  if (!anonymousEvent) {
+    if (sessionId) deleteCookie(c, SESSION_COOKIE, { path: '/' });
     return c.json({ migrated: false, event: null });
   }
 
-  // Find and migrate the anonymous event
+  // Migrate the anonymous event
   try {
-    const anonymousEvent = await prisma.event.findFirst({
-      where: { ownerId: sessionId, ownerType: 'anonymous' },
-    });
-
-    if (!anonymousEvent) {
-      deleteCookie(c, SESSION_COOKIE, { path: '/' });
-      return c.json({ migrated: false, event: null });
-    }
-
     const migratedEvent = await prisma.event.update({
       where: { id: anonymousEvent.id },
       data: { ownerId: userId, ownerType: 'user' },
     });
 
     // Clear the anonymous session cookie
-    deleteCookie(c, SESSION_COOKIE, { path: '/' });
+    if (sessionId) deleteCookie(c, SESSION_COOKIE, { path: '/' });
 
     return c.json({ migrated: true, event: migratedEvent });
   } catch (err) {
