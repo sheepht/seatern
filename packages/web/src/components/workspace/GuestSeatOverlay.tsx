@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useDraggable } from '@dnd-kit/core';
 import { useSeatingStore, type Guest } from '@/stores/seating';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface Props {
   guest: Guest
@@ -18,6 +19,7 @@ interface Props {
  * 眷屬位用 seatIndex 區分，但 data 始終指向主人（拖眷屬 = 拖整組）。
  */
 export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }: Props) {
+  const isMobile = useIsMobile();
   // 眷屬偏移量：拖 B1 → offset=1，目標座位會回推主人位置
   const companionOffset = isCompanion && guest.seatIndex !== null
     ? (seatIndex - guest.seatIndex + 100) % 100  // 簡單差值，環形桌上不會超過 100
@@ -231,8 +233,18 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
           setHoveredGuest(null);
           setShowTooltip(false);
           moveGuest(guest.id, null);
+        } else if (isMobile) {
+          // 手機版：點擊切換 hover 狀態（顯示推薦線），不開編輯
+          const currentHovered = useSeatingStore.getState().hoveredGuestId;
+          if (currentHovered === guest.id) {
+            setHoveredGuest(null);
+            setShowTooltip(false);
+          } else {
+            setHoveredGuest(guest.id);
+            setShowTooltip(true);
+          }
         } else {
-          // 第一次點擊 → 延遲判斷，等看有沒有雙擊
+          // 桌機版：第一次點擊 → 延遲判斷，等看有沒有雙擊
           clickTimerRef.current = setTimeout(() => {
             clickTimerRef.current = null;
             setEditingGuest(guest.id);
@@ -240,7 +252,7 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
         }
       }}
       onMouseEnter={(e) => {
-        if (isDragging) return;
+        if (isMobile || isDragging) return;
         const el = e.currentTarget;
         const remaining = hoverSuppressedUntil - Date.now();
         if (remaining > 0) {
@@ -252,10 +264,10 @@ export function GuestSeatOverlay({ guest, seatIndex, isCompanion, x, y, radius }
           el.style.borderColor = '#B08D57';
           setHoveredGuest(guest.id);
         }
-        // 立刻顯示 tooltip
         setShowTooltip(true);
       }}
       onMouseLeave={(e) => {
+        if (isMobile) return;
         if (delayRef.current) { clearTimeout(delayRef.current); delayRef.current = null; }
         if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
         setLongPressProgress(false);
