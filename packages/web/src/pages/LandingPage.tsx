@@ -968,7 +968,9 @@ export default function LandingPage() {
               認識團隊
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base text-[#78716C] sm:text-lg">
-              羊姥苑工作室是由一群快樂的小動物們組成，擅長詠唱程式來解決生活上的各種小事。
+              羊姥苑工作室是由一群快樂的小動物們組成，
+              <br className="hidden sm:inline" />
+              擅長詠唱程式來解決生活上的各種小事。
             </p>
           </div>
 
