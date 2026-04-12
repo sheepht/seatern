@@ -949,6 +949,76 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* 關於開發者 */}
+      <section
+        className="w-full px-6 py-20"
+        style={{ backgroundColor: '#F5F0E6' }}
+        aria-labelledby="about-team-title"
+      >
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-wider text-[#B08D57]" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
+              關於開發者
+            </p>
+            <h2
+              id="about-team-title"
+              className="mt-3 text-3xl font-bold text-[#1C1917] sm:text-4xl"
+              style={{ fontFamily: '"Noto Sans TC", sans-serif' }}
+            >
+              認識團隊
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-base text-[#78716C] sm:text-lg">
+              羊姥苑工作室是由一群快樂的小動物們組成，擅長詠唱程式來解決生活上的各種小事。
+            </p>
+          </div>
+
+          <div className="mt-14 grid gap-10 sm:grid-cols-2 sm:gap-14">
+            {[
+              {
+                name: 'JF oooooo',
+                avatar: 'https://sheepht.com/jf.png',
+                bio: [
+                  '喜歡唱歌打電動、身心靈保養與旅行',
+                  '每週三晚上八點在 Twitch 上放送娛樂',
+                  '人生就應該要做自己想做的事情，嘻嘻',
+                ],
+              },
+              {
+                name: 'Sexyoung',
+                avatar: 'https://sheepht.com/sexyoung.jpeg',
+                bio: [
+                  '音樂中毒玩家，不管什麼樂器都敢挑戰',
+                  '喜歡在晚上看 YT 補冷知識',
+                  '喝茶一定要喝蜂蜜紅茶才開心，吱吱',
+                ],
+              },
+            ].map((member) => (
+              <div key={member.name} className="flex flex-col items-center text-center">
+                <div className="relative">
+                  <img
+                    src={member.avatar}
+                    alt={`${member.name} 頭像`}
+                    className="h-32 w-32 rounded-full border-4 border-white object-cover shadow-lg sm:h-36 sm:w-36"
+                    loading="lazy"
+                  />
+                </div>
+                <h3
+                  className="mt-5 text-xl font-bold text-[#1C1917] sm:text-2xl"
+                  style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
+                >
+                  {member.name}
+                </h3>
+                <div className="mt-3 space-y-1 text-sm text-[#78716C] sm:text-base">
+                  {member.bio.map((line, i) => (
+                    <p key={i}>{line}</p>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <footer className="w-full bg-[#1C1917] px-6 py-12 text-[#A8A29E]">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-6 text-center sm:flex-row sm:justify-between sm:text-left">
           <div>
